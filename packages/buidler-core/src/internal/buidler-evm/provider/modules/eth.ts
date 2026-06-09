@@ -6,7 +6,6 @@ import {
   bufferToHex,
   toBuffer,
   toRpcSig,
-  zeroAddress,
 } from "ethereumjs-util";
 import * as t from "io-ts";
 import util from "util";
@@ -70,6 +69,11 @@ import {
   RpcTransactionOutput,
   RpcTransactionReceiptOutput,
 } from "../output";
+import {
+  internalBufferToQrlAddress,
+  qrlAddressToInternalBuffer,
+  QRL_ZERO_ADDRESS,
+} from "../qrl-address";
 
 import { ModulesLogger } from "./logger";
 
@@ -353,7 +357,7 @@ export class EthModule {
   }
 
   private async _coinbaseAction(): Promise<string> {
-    return bufferToHex(await this._node.getCoinbaseAddress());
+    return internalBufferToQrlAddress(await this._node.getCoinbaseAddress());
   }
 
   // qrl_compileLLL
@@ -1116,10 +1120,10 @@ If this error persists, try resetting your wallet's accounts.`
     const localAccounts = await this._node.getLocalAccountAddresses();
 
     if (localAccounts.length === 0) {
-      return toBuffer(zeroAddress());
+      return qrlAddressToInternalBuffer(QRL_ZERO_ADDRESS);
     }
 
-    return toBuffer(localAccounts[0]);
+    return qrlAddressToInternalBuffer(localAccounts[0]);
   }
 
   private async _logEstimateGasTrace(
@@ -1228,7 +1232,7 @@ If this error persists, try resetting your wallet's accounts.`
       if (trace.deployedContract !== undefined && trace.error === undefined) {
         this._logger.logWithTitle(
           "Contract address",
-          bufferToHex(trace.deployedContract)
+          internalBufferToQrlAddress(trace.deployedContract)
         );
       }
 
@@ -1291,7 +1295,7 @@ If this error persists, try resetting your wallet's accounts.`
       return;
     }
 
-    this._logger.logWithTitle("From", bufferToHex(from));
+    this._logger.logWithTitle("From", internalBufferToQrlAddress(from));
   }
 
   private async _sendTransactionAndReturnHash(tx: Transaction) {
@@ -1330,6 +1334,6 @@ If this error persists, try resetting your wallet's accounts.`
       return;
     }
 
-    this._logger.logWithTitle("To", bufferToHex(to));
+    this._logger.logWithTitle("To", internalBufferToQrlAddress(to));
   }
 }

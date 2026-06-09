@@ -15,6 +15,9 @@ import { setCWD } from "../helpers/cwd";
 describe("validateParams", function () {
   setCWD();
 
+  const qrlAddress =
+    "Q00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+
   describe("0-arguments", function () {
     it("Should return an empty array if no argument is given", function () {
       assert.deepEqual(validateParams([]), []);
@@ -53,10 +56,7 @@ describe("validateParams", function () {
 
     it("Should return the right values", function () {
       assert.deepEqual(
-        validateParams(
-          ["0x0000000000000000000000000000000000000001"],
-          rpcAddress
-        ),
+        validateParams([qrlAddress], rpcAddress),
         [toBuffer("0x0000000000000000000000000000000000000001")]
       );
 
@@ -75,6 +75,17 @@ describe("validateParams", function () {
           ),
           true,
         ]
+      );
+    });
+
+    it("Should reject 20-byte Ethereum addresses", function () {
+      assert.throws(
+        () =>
+          validateParams(
+            ["0x0000000000000000000000000000000000000001"],
+            rpcAddress
+          ),
+        InvalidArgumentsError
       );
     });
   });
@@ -122,7 +133,9 @@ describe("validateParams", function () {
 
       assert.deepEqual(
         validateParams(
-          ["0x1111111111111111111111111111111111111111"],
+          [
+            "Q00000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111111111111111111111111111111111111",
+          ],
           rpcAddress,
           optionalBlockTag
         ),

@@ -1,8 +1,9 @@
-import { BN, isValidAddress, toBuffer } from "ethereumjs-util";
+import { BN, toBuffer } from "ethereumjs-util";
 import * as t from "io-ts";
 import { PathReporter } from "io-ts/lib/PathReporter";
 
 import { InvalidArgumentsError } from "./errors";
+import { isQrlAddress, qrlAddressToInternalBuffer } from "./qrl-address";
 
 function optional<TypeT, OutputT>(
   codec: t.Type<TypeT, OutputT, unknown>,
@@ -54,8 +55,8 @@ export const rpcAddress = new t.Type<Buffer>(
   "ADDRESS",
   Buffer.isBuffer,
   (u, c) =>
-    typeof u === "string" && isValidAddress(u)
-      ? t.success(toBuffer(u))
+    isQrlAddress(u)
+      ? t.success(qrlAddressToInternalBuffer(u))
       : t.failure(u, c),
   t.identity
 );

@@ -53,6 +53,7 @@ import {
 } from "./errors";
 import { bloomFilter, Filter, filterLogs, LATEST_BLOCK, Type } from "./filter";
 import { getRpcBlock, getRpcLog, RpcLogOutput } from "./output";
+import { internalBufferToQrlAddress } from "./qrl-address";
 import { getCurrentTimestamp } from "./utils";
 
 const log = debug("buidler:core:buidler-evm:node");
@@ -999,7 +1000,10 @@ export class BuidlerNode extends EventEmitter {
 
   private _initLocalAccounts(localAccounts: Buffer[]) {
     for (const pk of localAccounts) {
-      this._accountPrivateKeys.set(bufferToHex(privateToAddress(pk)), pk);
+      this._accountPrivateKeys.set(
+        internalBufferToQrlAddress(privateToAddress(pk)),
+        pk
+      );
     }
   }
 
@@ -1163,7 +1167,7 @@ export class BuidlerNode extends EventEmitter {
   }
 
   private async _getLocalAccountPrivateKey(sender: Buffer): Promise<Buffer> {
-    const senderAddress = bufferToHex(sender);
+    const senderAddress = internalBufferToQrlAddress(sender);
     if (!this._accountPrivateKeys.has(senderAddress)) {
       throw new InvalidInputError(`unknown account ${senderAddress}`);
     }

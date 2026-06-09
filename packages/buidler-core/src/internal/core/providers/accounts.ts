@@ -1,10 +1,15 @@
 import { Transaction as TransactionT } from "ethereumjs-tx";
+import { bufferToHex } from "ethereumjs-util";
 
 import { IEthereumProvider } from "../../../types";
 import { deriveKeyFromMnemonicAndPath } from "../../util/keys-derivation";
 import { BuidlerError } from "../errors";
 import { ERRORS } from "../errors-list";
 
+import {
+  internalBufferToQrlAddress,
+  qrlAddressToInternalBuffer,
+} from "../../buidler-evm/provider/qrl-address";
 import { createChainIdGetter } from "./provider-utils";
 import { wrapSend } from "./wrapper";
 
@@ -29,19 +34,20 @@ export function createLocalAccountsProvider(
   hexPrivateKeys: string[]
 ) {
   const {
-    bufferToHex,
     toBuffer,
     privateToAddress,
   } = require("ethereumjs-util");
 
   const privateKeys = hexPrivateKeys.map((h) => toBuffer(h));
-  const addresses = privateKeys.map((pk) => bufferToHex(privateToAddress(pk)));
+  const addresses = privateKeys.map((pk) =>
+    internalBufferToQrlAddress(privateToAddress(pk))
+  );
 
   const getChainId = createChainIdGetter(provider);
 
   function getPrivateKey(address: string): Buffer | undefined {
-    for (let i = 0; i < address.length; i++) {
-      if (addresses[i] === address.toLowerCase()) {
+    for (let i = 0; i < addresses.length; i++) {
+      if (addresses[i].toLowerCase() === address.toLowerCase()) {
         return privateKeys[i];
       }
     }
@@ -238,9 +244,20 @@ async function getSignedTransaction(
 
   const { Transaction } = await import("ethereumjs-tx");
   let transaction: TransactionT;
+  const normalizedTx: JsonRpcTransactionData = {
+    ...tx,
+    from:
+      tx.from !== undefined
+        ? bufferToHex(qrlAddressToInternalBuffer(tx.from))
+        : undefined,
+    to:
+      tx.to !== undefined
+        ? bufferToHex(qrlAddressToInternalBuffer(tx.to))
+        : undefined,
+  };
 
   if (chains.chains.names[chainId] !== undefined) {
-    transaction = new Transaction(tx, { chain: chainId });
+    transaction = new Transaction(normalizedTx, { chain: chainId });
   } else {
     const { default: Common } = await import("ethereumjs-common");
 
@@ -253,7 +270,7 @@ async function getSignedTransaction(
       "istanbul"
     );
 
-    transaction = new Transaction(tx, { common });
+    transaction = new Transaction(normalizedTx, { common });
   }
 
   transaction.sign(privateKey);

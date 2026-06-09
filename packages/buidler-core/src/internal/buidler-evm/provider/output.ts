@@ -2,6 +2,7 @@ import { Transaction } from "ethereumjs-tx";
 import { BN, bufferToHex } from "ethereumjs-util";
 
 import { Block, TxBlockResult } from "./node";
+import { internalBufferToQrlAddress } from "./qrl-address";
 
 export interface RpcBlockOutput {
   difficulty: string;
@@ -109,7 +110,7 @@ export function getRpcBlock(
     transactionsRoot: bufferToRpcData(block.header.transactionsTrie),
     stateRoot: bufferToRpcData(block.header.stateRoot),
     receiptsRoot: bufferToRpcData(block.header.receiptTrie),
-    miner: bufferToRpcData(block.header.coinbase),
+    miner: internalBufferToQrlAddress(block.header.coinbase),
     difficulty: numberToRpcQuantity(new BN(block.header.difficulty)),
     totalDifficulty: numberToRpcQuantity(totalDifficulty),
     extraData: bufferToRpcData(block.header.extraData),
@@ -153,13 +154,13 @@ export function getRpcTransaction(
       block !== undefined
         ? numberToRpcQuantity(new BN(block.header.number))
         : null,
-    from: bufferToRpcData(tx.getSenderAddress()),
+    from: internalBufferToQrlAddress(tx.getSenderAddress()),
     gas: numberToRpcQuantity(new BN(tx.gasLimit)),
     gasPrice: numberToRpcQuantity(new BN(tx.gasPrice)),
     hash: bufferToRpcData(tx.hash(true)),
     input: bufferToRpcData(tx.data),
     nonce: numberToRpcQuantity(new BN(tx.nonce)),
-    to: tx.to.length === 0 ? null : bufferToRpcData(tx.to),
+    to: tx.to.length === 0 ? null : internalBufferToQrlAddress(tx.to),
     transactionIndex: index !== undefined ? numberToRpcQuantity(index) : null,
     value: numberToRpcQuantity(new BN(tx.value)),
     v: numberToRpcQuantity(new BN(tx.v)),
@@ -187,12 +188,14 @@ export function getRpcTransactionReceipt(
     transactionIndex: numberToRpcQuantity(index),
     blockHash: bufferToRpcData(block.hash()),
     blockNumber: numberToRpcQuantity(new BN(block.header.number)),
-    from: bufferToRpcData(tx.getSenderAddress()),
-    to: tx.to.length === 0 ? null : bufferToRpcData(tx.to),
+    from: internalBufferToQrlAddress(tx.getSenderAddress()),
+    to: tx.to.length === 0 ? null : internalBufferToQrlAddress(tx.to),
     cumulativeGasUsed: numberToRpcQuantity(cumulativeGasUsed),
     gasUsed: numberToRpcQuantity(new BN(receipt.gasUsed)),
     contractAddress:
-      createdAddress !== undefined ? bufferToRpcData(createdAddress) : null,
+      createdAddress !== undefined
+        ? internalBufferToQrlAddress(createdAddress)
+        : null,
     logs: receipt.logs,
     logsBloom: bufferToRpcData(txBlockResults[index].bloomBitvector),
     status: numberToRpcQuantity(receipt.status),
@@ -219,7 +222,7 @@ export function getRpcLog(
       block !== undefined
         ? numberToRpcQuantity(new BN(block.header.number))
         : null,
-    address: bufferToRpcData(log[0]),
+    address: internalBufferToQrlAddress(log[0]),
     data: bufferToRpcData(log[2]),
     topics: log[1].map((topic: Buffer) => bufferToRpcData(topic)),
   };
