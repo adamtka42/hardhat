@@ -1,7 +1,7 @@
 {
-  "name": "root",
+  "name": "@theqrl/hardhat-monorepo",
   "version": "0.0.0",
-  "author": "Nomic Labs LLC",
+  "author": "The QRL contributors",
   "license": "SEE LICENSE IN EACH PACKAGE'S LICENSE FILE",
   "private": true,
   "devDependencies": {
