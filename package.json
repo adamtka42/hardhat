@@ -1,0 +1,38 @@
+{
+  "name": "root",
+  "version": "0.0.0",
+  "author": "Nomic Labs LLC",
+  "license": "SEE LICENSE IN EACH PACKAGE'S LICENSE FILE",
+  "private": true,
+  "devDependencies": {
+    "@types/mocha": "^5.2.6",
+    "@types/node": "^8.10.44",
+    "@types/shelljs": "^0.8.6",
+    "chai": "^4.2.0",
+    "ganache-cli": "^6.4.3",
+    "lerna": "^3.13.4",
+    "mocha": "^7.1.2",
+    "nyc": "^14.1.0",
+    "prettier": "2.0.5",
+    "rimraf": "^3.0.2",
+    "shelljs": "^0.8.3",
+    "source-map-support": "^0.5.13",
+    "ts-node": "^8.1.0",
+    "tslint": "^5.16.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-consistent-codestyle": "^1.15.1",
+    "tslint-plugin-prettier": "^2.0.1",
+    "typescript": "~3.8.3"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "build": "lerna exec -- npm run build",
+    "build-test": "lerna exec -- npm run build-test",
+    "watch": "tsc --build --watch packages/*/src",
+    "clean": "lerna exec -- npm run clean",
+    "test": "node scripts/run-tests.js",
+    "lint": "lerna exec --no-bail -- npm run lint",
+    "lint:fix": "lerna exec -- npm run lint:fix"
+  },
+  "dependencies": {}
+}
