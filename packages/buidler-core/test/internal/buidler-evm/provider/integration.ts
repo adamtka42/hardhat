@@ -13,7 +13,7 @@ describe("Provider integration tests", function () {
       const artifact = await fsExtra.readJSON("artifacts/Contract.json");
 
       try {
-        await this.env.network.provider.send("eth_sendTransaction", [
+        await this.env.network.provider.send("qrl_sendTransaction", [
           {
             data: artifact.bytecode,
           },

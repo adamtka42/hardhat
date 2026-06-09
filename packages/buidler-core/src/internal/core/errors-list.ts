@@ -166,9 +166,9 @@ Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us i
     },
     ETHSIGN_MISSING_DATA_PARAM: {
       number: 103,
-      message: 'Missing "data" param when calling eth_sign.',
-      title: "Missing `data` param when calling eth_sign.",
-      description: `You called \`eth_sign\` with incorrect parameters.
+      message: 'Missing "data" param when calling qrl_sign.',
+      title: "Missing `data` param when calling qrl_sign.",
+      description: `You called \`qrl_sign\` with incorrect parameters.
 
 Please check that you are sending a \`data\` parameter.`,
     },

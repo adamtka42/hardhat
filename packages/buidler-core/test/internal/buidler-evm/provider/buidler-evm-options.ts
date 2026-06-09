@@ -21,8 +21,8 @@ describe("Buidler EVM special options", function () {
       useEnvironment();
 
       it("Should allow contracts larger than the EIP-170 limit", async function () {
-        const [sender] = await this.env.network.provider.send("eth_accounts");
-        await this.env.network.provider.send("eth_sendTransaction", [
+        const [sender] = await this.env.network.provider.send("qrl_accounts");
+        await this.env.network.provider.send("qrl_sendTransaction", [
           {
             from: sender,
             gas: numberToRpcQuantity(8000000),
@@ -37,10 +37,10 @@ describe("Buidler EVM special options", function () {
       useEnvironment();
 
       it("Should not allow contracts larger than the EIP-170 limit", async function () {
-        const [sender] = await this.env.network.provider.send("eth_accounts");
+        const [sender] = await this.env.network.provider.send("qrl_accounts");
         await expectErrorAsync(
           () =>
-            this.env.network.provider.send("eth_sendTransaction", [
+            this.env.network.provider.send("qrl_sendTransaction", [
               {
                 from: sender,
                 gas: numberToRpcQuantity(8000000),
@@ -59,14 +59,14 @@ describe("Buidler EVM special options", function () {
 
     it("Should set the blockchain date to the initialDate", async function () {
       const firstBlock = await this.env.network.provider.send(
-        "eth_getBlockByNumber",
+        "qrl_getBlockByNumber",
         ["latest", false]
       );
 
       await this.env.network.provider.send("evm_mine", []);
 
       const secondBlock = await this.env.network.provider.send(
-        "eth_getBlockByNumber",
+        "qrl_getBlockByNumber",
         ["latest", false]
       );
 

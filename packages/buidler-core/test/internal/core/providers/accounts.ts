@@ -35,21 +35,21 @@ describe("Local accounts provider", () => {
   beforeEach(() => {
     mock = new MockedProvider();
     mock.setReturnValue("net_version", numberToRpcQuantity(123));
-    mock.setReturnValue("eth_getTransactionCount", numberToRpcQuantity(0x8));
-    mock.setReturnValue("eth_accounts", []);
+    mock.setReturnValue("qrl_getTransactionCount", numberToRpcQuantity(0x8));
+    mock.setReturnValue("qrl_accounts", []);
 
     wrapper = createLocalAccountsProvider(mock, accounts);
   });
 
-  it("Should return the account addresses in eth_accounts", async () => {
-    const response = await wrapper.send("eth_accounts");
+  it("Should return the account addresses in qrl_accounts", async () => {
+    const response = await wrapper.send("qrl_accounts");
 
     assert.equal(response[0], privateKeyToAddress(accounts[0]));
     assert.equal(response[1], privateKeyToAddress(accounts[1]));
   });
 
-  it("Should return the account addresses in eth_requestAccounts", async () => {
-    const response = await wrapper.send("eth_requestAccounts");
+  it("Should return the account addresses in qrl_requestAccounts", async () => {
+    const response = await wrapper.send("qrl_requestAccounts");
     assert.equal(response[0], privateKeyToAddress(accounts[0]));
     assert.equal(response[1], privateKeyToAddress(accounts[1]));
   });
@@ -66,7 +66,7 @@ describe("Local accounts provider", () => {
     ];
 
     await expectBuidlerErrorAsync(
-      () => wrapper.send("eth_sendTransaction", params),
+      () => wrapper.send("qrl_sendTransaction", params),
       ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
       "gas"
     );
@@ -84,14 +84,14 @@ describe("Local accounts provider", () => {
     ];
 
     await expectBuidlerErrorAsync(
-      () => wrapper.send("eth_sendTransaction", params),
+      () => wrapper.send("qrl_sendTransaction", params),
       ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
       "gasPrice"
     );
   });
 
   it("Should, given two identical tx, return send the same raw tansaction", async () => {
-    await wrapper.send("eth_sendTransaction", [
+    await wrapper.send("qrl_sendTransaction", [
       {
         from: "0xb5bc06d4548a3ac17d72b372ae1e416bf65b8ead",
         to: "0xb5bc06d4548a3ac17d72b372ae1e416bf65b8ead",
@@ -103,7 +103,7 @@ describe("Local accounts provider", () => {
       },
     ]);
 
-    const rawTransaction = mock.getLatestParams("eth_sendRawTransaction")[0];
+    const rawTransaction = mock.getLatestParams("qrl_sendRawTransaction")[0];
 
     // This transaction was submitted to a blockchain it was accepted, so the
     // signature must be valid
@@ -119,7 +119,7 @@ describe("Local accounts provider", () => {
   it("Should throw if trying to send from an account that isn't local", async () => {
     await expectBuidlerErrorAsync(
       () =>
-        wrapper.send("eth_sendTransaction", [
+        wrapper.send("qrl_sendTransaction", [
           {
             from: "0x000006d4548a3ac17d72b372ae1e416bf65b8ead",
             to: "0xb5bc06d4548a3ac17d72b372ae1e416bf65b8ead",
@@ -137,13 +137,13 @@ describe("Local accounts provider", () => {
 
   it("Should forward other methods", async () => {
     const input = [1, 2];
-    await wrapper.send("eth_sarasa", input);
+    await wrapper.send("qrl_sarasa", input);
 
-    assert.deepEqual(mock.getLatestParams("eth_sarasa"), input);
+    assert.deepEqual(mock.getLatestParams("qrl_sarasa"), input);
   });
 
   it("Should get the nonce if not provided", async () => {
-    await wrapper.send("eth_sendTransaction", [
+    await wrapper.send("qrl_sendTransaction", [
       {
         from: "0xb5bc06d4548a3ac17d72b372ae1e416bf65b8ead",
         to: "0xb5bc06d4548a3ac17d72b372ae1e416bf65b8ead",
@@ -154,19 +154,19 @@ describe("Local accounts provider", () => {
       },
     ]);
 
-    assert.equal(mock.getNumberOfCalls("eth_getTransactionCount"), 1);
+    assert.equal(mock.getNumberOfCalls("qrl_getTransactionCount"), 1);
   });
 
-  describe("eth_sign", () => {
+  describe("qrl_sign", () => {
     it("Should be compatible with parity's implementation", async () => {
       // This test was created by using Parity Ethereum
-      // v2.2.5-beta-7fbcdfeed-20181213 and calling eth_sign
+      // v2.2.5-beta-7fbcdfeed-20181213 and calling qrl_sign
 
       const provider = createLocalAccountsProvider(mock, [
         "0x6e59a6617c48d76d3b21d722eaba867e16ecf54ab3da7a93724f51812bc6d1aa",
       ]);
 
-      const result = await provider.send("eth_sign", [
+      const result = await provider.send("qrl_sign", [
         "0x24f1a362780503D762060C1683864C4066A74b05",
         "0x41206d657373616765",
       ]);
@@ -184,7 +184,7 @@ describe("Local accounts provider", () => {
         "0xf159c85082f4dd4ee472583a37a1b5683c727ec99708f3d94ff05faa7a7a70ce",
       ]);
 
-      const result = await provider.send("eth_sign", [
+      const result = await provider.send("qrl_sign", [
         "0x0a929c90dd22f0fb09ec38983780530ee30a29a3",
         "0x41206d657373616765",
       ]);
@@ -207,7 +207,7 @@ describe("Local accounts provider", () => {
         "0xf2d19e944851ea0faa9440e24a22ddab850210cae46b306a3fde4c98b22a0dcb",
       ]);
 
-      const result = await provider.send("eth_sign", [
+      const result = await provider.send("qrl_sign", [
         "0x5Fd8509eABccFFec1d2530e48F55545B49Bd5B5e",
         "0x41206d657373616765",
       ]);
@@ -220,7 +220,7 @@ describe("Local accounts provider", () => {
 
     it("Should throw if no data is given", async () => {
       await expectBuidlerErrorAsync(
-        () => wrapper.send("eth_sign", [privateKeyToAddress(accounts[0])]),
+        () => wrapper.send("qrl_sign", [privateKeyToAddress(accounts[0])]),
         ERRORS.NETWORK.ETHSIGN_MISSING_DATA_PARAM
       );
     });
@@ -228,7 +228,7 @@ describe("Local accounts provider", () => {
     it("Should throw if the address isn't one of the local ones", async () => {
       await expectBuidlerErrorAsync(
         () =>
-          wrapper.send("eth_sign", [
+          wrapper.send("qrl_sign", [
             "0x000006d4548a3ac17d72b372ae1e416bf65b8ead",
             "0x00",
           ]),
@@ -237,13 +237,13 @@ describe("Local accounts provider", () => {
     });
 
     it("Should just forward if no address is given", async () => {
-      await wrapper.send("eth_sign");
-      assert.deepEqual(mock.getLatestParams("eth_sign"), []);
+      await wrapper.send("qrl_sign");
+      assert.deepEqual(mock.getLatestParams("qrl_sign"), []);
     });
   });
 
-  describe("eth_signTypedData", () => {
-    // TODO: Test this. Note that it just forwards to/from eth-sign-util
+  describe("qrl_signTypedData", () => {
+    // TODO: Test this. Note that it just forwards to/from eth-sig-util
   });
 });
 
@@ -260,19 +260,19 @@ describe("hdwallet provider", () => {
   });
 
   it("should generate a valid address", async () => {
-    const response = await wrapper.send("eth_accounts");
+    const response = await wrapper.send("qrl_accounts");
     assert.equal(response[0], "0x4f3e91d2cacd82fffd1f33a0d26d4078401986e9");
   });
 
   it("should generate a valid address when given a different index", async () => {
     wrapper = createHDWalletProvider(mock, mnemonic, hdpath, 1);
-    const response = await wrapper.send("eth_accounts");
+    const response = await wrapper.send("qrl_accounts");
     assert.equal(response[0], "0x2a97a65d5673a2c61e95ce33cecadf24f654f96d");
   });
 
   it("should generate 2 accounts", async () => {
     wrapper = createHDWalletProvider(mock, mnemonic, hdpath, 0, 2);
-    const response = await wrapper.send("eth_accounts");
+    const response = await wrapper.send("qrl_accounts");
     assert.deepEqual(response, [
       "0x4f3e91d2cacd82fffd1f33a0d26d4078401986e9",
       "0x2a97a65d5673a2c61e95ce33cecadf24f654f96d",
@@ -282,7 +282,7 @@ describe("hdwallet provider", () => {
   describe("HDPath formatting", () => {
     it("Should work if it doesn't end in a /", async () => {
       wrapper = createHDWalletProvider(mock, mnemonic, "m/44'/60'/0'/0");
-      const response = await wrapper.send("eth_accounts");
+      const response = await wrapper.send("qrl_accounts");
       assert.equal(response[0], "0x4f3e91d2cacd82fffd1f33a0d26d4078401986e9");
     });
 
@@ -337,7 +337,7 @@ describe("Account provider", () => {
     mock = new MockedProvider();
 
     provider = wrapSend(mock, async (method, params) => {
-      if (method === "eth_accounts") {
+      if (method === "qrl_accounts") {
         return ["0x2a97a65d5673a2c61e95ce33cecadf24f654f96d"];
       }
       return mock.send(method, params);
@@ -350,18 +350,18 @@ describe("Account provider", () => {
   });
 
   it("Should set the from value into the transaction", async () => {
-    await wrapper.send("eth_sendTransaction", [tx]);
+    await wrapper.send("qrl_sendTransaction", [tx]);
 
-    const params = mock.getLatestParams("eth_sendTransaction");
+    const params = mock.getLatestParams("qrl_sendTransaction");
 
     assert.equal(params[0].from, "0x2a97a65d5673a2c61e95ce33cecadf24f654f96d");
   });
 
   it("Should not replace transaction's from", async () => {
     tx.from = "0x000006d4548a3ac17d72b372ae1e416bf65b8ead";
-    await wrapper.send("eth_sendTransaction", [tx]);
+    await wrapper.send("qrl_sendTransaction", [tx]);
 
-    const params = mock.getLatestParams("eth_sendTransaction");
+    const params = mock.getLatestParams("qrl_sendTransaction");
 
     assert.equal(params[0].from, "0x000006d4548a3ac17d72b372ae1e416bf65b8ead");
   });
@@ -370,20 +370,20 @@ describe("Account provider", () => {
     wrapper = createSenderProvider(provider);
 
     tx.from = "0x000006d4548a3ac17d72b372ae1e416bf65b8ead";
-    await wrapper.send("eth_sendTransaction", [tx]);
+    await wrapper.send("qrl_sendTransaction", [tx]);
 
-    const params = mock.getLatestParams("eth_sendTransaction");
+    const params = mock.getLatestParams("qrl_sendTransaction");
     assert.equal(params[0].from, "0x000006d4548a3ac17d72b372ae1e416bf65b8ead");
   });
 
   it("Should not fail if provider doesn't have any accounts", async () => {
-    mock.setReturnValue("eth_accounts", []);
+    mock.setReturnValue("qrl_accounts", []);
     wrapper = createSenderProvider(mock);
 
     tx.value = "asd";
-    await wrapper.send("eth_call", [tx]);
+    await wrapper.send("qrl_call", [tx]);
 
-    const params = mock.getLatestParams("eth_call");
+    const params = mock.getLatestParams("qrl_call");
     assert.equal(params[0].value, "asd");
   });
 });

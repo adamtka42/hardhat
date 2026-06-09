@@ -88,193 +88,193 @@ export class EthModule {
     params: any[] = []
   ): Promise<any> {
     switch (method) {
-      case "eth_accounts":
+      case "qrl_accounts":
         return this._accountsAction(...this._accountsParams(params));
 
-      case "eth_blockNumber":
+      case "qrl_blockNumber":
         return this._blockNumberAction(...this._blockNumberParams(params));
 
-      case "eth_call":
+      case "qrl_call":
         return this._callAction(...this._callParams(params));
 
-      case "eth_chainId":
+      case "qrl_chainId":
         return this._chainIdAction(...this._chainIdParams(params));
 
-      case "eth_coinbase":
+      case "qrl_coinbase":
         return this._coinbaseAction(...this._coinbaseParams(params));
 
-      case "eth_compileLLL":
+      case "qrl_compileLLL":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_compileSerpent":
+      case "qrl_compileSerpent":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_compileSolidity":
+      case "qrl_compileSolidity":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_estimateGas":
+      case "qrl_estimateGas":
         return this._estimateGasAction(...this._estimateGasParams(params));
 
-      case "eth_gasPrice":
+      case "qrl_gasPrice":
         return this._gasPriceAction(...this._gasPriceParams(params));
 
-      case "eth_getBalance":
+      case "qrl_getBalance":
         return this._getBalanceAction(...this._getBalanceParams(params));
 
-      case "eth_getBlockByHash":
+      case "qrl_getBlockByHash":
         return this._getBlockByHashAction(
           ...this._getBlockByHashParams(params)
         );
 
-      case "eth_getBlockByNumber":
+      case "qrl_getBlockByNumber":
         return this._getBlockByNumberAction(
           ...this._getBlockByNumberParams(params)
         );
 
-      case "eth_getBlockTransactionCountByHash":
+      case "qrl_getBlockTransactionCountByHash":
         return this._getBlockTransactionCountByHashAction(
           ...this._getBlockTransactionCountByHashParams(params)
         );
 
-      case "eth_getBlockTransactionCountByNumber":
+      case "qrl_getBlockTransactionCountByNumber":
         return this._getBlockTransactionCountByNumberAction(
           ...this._getBlockTransactionCountByNumberParams(params)
         );
 
-      case "eth_getCode":
+      case "qrl_getCode":
         return this._getCodeAction(...this._getCodeParams(params));
 
-      case "eth_getCompilers":
+      case "qrl_getCompilers":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_getFilterChanges":
+      case "qrl_getFilterChanges":
         return this._getFilterChangesAction(
           ...this._getFilterChangesParams(params)
         );
 
-      case "eth_getFilterLogs":
+      case "qrl_getFilterLogs":
         return this._getFilterLogsAction(...this._getFilterLogsParams(params));
 
-      case "eth_getLogs":
+      case "qrl_getLogs":
         return this._getLogsAction(...this._getLogsParams(params));
 
-      case "eth_getProof":
+      case "qrl_getProof":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_getStorageAt":
+      case "qrl_getStorageAt":
         return this._getStorageAtAction(...this._getStorageAtParams(params));
 
-      case "eth_getTransactionByBlockHashAndIndex":
+      case "qrl_getTransactionByBlockHashAndIndex":
         return this._getTransactionByBlockHashAndIndexAction(
           ...this._getTransactionByBlockHashAndIndexParams(params)
         );
 
-      case "eth_getTransactionByBlockNumberAndIndex":
+      case "qrl_getTransactionByBlockNumberAndIndex":
         return this._getTransactionByBlockNumberAndIndexAction(
           ...this._getTransactionByBlockNumberAndIndexParams(params)
         );
 
-      case "eth_getTransactionByHash":
+      case "qrl_getTransactionByHash":
         return this._getTransactionByHashAction(
           ...this._getTransactionByHashParams(params)
         );
 
-      case "eth_getTransactionCount":
+      case "qrl_getTransactionCount":
         return this._getTransactionCountAction(
           ...this._getTransactionCountParams(params)
         );
 
-      case "eth_getTransactionReceipt":
+      case "qrl_getTransactionReceipt":
         return this._getTransactionReceiptAction(
           ...this._getTransactionReceiptParams(params)
         );
 
-      case "eth_getUncleByBlockHashAndIndex":
+      case "qrl_getUncleByBlockHashAndIndex":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_getUncleByBlockNumberAndIndex":
+      case "qrl_getUncleByBlockNumberAndIndex":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_getUncleCountByBlockHash":
+      case "qrl_getUncleCountByBlockHash":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_getUncleCountByBlockNumber":
+      case "qrl_getUncleCountByBlockNumber":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_getWork":
+      case "qrl_getWork":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_hashrate":
+      case "qrl_hashrate":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_mining":
+      case "qrl_mining":
         return this._miningAction(...this._miningParams(params));
 
-      case "eth_newBlockFilter":
+      case "qrl_newBlockFilter":
         return this._newBlockFilterAction(
           ...this._newBlockFilterParams(params)
         );
 
-      case "eth_newFilter":
+      case "qrl_newFilter":
         return this._newFilterAction(...this._newFilterParams(params));
 
-      case "eth_newPendingTransactionFilter":
+      case "qrl_newPendingTransactionFilter":
         return this._newPendingTransactionAction(
           ...this._newPendingTransactionParams(params)
         );
 
-      case "eth_pendingTransactions":
+      case "qrl_pendingTransactions":
         return this._pendingTransactionsAction(
           ...this._pendingTransactionsParams(params)
         );
 
-      case "eth_protocolVersion":
+      case "qrl_protocolVersion":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_sendRawTransaction":
+      case "qrl_sendRawTransaction":
         return this._sendRawTransactionAction(
           ...this._sendRawTransactionParams(params)
         );
 
-      case "eth_sendTransaction":
+      case "qrl_sendTransaction":
         return this._sendTransactionAction(
           ...this._sendTransactionParams(params)
         );
 
-      case "eth_sign":
+      case "qrl_sign":
         return this._signAction(...this._signParams(params));
 
-      case "eth_signTransaction":
+      case "qrl_signTransaction":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_signTypedData":
+      case "qrl_signTypedData":
         return this._signTypedDataAction(...this._signTypedDataParams(params));
 
-      case "eth_submitHashrate":
+      case "qrl_submitHashrate":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_submitWork":
+      case "qrl_submitWork":
         throw new MethodNotSupportedError(`Method ${method} is not supported`);
 
-      case "eth_subscribe":
+      case "qrl_subscribe":
         return this._subscribeAction(...this._subscribeParams(params));
 
-      case "eth_syncing":
+      case "qrl_syncing":
         return this._syncingAction(...this._syncingParams(params));
 
-      case "eth_uninstallFilter":
+      case "qrl_uninstallFilter":
         return this._uninstallFilterAction(
           ...this._uninstallFilterParams(params)
         );
 
-      case "eth_unsubscribe":
+      case "qrl_unsubscribe":
         return this._unsubscribeAction(...this._unsubscribeParams(params));
     }
 
     throw new MethodNotFoundError(`Method ${method} not found`);
   }
 
-  // eth_accounts
+  // qrl_accounts
 
   private _accountsParams(params: any[]): [] {
     return validateParams(params);
@@ -284,7 +284,7 @@ export class EthModule {
     return this._node.getLocalAccountAddresses();
   }
 
-  // eth_blockNumber
+  // qrl_blockNumber
 
   private _blockNumberParams(params: any[]): [] {
     return validateParams(params);
@@ -295,7 +295,7 @@ export class EthModule {
     return numberToRpcQuantity(blockNumber);
   }
 
-  // eth_call
+  // qrl_call
 
   private _callParams(params: any[]): [RpcCallRequest, OptionalBlockTag] {
     return validateParams(params, rpcCallRequest, optionalBlockTag);
@@ -336,7 +336,7 @@ export class EthModule {
     return bufferToRpcData(returnData);
   }
 
-  // eth_chainId
+  // qrl_chainId
 
   private _chainIdParams(params: any[]): [] {
     return validateParams(params);
@@ -346,7 +346,7 @@ export class EthModule {
     return numberToRpcQuantity(this._common.chainId());
   }
 
-  // eth_coinbase
+  // qrl_coinbase
 
   private _coinbaseParams(params: any[]): [] {
     return validateParams(params);
@@ -356,13 +356,13 @@ export class EthModule {
     return bufferToHex(await this._node.getCoinbaseAddress());
   }
 
-  // eth_compileLLL
+  // qrl_compileLLL
 
-  // eth_compileSerpent
+  // qrl_compileSerpent
 
-  // eth_compileSolidity
+  // qrl_compileSolidity
 
-  // eth_estimateGas
+  // qrl_estimateGas
 
   private _estimateGasParams(
     params: any[]
@@ -398,7 +398,7 @@ export class EthModule {
     return numberToRpcQuantity(estimation);
   }
 
-  // eth_gasPrice
+  // qrl_gasPrice
 
   private _gasPriceParams(params: any[]): [] {
     return validateParams(params);
@@ -408,7 +408,7 @@ export class EthModule {
     return numberToRpcQuantity(await this._node.getGasPrice());
   }
 
-  // eth_getBalance
+  // qrl_getBalance
 
   private _getBalanceParams(params: any[]): [Buffer, OptionalBlockTag] {
     return validateParams(params, rpcAddress, optionalBlockTag);
@@ -423,7 +423,7 @@ export class EthModule {
     return numberToRpcQuantity(await this._node.getAccountBalance(address));
   }
 
-  // eth_getBlockByHash
+  // qrl_getBlockByHash
 
   private _getBlockByHashParams(params: any[]): [Buffer, boolean] {
     return validateParams(params, rpcHash, t.boolean);
@@ -443,7 +443,7 @@ export class EthModule {
     return getRpcBlock(block, totalDifficulty, includeTransactions);
   }
 
-  // eth_getBlockByNumber
+  // qrl_getBlockByNumber
 
   private _getBlockByNumberParams(params: any[]): [OptionalBlockTag, boolean] {
     return validateParams(params, optionalBlockTag, t.boolean);
@@ -462,7 +462,7 @@ export class EthModule {
         block = await this._node.getLatestBlock();
       } else {
         throw new InvalidInputError(
-          `eth_getBlockByNumber doesn't support ${tag}`
+          `qrl_getBlockByNumber doesn't support ${tag}`
         );
       }
     } else {
@@ -481,7 +481,7 @@ export class EthModule {
     return getRpcBlock(block, totalDifficulty, includeTransactions);
   }
 
-  // eth_getBlockTransactionCountByHash
+  // qrl_getBlockTransactionCountByHash
 
   private _getBlockTransactionCountByHashParams(params: any[]): [Buffer] {
     return validateParams(params, rpcHash);
@@ -498,7 +498,7 @@ export class EthModule {
     return numberToRpcQuantity(block.transactions.length);
   }
 
-  // eth_getBlockTransactionCountByNumber
+  // qrl_getBlockTransactionCountByNumber
 
   private _getBlockTransactionCountByNumberParams(params: any[]): [BN] {
     return validateParams(params, rpcQuantity);
@@ -515,7 +515,7 @@ export class EthModule {
     return numberToRpcQuantity(block.transactions.length);
   }
 
-  // eth_getCode
+  // qrl_getCode
 
   private _getCodeParams(params: any[]): [Buffer, OptionalBlockTag] {
     return validateParams(params, rpcAddress, optionalBlockTag);
@@ -530,9 +530,9 @@ export class EthModule {
     return bufferToRpcData(await this._node.getCode(address));
   }
 
-  // eth_getCompilers
+  // qrl_getCompilers
 
-  // eth_getFilterChanges
+  // qrl_getFilterChanges
 
   private _getFilterChangesParams(params: any[]): [BN] {
     return validateParams(params, rpcQuantity);
@@ -549,7 +549,7 @@ export class EthModule {
     return changes;
   }
 
-  // eth_getFilterLogs
+  // qrl_getFilterLogs
 
   private _getFilterLogsParams(params: any[]): [BN] {
     return validateParams(params, rpcQuantity);
@@ -566,7 +566,7 @@ export class EthModule {
     return changes;
   }
 
-  // eth_getLogs
+  // qrl_getLogs
 
   private _getLogsParams(params: any[]): [RpcFilterRequest] {
     return validateParams(params, rpcFilterRequest);
@@ -605,9 +605,9 @@ export class EthModule {
     return this._node.getLogs(filterParams);
   }
 
-  // eth_getProof
+  // qrl_getProof
 
-  // eth_getStorageAt
+  // qrl_getStorageAt
 
   private _getStorageAtParams(params: any[]): [Buffer, BN, OptionalBlockTag] {
     return validateParams(params, rpcAddress, rpcQuantity, optionalBlockTag);
@@ -631,7 +631,7 @@ export class EthModule {
     return bufferToRpcData(data);
   }
 
-  // eth_getTransactionByBlockHashAndIndex
+  // qrl_getTransactionByBlockHashAndIndex
 
   private _getTransactionByBlockHashAndIndexParams(
     params: any[]
@@ -657,7 +657,7 @@ export class EthModule {
     return getRpcTransaction(tx, block, i);
   }
 
-  // eth_getTransactionByBlockNumberAndIndex
+  // qrl_getTransactionByBlockNumberAndIndex
 
   private _getTransactionByBlockNumberAndIndexParams(params: any[]): [BN, BN] {
     return validateParams(params, rpcQuantity, rpcQuantity);
@@ -681,7 +681,7 @@ export class EthModule {
     return getRpcTransaction(tx, block, i);
   }
 
-  // eth_getTransactionByHash
+  // qrl_getTransactionByHash
 
   private _getTransactionByHashParams(params: any[]): [Buffer] {
     return validateParams(params, rpcHash);
@@ -710,7 +710,7 @@ export class EthModule {
     return getRpcTransaction(tx, block, index);
   }
 
-  // eth_getTransactionCount
+  // qrl_getTransactionCount
 
   private _getTransactionCountParams(
     params: any[]
@@ -722,7 +722,7 @@ export class EthModule {
     address: Buffer,
     blockTag: OptionalBlockTag
   ): Promise<string> {
-    // TODO: MetaMask does some eth_getTransactionCount(sender, currentBlock)
+    // TODO: MetaMask does some qrl_getTransactionCount(sender, currentBlock)
     //   calls right after sending a transaction.
     //   As we insta-mine, the currentBlock that they send is different from the
     //   one we have, which results on an error.
@@ -745,7 +745,7 @@ export class EthModule {
     return numberToRpcQuantity(await this._node.getAccountNonce(address));
   }
 
-  // eth_getTransactionReceipt
+  // qrl_getTransactionReceipt
 
   private _getTransactionReceiptParams(params: any[]): [Buffer] {
     return validateParams(params, rpcHash);
@@ -771,27 +771,27 @@ export class EthModule {
     return getRpcTransactionReceipt(tx, block, index, txBlockResults!);
   }
 
-  // eth_getUncleByBlockHashAndIndex
+  // qrl_getUncleByBlockHashAndIndex
 
   // TODO: Implement
 
-  // eth_getUncleByBlockNumberAndIndex
+  // qrl_getUncleByBlockNumberAndIndex
 
   // TODO: Implement
 
-  // eth_getUncleCountByBlockHash
+  // qrl_getUncleCountByBlockHash
 
   // TODO: Implement
 
-  // eth_getUncleCountByBlockNumber
+  // qrl_getUncleCountByBlockNumber
 
   // TODO: Implement
 
-  // eth_getWork
+  // qrl_getWork
 
-  // eth_hashrate
+  // qrl_hashrate
 
-  // eth_mining
+  // qrl_mining
 
   private _miningParams(params: any[]): [] {
     return validateParams(params);
@@ -801,7 +801,7 @@ export class EthModule {
     return false;
   }
 
-  // eth_newBlockFilter
+  // qrl_newBlockFilter
 
   private _newBlockFilterParams(params: any[]): [] {
     return [];
@@ -812,7 +812,7 @@ export class EthModule {
     return numberToRpcQuantity(filterId);
   }
 
-  // eth_newFilter
+  // qrl_newFilter
 
   private _newFilterParams(params: any[]): [RpcFilterRequest] {
     return validateParams(params, rpcFilterRequest);
@@ -824,7 +824,7 @@ export class EthModule {
     return numberToRpcQuantity(filterId);
   }
 
-  // eth_newPendingTransactionFilter
+  // qrl_newPendingTransactionFilter
 
   private _newPendingTransactionParams(params: any[]): [] {
     return [];
@@ -835,7 +835,7 @@ export class EthModule {
     return numberToRpcQuantity(filterId);
   }
 
-  // eth_pendingTransactions
+  // qrl_pendingTransactions
 
   private _pendingTransactionsParams(params: any[]): [] {
     return [];
@@ -846,9 +846,9 @@ export class EthModule {
     return txs.map((tx) => getRpcTransaction(tx));
   }
 
-  // eth_protocolVersion
+  // qrl_protocolVersion
 
-  // eth_sendRawTransaction
+  // qrl_sendRawTransaction
 
   private _sendRawTransactionParams(params: any[]): [Buffer] {
     return validateParams(params, rpcData);
@@ -873,7 +873,7 @@ export class EthModule {
     return this._sendTransactionAndReturnHash(tx);
   }
 
-  // eth_sendTransaction
+  // qrl_sendTransaction
 
   private _sendTransactionParams(params: any[]): [RpcTransactionRequest] {
     return validateParams(params, rpcTransactionRequest);
@@ -891,7 +891,7 @@ export class EthModule {
     return this._sendTransactionAndReturnHash(tx);
   }
 
-  // eth_sign
+  // qrl_sign
 
   private _signParams(params: any[]): [Buffer, Buffer] {
     return validateParams(params, rpcAddress, rpcData);
@@ -903,9 +903,9 @@ export class EthModule {
     return toRpcSig(signature.v, signature.r, signature.s);
   }
 
-  // eth_signTransaction
+  // qrl_signTransaction
 
-  // eth_signTypedData
+  // qrl_signTypedData
 
   private _signTypedDataParams(params: any[]): [Buffer, any] {
     return validateParams(params, rpcAddress, rpcUnknown);
@@ -918,9 +918,9 @@ export class EthModule {
     return this._node.signTypedData(address, typedData);
   }
 
-  // eth_submitHashrate
+  // qrl_submitHashrate
 
-  // eth_submitWork
+  // qrl_submitWork
 
   private _subscribeParams(
     params: any[]
@@ -964,7 +964,7 @@ export class EthModule {
     }
   }
 
-  // eth_syncing
+  // qrl_syncing
 
   private _syncingParams(params: any[]): [] {
     return validateParams(params);
@@ -974,7 +974,7 @@ export class EthModule {
     return false;
   }
 
-  // eth_uninstallFilter
+  // qrl_uninstallFilter
 
   private _uninstallFilterParams(params: any): [BN] {
     return validateParams(params, rpcQuantity);

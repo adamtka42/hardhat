@@ -64,7 +64,7 @@ describe("Provider utils", function () {
   describe("createChainIdGetter", function () {
     it("Should call the provider only once", async function () {
       const mockedProvider = new MockedProvider();
-      mockedProvider.setReturnValue("eth_chainId", numberToRpcQuantity(1));
+      mockedProvider.setReturnValue("qrl_chainId", numberToRpcQuantity(1));
       mockedProvider.setReturnValue("net_version", "2");
 
       const chainIdGetter = createChainIdGetter(mockedProvider);
@@ -84,7 +84,7 @@ describe("Provider utils", function () {
       assert.equal(mockedProvider2.getTotalNumberOfCalls(), 0);
       await netVersionGetter();
 
-      // First eth_chainId is called, then net_version, hence 2
+      // First qrl_chainId is called, then net_version, hence 2
       assert.equal(mockedProvider2.getTotalNumberOfCalls(), 2);
       await netVersionGetter();
       assert.equal(mockedProvider2.getTotalNumberOfCalls(), 2);
@@ -92,9 +92,9 @@ describe("Provider utils", function () {
       assert.equal(mockedProvider2.getTotalNumberOfCalls(), 2);
     });
 
-    it("Should use eth_chainId if supported", async function () {
+    it("Should use qrl_chainId if supported", async function () {
       const mockedProvider = new MockedProvider();
-      mockedProvider.setReturnValue("eth_chainId", numberToRpcQuantity(1));
+      mockedProvider.setReturnValue("qrl_chainId", numberToRpcQuantity(1));
       mockedProvider.setReturnValue("net_version", "2");
 
       const chainIdGetter = createChainIdGetter(mockedProvider);
@@ -102,7 +102,7 @@ describe("Provider utils", function () {
       assert.equal(await chainIdGetter(), 1);
     });
 
-    it("Should use net_version if eth_chainId is not supported", async function () {
+    it("Should use net_version if qrl_chainId is not supported", async function () {
       const mockedProvider = new MockedProvider();
       mockedProvider.setReturnValue("net_version", "2");
       const netVersionGetter = createChainIdGetter(mockedProvider);
@@ -110,9 +110,9 @@ describe("Provider utils", function () {
       assert.equal(await netVersionGetter(), 2);
     });
 
-    it("Should throw if both eth_chainId and net_version fail", async function () {
+    it("Should throw if both qrl_chainId and net_version fail", async function () {
       const mockedProvider = new MockedProvider();
-      mockedProvider.setReturnValue("eth_chainId", () => {
+      mockedProvider.setReturnValue("qrl_chainId", () => {
         throw new Error("Unsupported method");
       });
       mockedProvider.setReturnValue("net_version", () => {

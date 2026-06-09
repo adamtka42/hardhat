@@ -32,10 +32,10 @@ export function createChainIdGetter(provider: IEthereumProvider) {
   return async function getRealChainId(): Promise<number> {
     if (cachedChainId === undefined) {
       try {
-        const id = await provider.send("eth_chainId");
+        const id = await provider.send("qrl_chainId");
         cachedChainId = rpcQuantityToNumber(id);
       } catch (error) {
-        // If eth_chainId fails we default to net_version
+        // If qrl_chainId fails we default to net_version
         // TODO: This should be removed in the future.
         // See: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-695.md
         const id: string = await provider.send("net_version");

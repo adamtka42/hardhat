@@ -13,7 +13,7 @@ export function createFixedGasProvider(
   const rpcGasLimit = numberToRpcQuantity(gasLimit);
 
   return wrapSend(provider, async (method, params) => {
-    if (method === "eth_sendTransaction") {
+    if (method === "qrl_sendTransaction") {
       const tx = params[0];
       if (tx !== undefined && tx.gas === undefined) {
         tx.gas = rpcGasLimit;
@@ -31,7 +31,7 @@ export function createFixedGasPriceProvider(
   const rpcGasPrice = numberToRpcQuantity(gasPrice);
 
   return wrapSend(provider, async (method, params) => {
-    if (method === "eth_sendTransaction") {
+    if (method === "qrl_sendTransaction") {
       const tx = params[0];
       if (tx !== undefined && tx.gasPrice === undefined) {
         tx.gasPrice = rpcGasPrice;
@@ -49,7 +49,7 @@ export function createAutomaticGasProvider(
   const getMultipliedGasEstimation = createMultipliedGasEstimationGetter();
 
   return wrapSend(provider, async (method, params) => {
-    if (method === "eth_sendTransaction") {
+    if (method === "qrl_sendTransaction") {
       const tx = params[0];
       if (tx !== undefined && tx.gas === undefined) {
         tx.gas = await getMultipliedGasEstimation(
@@ -68,11 +68,11 @@ export function createAutomaticGasPriceProvider(provider: IEthereumProvider) {
   let gasPrice: string | undefined;
 
   return wrapSend(provider, async (method, params) => {
-    if (method === "eth_sendTransaction") {
+    if (method === "qrl_sendTransaction") {
       const tx = params[0];
       if (tx !== undefined && tx.gasPrice === undefined) {
         if (gasPrice === undefined) {
-          gasPrice = await provider.send("eth_gasPrice");
+          gasPrice = await provider.send("qrl_gasPrice");
         }
 
         tx.gasPrice = gasPrice;
@@ -104,7 +104,7 @@ export function createGanacheGasMultiplierProvider(
       isGanache = clientVersion.includes("TestRPC");
     }
 
-    if (method === "eth_estimateGas" && isGanache) {
+    if (method === "qrl_estimateGas" && isGanache) {
       return getMultipliedGasEstimation(
         provider,
         params,
@@ -125,7 +125,7 @@ function createMultipliedGasEstimationGetter() {
     provider: IEthereumProvider
   ): Promise<number> {
     if (cachedGasLimit === undefined) {
-      const latestBlock = await provider.send("eth_getBlockByNumber", [
+      const latestBlock = await provider.send("qrl_getBlockByNumber", [
         "latest",
         false,
       ]);
@@ -147,7 +147,7 @@ function createMultipliedGasEstimationGetter() {
     gasMultiplier: number
   ): Promise<string> {
     try {
-      const realEstimation = await provider.send("eth_estimateGas", params);
+      const realEstimation = await provider.send("qrl_estimateGas", params);
 
       if (gasMultiplier === 1) {
         return realEstimation;

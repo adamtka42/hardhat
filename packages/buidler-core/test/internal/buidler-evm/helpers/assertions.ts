@@ -100,10 +100,10 @@ export async function assertNodeBalances(
   provider: EthereumProvider,
   expectedBalances: Array<number | BN>
 ) {
-  const accounts: string[] = await provider.send("eth_accounts");
+  const accounts: string[] = await provider.send("qrl_accounts");
 
   const balances = await Promise.all(
-    accounts.map((acc) => provider.send("eth_getBalance", [acc]))
+    accounts.map((acc) => provider.send("qrl_getBalance", [acc]))
   );
 
   assert.deepEqual(balances, expectedBalances.map(numberToRpcQuantity));
@@ -116,7 +116,7 @@ export async function assertTransactionFailure(
   code?: number
 ) {
   try {
-    await provider.send("eth_sendTransaction", [txData]);
+    await provider.send("qrl_sendTransaction", [txData]);
   } catch (error) {
     if (code !== undefined) {
       assert.equal(error.code, code);
@@ -194,7 +194,7 @@ export async function assertLatestBlockNumber(
   provider: EthereumProvider,
   latestBlockNumber: number
 ) {
-  const block = await provider.send("eth_getBlockByNumber", ["latest", false]);
+  const block = await provider.send("qrl_getBlockByNumber", ["latest", false]);
 
   assert.isNotNull(block);
   assert.equal(block.number, numberToRpcQuantity(latestBlockNumber));

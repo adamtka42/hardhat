@@ -38,7 +38,7 @@ async function deployContract(
   provider: EthereumProvider,
   deploymentCode: string
 ) {
-  const hash = await provider.send("eth_sendTransaction", [
+  const hash = await provider.send("qrl_sendTransaction", [
     {
       from: DEFAULT_ACCOUNTS_ADDRESSES[0],
       data: deploymentCode,
@@ -46,7 +46,7 @@ async function deployContract(
     },
   ]);
 
-  const { contractAddress } = await provider.send("eth_getTransactionReceipt", [
+  const { contractAddress } = await provider.send("qrl_getTransactionReceipt", [
     hash,
   ]);
 
@@ -61,7 +61,7 @@ describe("Evm module", function () {
 
       describe("evm_increaseTime", async function () {
         it("should increase the offset of time used for block timestamps", async function () {
-          const accounts = await this.provider.send("eth_accounts");
+          const accounts = await this.provider.send("qrl_accounts");
           const burnTxParams = {
             from: accounts[0],
             to: zeroAddress(),
@@ -70,25 +70,25 @@ describe("Evm module", function () {
             gasPrice: numberToRpcQuantity(1),
           };
 
-          const firstBlock = await this.provider.send("eth_getBlockByNumber", [
+          const firstBlock = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(0),
             false,
           ]);
 
           await this.provider.send("evm_increaseTime", [123]);
 
-          await this.provider.send("eth_sendTransaction", [burnTxParams]);
+          await this.provider.send("qrl_sendTransaction", [burnTxParams]);
 
-          const secondBlock = await this.provider.send("eth_getBlockByNumber", [
+          const secondBlock = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(1),
             false,
           ]);
 
           await this.provider.send("evm_increaseTime", [456]);
 
-          await this.provider.send("eth_sendTransaction", [burnTxParams]);
+          await this.provider.send("qrl_sendTransaction", [burnTxParams]);
 
-          const thirdBlock = await this.provider.send("eth_getBlockByNumber", [
+          const thirdBlock = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(2),
             false,
           ]);
@@ -126,7 +126,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine", []);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             ["latest", false]
           );
 
@@ -142,7 +142,7 @@ describe("Evm module", function () {
           );
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             ["latest", false]
           );
 
@@ -158,7 +158,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine", []);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             ["latest", false]
           );
 
@@ -172,7 +172,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine", []);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             ["latest", false]
           );
 
@@ -185,7 +185,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine", [timestamp + 100]);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             ["latest", false]
           );
 
@@ -205,7 +205,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine", []);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             ["latest", false]
           );
 
@@ -261,7 +261,7 @@ describe("Evm module", function () {
               timestamp - 1000,
             ]);
             const latestBlock = await this.env.network.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
 
@@ -273,7 +273,7 @@ describe("Evm module", function () {
 
             await this.env.network.provider.send("evm_mine");
             const latestBlock2 = await this.env.network.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
             assertQuantity(latestBlock2.timestamp, timestamp - 500);
@@ -286,7 +286,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine");
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             [numberToRpcQuantity(1), false]
           );
 
@@ -295,7 +295,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine");
 
           const block2: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             [numberToRpcQuantity(2), false]
           );
 
@@ -306,7 +306,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine", [timestamp]);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             [numberToRpcQuantity(1), false]
           );
 
@@ -319,7 +319,7 @@ describe("Evm module", function () {
           await this.provider.send("evm_mine");
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             [numberToRpcQuantity(2), false]
           );
 
@@ -388,7 +388,7 @@ describe("Evm module", function () {
               []
             );
             const initialLatestBlock = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
 
@@ -397,7 +397,7 @@ describe("Evm module", function () {
             await this.provider.send("evm_mine");
             await this.provider.send("evm_mine");
             const latestBlockBeforeReverting = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
 
@@ -407,33 +407,33 @@ describe("Evm module", function () {
             assert.isTrue(reverted);
 
             const newLatestBlock = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
             assert.equal(newLatestBlock.hash, initialLatestBlock.hash);
 
-            const blockByHash = await this.provider.send("eth_getBlockByHash", [
+            const blockByHash = await this.provider.send("qrl_getBlockByHash", [
               bufferToRpcData(latestBlockBeforeReverting.hash),
               false,
             ]);
             assert.isNull(blockByHash);
 
             const blockByNumber = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [latestBlockBeforeReverting.number, false]
             );
             assert.isNull(blockByNumber);
           });
 
           it("Deletes previous transactions", async function () {
-            const [from] = await this.provider.send("eth_accounts");
+            const [from] = await this.provider.send("qrl_accounts");
 
             const snapshotId: string = await this.provider.send(
               "evm_snapshot",
               []
             );
 
-            const txHash = await this.provider.send("eth_sendTransaction", [
+            const txHash = await this.provider.send("qrl_sendTransaction", [
               {
                 from,
                 to: "0x1111111111111111111111111111111111111111",
@@ -450,14 +450,14 @@ describe("Evm module", function () {
             assert.isTrue(reverted);
 
             const txHashAfter = await this.provider.send(
-              "eth_getTransactionByHash",
+              "qrl_getTransactionByHash",
               [txHash]
             );
             assert.isNull(txHashAfter);
           });
 
           it("Allows resending the same tx after a revert", async function () {
-            const [from] = await this.provider.send("eth_accounts");
+            const [from] = await this.provider.send("qrl_accounts");
 
             const snapshotId: string = await this.provider.send(
               "evm_snapshot",
@@ -473,7 +473,7 @@ describe("Evm module", function () {
               nonce: numberToRpcQuantity(0),
             };
 
-            const txHash = await this.provider.send("eth_sendTransaction", [
+            const txHash = await this.provider.send("qrl_sendTransaction", [
               txParams,
             ]);
 
@@ -482,7 +482,7 @@ describe("Evm module", function () {
             ]);
             assert.isTrue(reverted);
 
-            const txHash2 = await this.provider.send("eth_sendTransaction", [
+            const txHash2 = await this.provider.send("qrl_sendTransaction", [
               txParams,
             ]);
 
@@ -589,7 +589,7 @@ describe("Evm module", function () {
             );
 
             const snapshotedBlock = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
 
@@ -608,7 +608,7 @@ describe("Evm module", function () {
 
             await this.provider.send("evm_mine");
             const afterRevertBlock = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               ["latest", false]
             );
 
@@ -623,9 +623,9 @@ describe("Evm module", function () {
           it("Restores the previous state", async function () {
             // This is a very coarse test, as we know that the entire state is
             // managed by the vm, and is restored as a whole
-            const [from] = await this.provider.send("eth_accounts");
+            const [from] = await this.provider.send("qrl_accounts");
 
-            const balanceBeforeTx = await this.provider.send("eth_getBalance", [
+            const balanceBeforeTx = await this.provider.send("qrl_getBalance", [
               from,
             ]);
 
@@ -643,9 +643,9 @@ describe("Evm module", function () {
               nonce: numberToRpcQuantity(0),
             };
 
-            await this.provider.send("eth_sendTransaction", [txParams]);
+            await this.provider.send("qrl_sendTransaction", [txParams]);
 
-            const balanceAfterTx = await this.provider.send("eth_getBalance", [
+            const balanceAfterTx = await this.provider.send("qrl_getBalance", [
               from,
             ]);
 
@@ -657,7 +657,7 @@ describe("Evm module", function () {
             assert.isTrue(reverted);
 
             const balanceAfterRevert = await this.provider.send(
-              "eth_getBalance",
+              "qrl_getBalance",
               [from]
             );
 

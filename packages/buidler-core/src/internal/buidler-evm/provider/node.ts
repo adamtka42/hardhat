@@ -1153,7 +1153,7 @@ export class BuidlerNode extends EventEmitter {
       if (filter.type === Type.PENDING_TRANSACTION_SUBSCRIPTION) {
         const hash = bufferToHex(tx.hash(true));
         if (filter.subscription) {
-          this._emitEthEvent(filter.id, hash);
+          this._emitQrlEvent(filter.id, hash);
           return;
         }
 
@@ -1234,7 +1234,7 @@ export class BuidlerNode extends EventEmitter {
         case Type.BLOCK_SUBSCRIPTION:
           const hash = block.hash();
           if (filter.subscription) {
-            this._emitEthEvent(filter.id, getRpcBlock(block, td, false));
+            this._emitQrlEvent(filter.id, getRpcBlock(block, td, false));
             return;
           }
 
@@ -1255,7 +1255,7 @@ export class BuidlerNode extends EventEmitter {
 
             if (filter.subscription) {
               logs.forEach((rpcLog) => {
-                this._emitEthEvent(filter.id, rpcLog);
+                this._emitQrlEvent(filter.id, rpcLog);
               });
               return;
             }
@@ -1591,8 +1591,8 @@ If you are using a wallet or dapp, try resetting your wallet's accounts.`
     return filterId.toString();
   }
 
-  private _emitEthEvent(filterId: BN, result: any) {
-    this.emit("ethEvent", {
+  private _emitQrlEvent(filterId: BN, result: any) {
+    this.emit("qrlEvent", {
       result,
       filterId,
     });

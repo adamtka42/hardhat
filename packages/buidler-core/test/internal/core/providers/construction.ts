@@ -42,10 +42,10 @@ describe("Base providers wrapping", () => {
     mockedProvider = new MockedProvider();
     mockedProvider.setReturnValue("web3_clientVersion", "Not ganache");
     mockedProvider.setReturnValue("net_version", "1337");
-    mockedProvider.setReturnValue("eth_getBlockByNumber", {
+    mockedProvider.setReturnValue("qrl_getBlockByNumber", {
       gasLimit: numberToRpcQuantity(8000000),
     });
-    mockedProvider.setReturnValue("eth_accounts", [
+    mockedProvider.setReturnValue("qrl_accounts", [
       "0x04397ae3f38106cebdf03f963074ecfc23d509d9",
     ]);
   });
@@ -61,7 +61,7 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      const accounts = await provider.send("eth_accounts");
+      const accounts = await provider.send("qrl_accounts");
 
       assert.deepEqual(accounts, [
         "0x04397ae3f38106cebdf03f963074ecfc23d509d9",
@@ -81,7 +81,7 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      const accounts = await provider.send("eth_accounts");
+      const accounts = await provider.send("qrl_accounts");
 
       assert.deepEqual(accounts, [
         "0xd26a6f43b0df5c539778e08feec29908ea83a1c1",
@@ -94,8 +94,8 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      await provider.send("eth_accounts", ["param1", "param2"]);
-      const params = mockedProvider.getLatestParams("eth_accounts");
+      await provider.send("qrl_accounts", ["param1", "param2"]);
+      const params = mockedProvider.getLatestParams("qrl_accounts");
       assert.deepEqual(params, ["param1", "param2"]);
     });
   });
@@ -105,7 +105,7 @@ describe("Base providers wrapping", () => {
 
     beforeEach(async () => {
       mockedProvider.setReturnValue(
-        "eth_estimateGas",
+        "qrl_estimateGas",
         numberToRpcQuantity(123)
       );
 
@@ -127,9 +127,9 @@ describe("Base providers wrapping", () => {
         from: "0xa2b6816c50d49101901d93f5302a3a57e0a1281b",
       });
 
-      await provider.send("eth_sendTransaction", [{}]);
+      await provider.send("qrl_sendTransaction", [{}]);
 
-      const [tx] = mockedProvider.getLatestParams("eth_sendTransaction");
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.from, "0xa2b6816c50d49101901d93f5302a3a57e0a1281b");
     });
 
@@ -138,8 +138,8 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      await provider.send("eth_sendTransaction", [{}]);
-      const [tx] = mockedProvider.getLatestParams("eth_sendTransaction");
+      await provider.send("qrl_sendTransaction", [{}]);
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.from, "0x04397ae3f38106cebdf03f963074ecfc23d509d9");
     });
   });
@@ -149,11 +149,11 @@ describe("Base providers wrapping", () => {
 
     beforeEach(() => {
       mockedProvider.setReturnValue(
-        "eth_estimateGas",
+        "qrl_estimateGas",
         numberToRpcQuantity(123)
       );
 
-      mockedProvider.setReturnValue("eth_gasPrice", numberToRpcQuantity(123));
+      mockedProvider.setReturnValue("qrl_gasPrice", numberToRpcQuantity(123));
     });
 
     it("Should wrap with an auto gas provider if 'auto' is used", async () => {
@@ -162,8 +162,8 @@ describe("Base providers wrapping", () => {
         gas: "auto",
       });
 
-      await provider.send("eth_sendTransaction", [{ from: "0x0" }]);
-      const [tx] = mockedProvider.getLatestParams("eth_sendTransaction");
+      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.gas, numberToRpcQuantity(123));
     });
 
@@ -172,8 +172,8 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      await provider.send("eth_sendTransaction", [{ from: "0x0" }]);
-      const [tx] = mockedProvider.getLatestParams("eth_sendTransaction");
+      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(
         tx.gas,
         numberToRpcQuantity(Math.floor(123 * DEFAULT_GAS_MULTIPLIER))
@@ -186,8 +186,8 @@ describe("Base providers wrapping", () => {
         gasMultiplier: OTHER_GAS_MULTIPLIER,
       });
 
-      await provider.send("eth_sendTransaction", [{ from: "0x0" }]);
-      const [tx] = mockedProvider.getLatestParams("eth_sendTransaction");
+      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(
         tx.gas,
         numberToRpcQuantity(Math.floor(123 * OTHER_GAS_MULTIPLIER))
@@ -200,15 +200,15 @@ describe("Base providers wrapping", () => {
         gas: 678,
       });
 
-      await provider.send("eth_sendTransaction", [{ from: "0x0" }]);
-      const [tx] = mockedProvider.getLatestParams("eth_sendTransaction");
+      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.gas, numberToRpcQuantity(678));
     });
   });
 
   describe("Gas price wrapping", () => {
     beforeEach(() => {
-      mockedProvider.setReturnValue("eth_gasPrice", numberToRpcQuantity(123));
+      mockedProvider.setReturnValue("qrl_gasPrice", numberToRpcQuantity(123));
     });
 
     it("Should wrap with an auto gas price provider if 'auto' is used", async () => {
@@ -217,7 +217,7 @@ describe("Base providers wrapping", () => {
         gasPrice: "auto",
       });
 
-      const gasPrice = await provider.send("eth_gasPrice");
+      const gasPrice = await provider.send("qrl_gasPrice");
       assert.equal(gasPrice, numberToRpcQuantity(123));
     });
 
@@ -226,7 +226,7 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      const gasPrice = await provider.send("eth_gasPrice");
+      const gasPrice = await provider.send("qrl_gasPrice");
       assert.equal(gasPrice, numberToRpcQuantity(123));
     });
 
@@ -236,9 +236,9 @@ describe("Base providers wrapping", () => {
         gasPrice: 789,
       });
 
-      await provider.send("eth_sendTransaction", [{}]);
+      await provider.send("qrl_sendTransaction", [{}]);
       const [{ gasPrice }] = mockedProvider.getLatestParams(
-        "eth_sendTransaction"
+        "qrl_sendTransaction"
       );
 
       assert.equal(gasPrice, numberToRpcQuantity(789));
@@ -253,7 +253,7 @@ describe("Base providers wrapping", () => {
       });
 
       await expectBuidlerErrorAsync(
-        () => provider.send("eth_getAccounts", []),
+        () => provider.send("qrl_getAccounts", []),
         ERRORS.NETWORK.INVALID_GLOBAL_CHAIN_ID
       );
     });
@@ -262,7 +262,7 @@ describe("Base providers wrapping", () => {
   describe("Ganache multiplier provider", () => {
     it("Should wrap with a ganache multiplier provider", async () => {
       mockedProvider.setReturnValue(
-        "eth_estimateGas",
+        "qrl_estimateGas",
         numberToRpcQuantity(123)
       );
       mockedProvider.setReturnValue(
@@ -274,7 +274,7 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      const estimation = await provider.send("eth_estimateGas", [
+      const estimation = await provider.send("qrl_estimateGas", [
         { to: "0xa2b6816c50d49101901d93f5302a3a57e0a1281b", value: 1 },
       ]);
 

@@ -7,11 +7,11 @@ import { MockedProvider } from "./mocks";
 describe("Chain id provider", () => {
   it("should fail when configured chain id dont match the real chain id", async () => {
     const mock = new MockedProvider();
-    mock.setReturnValue("eth_chainId", "0xabcabc");
+    mock.setReturnValue("qrl_chainId", "0xabcabc");
 
     const wrapper = createChainIdValidationProvider(mock, 66666);
     await expectBuidlerErrorAsync(
-      () => wrapper.send("eth_getAccounts", []),
+      () => wrapper.send("qrl_getAccounts", []),
       ERRORS.NETWORK.INVALID_GLOBAL_CHAIN_ID
     );
   });

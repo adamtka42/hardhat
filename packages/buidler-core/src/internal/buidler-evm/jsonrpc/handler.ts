@@ -75,7 +75,7 @@ export default class JsonRpcHandler {
         ws.send(
           JSON.stringify({
             jsonrpc: "2.0",
-            method: "eth_subscribe",
+            method: "qrl_subscribe",
             params: payload,
           })
         );
@@ -84,7 +84,7 @@ export default class JsonRpcHandler {
       }
     };
 
-    // Handle eth_subscribe notifications.
+    // Handle qrl_subscribe notifications.
     this._provider.addListener("notification", listener);
 
     ws.on("message", async (msg) => {
@@ -100,10 +100,10 @@ export default class JsonRpcHandler {
 
         rpcResp = await this._handleRequest(rpcReq);
 
-        // If eth_subscribe was successful, keep track of the subscription id,
+        // If qrl_subscribe was successful, keep track of the subscription id,
         // so we can cleanup on websocket close.
         if (
-          rpcReq.method === "eth_subscribe" &&
+          rpcReq.method === "qrl_subscribe" &&
           isSuccessfulJsonResponse(rpcResp)
         ) {
           subscriptions.push(rpcResp.result.id);
@@ -126,13 +126,13 @@ export default class JsonRpcHandler {
     });
 
     ws.on("close", () => {
-      // Remove eth_subscribe listener.
+      // Remove qrl_subscribe listener.
       this._provider.removeListener("notification", listener);
 
       // Clear any active subscriptions for the closed websocket connection.
       isClosed = true;
       subscriptions.forEach(async (subscriptionId) => {
-        await this._provider.send("eth_unsubscribe", [subscriptionId]);
+        await this._provider.send("qrl_unsubscribe", [subscriptionId]);
       });
     });
   };

@@ -58,7 +58,7 @@ const PRECOMPILES_COUNT = 8;
 async function sendTxToZeroAddress(
   provider: EthereumProvider
 ): Promise<string> {
-  const accounts = await provider.send("eth_accounts");
+  const accounts = await provider.send("qrl_accounts");
 
   const burnTxParams = {
     from: accounts[0],
@@ -68,14 +68,14 @@ async function sendTxToZeroAddress(
     gasPrice: numberToRpcQuantity(1),
   };
 
-  return provider.send("eth_sendTransaction", [burnTxParams]);
+  return provider.send("qrl_sendTransaction", [burnTxParams]);
 }
 
 async function deployContract(
   provider: EthereumProvider,
   deploymentCode: string
 ) {
-  const hash = await provider.send("eth_sendTransaction", [
+  const hash = await provider.send("qrl_sendTransaction", [
     {
       from: DEFAULT_ACCOUNTS_ADDRESSES[0],
       data: deploymentCode,
@@ -83,7 +83,7 @@ async function deployContract(
     },
   ]);
 
-  const { contractAddress } = await provider.send("eth_getTransactionReceipt", [
+  const { contractAddress } = await provider.send("qrl_getTransactionReceipt", [
     hash,
   ]);
 
@@ -94,7 +94,7 @@ async function sendTransactionFromTxParams(
   provider: EthereumProvider,
   txParams: TransactionParams
 ) {
-  return provider.send("eth_sendTransaction", [
+  return provider.send("qrl_sendTransaction", [
     {
       to: bufferToHex(txParams.to),
       from: bufferToHex(txParams.from),
@@ -130,41 +130,41 @@ describe("Eth module", function () {
       setCWD();
       provider.useProvider();
 
-      describe("eth_accounts", async function () {
+      describe("qrl_accounts", async function () {
         it("should return the genesis accounts in lower case", async function () {
-          const accounts = await this.provider.send("eth_accounts");
+          const accounts = await this.provider.send("qrl_accounts");
 
           assert.deepEqual(accounts, DEFAULT_ACCOUNTS_ADDRESSES);
         });
       });
 
-      describe("eth_blockNumber", async function () {
+      describe("qrl_blockNumber", async function () {
         it("should return the current block number as QUANTITY", async function () {
-          let blockNumber = await this.provider.send("eth_blockNumber");
+          let blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 0);
 
           await sendTxToZeroAddress(this.provider);
 
-          blockNumber = await this.provider.send("eth_blockNumber");
+          blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 1);
 
           await sendTxToZeroAddress(this.provider);
 
-          blockNumber = await this.provider.send("eth_blockNumber");
+          blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 2);
 
           await sendTxToZeroAddress(this.provider);
 
-          blockNumber = await this.provider.send("eth_blockNumber");
+          blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 3);
         });
 
         it("Shouldn increase if a transaction gets to execute and fails", async function () {
-          let blockNumber = await this.provider.send("eth_blockNumber");
+          let blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 0);
 
           try {
-            await this.provider.send("eth_sendTransaction", [
+            await this.provider.send("qrl_sendTransaction", [
               {
                 from: DEFAULT_ACCOUNTS_ADDRESSES[0],
                 to: "0x0000000000000000000000000000000000000001",
@@ -178,15 +178,15 @@ describe("Eth module", function () {
             assert.notInclude(e.message, "Tx should have failed");
           }
 
-          blockNumber = await this.provider.send("eth_blockNumber");
+          blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 1);
         });
 
         it("Shouldn't increase if a call is made", async function () {
-          let blockNumber = await this.provider.send("eth_blockNumber");
+          let blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 0);
 
-          await this.provider.send("eth_call", [
+          await this.provider.send("qrl_call", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: "0x0000000000000000000000000000000000000000",
@@ -195,19 +195,19 @@ describe("Eth module", function () {
             },
           ]);
 
-          blockNumber = await this.provider.send("eth_blockNumber");
+          blockNumber = await this.provider.send("qrl_blockNumber");
           assertQuantity(blockNumber, 0);
         });
       });
 
-      describe("eth_call", async function () {
+      describe("qrl_call", async function () {
         it("Should return the value returned by the contract", async function () {
           const contractAddress = await deployContract(
             this.provider,
             `0x${EXAMPLE_CONTRACT.bytecode.object}`
           );
 
-          const result = await this.provider.send("eth_call", [
+          const result = await this.provider.send("qrl_call", [
             { to: contractAddress, data: EXAMPLE_CONTRACT.selectors.i },
           ]);
 
@@ -216,7 +216,7 @@ describe("Eth module", function () {
             "0x0000000000000000000000000000000000000000000000000000000000000000"
           );
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: contractAddress,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -224,7 +224,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          const result2 = await this.provider.send("eth_call", [
+          const result2 = await this.provider.send("qrl_call", [
             { to: contractAddress, data: EXAMPLE_CONTRACT.selectors.i },
           ]);
 
@@ -242,7 +242,7 @@ describe("Eth module", function () {
             `0x${EXAMPLE_CONTRACT.bytecode.object}`
           );
 
-          const result = await this.provider.send("eth_call", [
+          const result = await this.provider.send("qrl_call", [
             { to: contractAddress, data: EXAMPLE_CONTRACT.selectors.i, from },
           ]);
 
@@ -251,7 +251,7 @@ describe("Eth module", function () {
             "0x0000000000000000000000000000000000000000000000000000000000000000"
           );
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: contractAddress,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -259,7 +259,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          const result2 = await this.provider.send("eth_call", [
+          const result2 = await this.provider.send("qrl_call", [
             { to: contractAddress, data: EXAMPLE_CONTRACT.selectors.i, from },
           ]);
 
@@ -277,7 +277,7 @@ describe("Eth module", function () {
             `0x${EXAMPLE_READ_CONTRACT.bytecode.object}`
           );
 
-          const blockResult = await this.provider.send("eth_call", [
+          const blockResult = await this.provider.send("qrl_call", [
             {
               to: contractAddress,
               data: EXAMPLE_READ_CONTRACT.selectors.blockNumber,
@@ -290,7 +290,7 @@ describe("Eth module", function () {
             "0x0000000000000000000000000000000000000000000000000000000000000001"
           );
 
-          const timestampResult = await this.provider.send("eth_call", [
+          const timestampResult = await this.provider.send("qrl_call", [
             {
               to: contractAddress,
               data: EXAMPLE_READ_CONTRACT.selectors.blockTimestamp,
@@ -309,7 +309,7 @@ describe("Eth module", function () {
             `0x${EXAMPLE_READ_CONTRACT.bytecode.object}`
           );
 
-          const blockResult = await this.provider.send("eth_call", [
+          const blockResult = await this.provider.send("qrl_call", [
             {
               to: contractAddress,
               data: EXAMPLE_READ_CONTRACT.selectors.blockNumber,
@@ -321,7 +321,7 @@ describe("Eth module", function () {
             "0x0000000000000000000000000000000000000000000000000000000000000001"
           );
 
-          const timestampResult = await this.provider.send("eth_call", [
+          const timestampResult = await this.provider.send("qrl_call", [
             {
               to: contractAddress,
               data: EXAMPLE_READ_CONTRACT.selectors.blockTimestamp,
@@ -339,7 +339,7 @@ describe("Eth module", function () {
           const timestamp = getCurrentTimestamp() + 60;
           await this.provider.send("evm_setNextBlockTimestamp", [timestamp]);
 
-          const blockResult = await this.provider.send("eth_call", [
+          const blockResult = await this.provider.send("qrl_call", [
             {
               to: contractAddress,
               data: EXAMPLE_READ_CONTRACT.selectors.blockNumber,
@@ -352,7 +352,7 @@ describe("Eth module", function () {
             "0x0000000000000000000000000000000000000000000000000000000000000002"
           );
 
-          const timestampResult = await this.provider.send("eth_call", [
+          const timestampResult = await this.provider.send("qrl_call", [
             {
               to: contractAddress,
               data: EXAMPLE_READ_CONTRACT.selectors.blockTimestamp,
@@ -363,7 +363,7 @@ describe("Eth module", function () {
           assert.equal(timestampResult, timestamp);
         });
         it("Should return an empty buffer if called an non-contract account", async function () {
-          const result = await this.provider.send("eth_call", [
+          const result = await this.provider.send("qrl_call", [
             {
               to: DEFAULT_ACCOUNTS_ADDRESSES[0],
               data: EXAMPLE_CONTRACT.selectors.i,
@@ -374,45 +374,45 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_chainId", async function () {
+      describe("qrl_chainId", async function () {
         it("should return the chain id as QUANTITY", async function () {
           assertQuantity(
-            await this.provider.send("eth_chainId"),
+            await this.provider.send("qrl_chainId"),
             this.common.chainId()
           );
         });
       });
 
-      describe("eth_coinbase", async function () {
+      describe("qrl_coinbase", async function () {
         it("should return the the hardcoded coinbase address", async function () {
           assert.equal(
-            await this.provider.send("eth_coinbase"),
+            await this.provider.send("qrl_coinbase"),
             bufferToHex(COINBASE_ADDRESS)
           );
         });
       });
 
-      describe("eth_compileLLL", async function () {
+      describe("qrl_compileLLL", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_compileLLL");
+          await assertNotSupported(this.provider, "qrl_compileLLL");
         });
       });
 
-      describe("eth_compileSerpent", async function () {
+      describe("qrl_compileSerpent", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_compileSerpent");
+          await assertNotSupported(this.provider, "qrl_compileSerpent");
         });
       });
 
-      describe("eth_compileSolidity", async function () {
+      describe("qrl_compileSolidity", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_compileSolidity");
+          await assertNotSupported(this.provider, "qrl_compileSolidity");
         });
       });
 
-      describe("eth_estimateGas", async function () {
+      describe("qrl_estimateGas", async function () {
         it("should estimate the gas for a transfer", async function () {
-          const estimation = await this.provider.send("eth_estimateGas", [
+          const estimation = await this.provider.send("qrl_estimateGas", [
             {
               from: zeroAddress(),
               to: zeroAddress(),
@@ -423,28 +423,28 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_gasPrice", async function () {
+      describe("qrl_gasPrice", async function () {
         it("should return a fixed gas price", async function () {
-          assertQuantity(await this.provider.send("eth_gasPrice"), 8e9);
+          assertQuantity(await this.provider.send("qrl_gasPrice"), 8e9);
         });
       });
 
-      describe("eth_getBalance", async function () {
+      describe("qrl_getBalance", async function () {
         it("Should return 0 for random accounts", async function () {
           assertQuantity(
-            await this.provider.send("eth_getBalance", [zeroAddress()]),
+            await this.provider.send("qrl_getBalance", [zeroAddress()]),
             0
           );
 
           assertQuantity(
-            await this.provider.send("eth_getBalance", [
+            await this.provider.send("qrl_getBalance", [
               "0x0000000000000000000000000000000000000001",
             ]),
             0
           );
 
           assertQuantity(
-            await this.provider.send("eth_getBalance", [
+            await this.provider.send("qrl_getBalance", [
               "0x0001231287316387168230000000000000000001",
             ]),
             0
@@ -458,7 +458,7 @@ describe("Eth module", function () {
         it("Should return the updated balance after a transaction is made", async function () {
           await assertNodeBalances(this.provider, DEFAULT_ACCOUNTS_BALANCES);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[1],
@@ -473,7 +473,7 @@ describe("Eth module", function () {
             DEFAULT_ACCOUNTS_BALANCES[1].addn(1),
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[1],
@@ -492,7 +492,7 @@ describe("Eth module", function () {
         it("Should return the original balance after a call is made", async function () {
           await assertNodeBalances(this.provider, DEFAULT_ACCOUNTS_BALANCES);
 
-          await this.provider.send("eth_call", [
+          await this.provider.send("qrl_call", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[1],
@@ -502,7 +502,7 @@ describe("Eth module", function () {
 
           await assertNodeBalances(this.provider, DEFAULT_ACCOUNTS_BALANCES);
 
-          await this.provider.send("eth_call", [
+          await this.provider.send("qrl_call", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[1],
               to: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -514,14 +514,14 @@ describe("Eth module", function () {
         });
 
         it("should assign the block reward to the coinbase address", async function () {
-          const coinbase = await this.provider.send("eth_coinbase");
+          const coinbase = await this.provider.send("qrl_coinbase");
 
           assertQuantity(
-            await this.provider.send("eth_getBalance", [coinbase]),
+            await this.provider.send("qrl_getBalance", [coinbase]),
             0
           );
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -529,12 +529,12 @@ describe("Eth module", function () {
           ]);
 
           const balance = new BN(
-            toBuffer(await this.provider.send("eth_getBalance", [coinbase]))
+            toBuffer(await this.provider.send("qrl_getBalance", [coinbase]))
           );
 
           assert.isTrue(balance.gtn(0));
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -542,24 +542,24 @@ describe("Eth module", function () {
           ]);
 
           const balance2 = new BN(
-            toBuffer(await this.provider.send("eth_getBalance", [coinbase]))
+            toBuffer(await this.provider.send("qrl_getBalance", [coinbase]))
           );
 
           assert.isTrue(balance2.gt(balance));
         });
       });
 
-      describe("eth_getBlockByHash", async function () {
+      describe("qrl_getBlockByHash", async function () {
         it("should return null for non-existing blocks", async function () {
           assert.isNull(
-            await this.provider.send("eth_getBlockByHash", [
+            await this.provider.send("qrl_getBlockByHash", [
               "0x0000000000000000000000000000000000000000000000000000000000000001",
               false,
             ])
           );
 
           assert.isNull(
-            await this.provider.send("eth_getBlockByHash", [
+            await this.provider.send("qrl_getBlockByHash", [
               "0x0000000000000000000000000000000000000000000000000000000000000123",
               true,
             ])
@@ -569,12 +569,12 @@ describe("Eth module", function () {
         it("Should return the block with transaction hashes if the second argument is false", async function () {
           const txHash = await sendTxToZeroAddress(this.provider);
           const txOutput: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByHash",
+            "qrl_getTransactionByHash",
             [txHash]
           );
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByHash",
+            "qrl_getBlockByHash",
             [txOutput.blockHash, false]
           );
 
@@ -589,12 +589,12 @@ describe("Eth module", function () {
         it("Should return the block with the complete transactions if the second argument is true", async function () {
           const txHash = await sendTxToZeroAddress(this.provider);
           const txOutput: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByHash",
+            "qrl_getTransactionByHash",
             [txHash]
           );
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByHash",
+            "qrl_getBlockByHash",
             [txOutput.blockHash, true]
           );
 
@@ -610,10 +610,10 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getBlockByNumber", async function () {
-        describe("eth_getBlockByNumber", async function () {
+      describe("qrl_getBlockByNumber", async function () {
+        describe("qrl_getBlockByNumber", async function () {
           it("Should return the genesis block for number 0", async function () {
-            const block = await this.provider.send("eth_getBlockByNumber", [
+            const block = await this.provider.send("qrl_getBlockByNumber", [
               numberToRpcQuantity(0),
               false,
             ]);
@@ -628,14 +628,14 @@ describe("Eth module", function () {
           });
 
           it("Should return null for unknown blocks", async function () {
-            const block = await this.provider.send("eth_getBlockByNumber", [
+            const block = await this.provider.send("qrl_getBlockByNumber", [
               numberToRpcQuantity(2),
               false,
             ]);
 
             assert.isNull(block);
 
-            const block2 = await this.provider.send("eth_getBlockByNumber", [
+            const block2 = await this.provider.send("qrl_getBlockByNumber", [
               numberToRpcQuantity(1),
               true,
             ]);
@@ -645,14 +645,14 @@ describe("Eth module", function () {
 
           it("Should return the new blocks", async function () {
             const genesisBlock: RpcBlockOutput = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [numberToRpcQuantity(0), false]
             );
 
             const txHash = await sendTxToZeroAddress(this.provider);
 
             const block: RpcBlockOutput = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [numberToRpcQuantity(1), false]
             );
 
@@ -666,14 +666,14 @@ describe("Eth module", function () {
 
           it("should return the complete transactions if the second argument is true", async function () {
             const genesisBlock: RpcBlockOutput = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [numberToRpcQuantity(0), false]
             );
 
             const txHash = await sendTxToZeroAddress(this.provider);
 
             const block: RpcBlockOutput = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [numberToRpcQuantity(1), true]
             );
 
@@ -691,13 +691,13 @@ describe("Eth module", function () {
 
             assert.deepEqual(
               txOutput,
-              await this.provider.send("eth_getTransactionByHash", [txHash])
+              await this.provider.send("qrl_getTransactionByHash", [txHash])
             );
           });
 
           it("should return the right block total difficulty", async function () {
             const genesisBlock: RpcBlockOutput = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [numberToRpcQuantity(0), false]
             );
 
@@ -707,7 +707,7 @@ describe("Eth module", function () {
             await sendTxToZeroAddress(this.provider);
 
             const block: RpcBlockOutput = await this.provider.send(
-              "eth_getBlockByNumber",
+              "qrl_getBlockByNumber",
               [numberToRpcQuantity(1), false]
             );
 
@@ -719,10 +719,10 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getBlockTransactionCountByHash", async function () {
+      describe("qrl_getBlockTransactionCountByHash", async function () {
         it("should return null for non-existing blocks", async function () {
           assert.isNull(
-            await this.provider.send("eth_getBlockTransactionCountByHash", [
+            await this.provider.send("qrl_getBlockTransactionCountByHash", [
               "0x1111111111111111111111111111111111111111111111111111111111111111",
             ])
           );
@@ -730,12 +730,12 @@ describe("Eth module", function () {
 
         it("Should return 0 for the genesis block", async function () {
           const genesisBlock: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             [numberToRpcQuantity(0), false]
           );
 
           assertQuantity(
-            await this.provider.send("eth_getBlockTransactionCountByHash", [
+            await this.provider.send("qrl_getBlockTransactionCountByHash", [
               genesisBlock.hash,
             ]),
             0
@@ -746,12 +746,12 @@ describe("Eth module", function () {
           const txhash = await sendTxToZeroAddress(this.provider);
 
           const txOutput: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByHash",
+            "qrl_getTransactionByHash",
             [txhash]
           );
 
           assertQuantity(
-            await this.provider.send("eth_getBlockTransactionCountByHash", [
+            await this.provider.send("qrl_getBlockTransactionCountByHash", [
               txOutput.blockHash,
             ]),
             1
@@ -759,10 +759,10 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getBlockTransactionCountByNumber", async function () {
+      describe("qrl_getBlockTransactionCountByNumber", async function () {
         it("should return null for non-existing blocks", async function () {
           assert.isNull(
-            await this.provider.send("eth_getBlockTransactionCountByNumber", [
+            await this.provider.send("qrl_getBlockTransactionCountByNumber", [
               numberToRpcQuantity(1),
             ])
           );
@@ -770,7 +770,7 @@ describe("Eth module", function () {
 
         it("Should return 0 for the genesis block", async function () {
           assertQuantity(
-            await this.provider.send("eth_getBlockTransactionCountByNumber", [
+            await this.provider.send("qrl_getBlockTransactionCountByNumber", [
               numberToRpcQuantity(0),
             ]),
             0
@@ -781,7 +781,7 @@ describe("Eth module", function () {
           await sendTxToZeroAddress(this.provider);
 
           assertQuantity(
-            await this.provider.send("eth_getBlockTransactionCountByNumber", [
+            await this.provider.send("qrl_getBlockTransactionCountByNumber", [
               numberToRpcQuantity(1),
             ]),
             1
@@ -789,10 +789,10 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getCode", async function () {
+      describe("qrl_getCode", async function () {
         it("Should return an empty buffer for non-contract accounts", async function () {
           assert.equal(
-            await this.provider.send("eth_getCode", [zeroAddress()]),
+            await this.provider.send("qrl_getCode", [zeroAddress()]),
             "0x"
           );
         });
@@ -803,7 +803,7 @@ describe("Eth module", function () {
             const zero = zeroAddress();
 
             assert.equal(
-              await this.provider.send("eth_getCode", [
+              await this.provider.send("qrl_getCode", [
                 zero.substr(0, zero.length - precompileNumber.length) +
                   precompileNumber,
               ]),
@@ -822,26 +822,26 @@ describe("Eth module", function () {
           );
 
           assert.equal(
-            await this.provider.send("eth_getCode", [contractAddress]),
+            await this.provider.send("qrl_getCode", [contractAddress]),
             "0x41"
           );
         });
       });
 
-      describe("eth_getCompilers", async function () {
+      describe("qrl_getCompilers", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_getCompilers");
+          await assertNotSupported(this.provider, "qrl_getCompilers");
         });
       });
 
       describe("block filters", function () {
         it("Supports block filters", async function () {
-          assert.isString(await this.provider.send("eth_newBlockFilter"));
+          assert.isString(await this.provider.send("qrl_newBlockFilter"));
         });
 
         it("Supports uninstalling an existing filter", async function () {
-          const filterId = await this.provider.send("eth_newBlockFilter", []);
-          const uninstalled = await this.provider.send("eth_uninstallFilter", [
+          const filterId = await this.provider.send("qrl_newBlockFilter", []);
+          const uninstalled = await this.provider.send("qrl_uninstallFilter", [
             filterId,
           ]);
 
@@ -849,7 +849,7 @@ describe("Eth module", function () {
         });
 
         it("Doesn't fail on uninstalling a non-existent filter", async function () {
-          const uninstalled = await this.provider.send("eth_uninstallFilter", [
+          const uninstalled = await this.provider.send("qrl_uninstallFilter", [
             "0x1",
           ]);
 
@@ -857,8 +857,8 @@ describe("Eth module", function () {
         });
 
         it("should start returning at least one block", async function () {
-          const filterId = await this.provider.send("eth_newBlockFilter", []);
-          const blockHashes = await this.provider.send("eth_getFilterChanges", [
+          const filterId = await this.provider.send("qrl_newBlockFilter", []);
+          const blockHashes = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -866,11 +866,11 @@ describe("Eth module", function () {
         });
 
         it("should not return the same block twice", async function () {
-          const filterId = await this.provider.send("eth_newBlockFilter", []);
+          const filterId = await this.provider.send("qrl_newBlockFilter", []);
 
-          await this.provider.send("eth_getFilterChanges", [filterId]);
+          await this.provider.send("qrl_getFilterChanges", [filterId]);
 
-          const blockHashes = await this.provider.send("eth_getFilterChanges", [
+          const blockHashes = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -878,16 +878,16 @@ describe("Eth module", function () {
         });
 
         it("should return new blocks", async function () {
-          const filterId = await this.provider.send("eth_newBlockFilter", []);
+          const filterId = await this.provider.send("qrl_newBlockFilter", []);
 
           const initialHashes = await this.provider.send(
-            "eth_getFilterChanges",
+            "qrl_getFilterChanges",
             [filterId]
           );
 
           assert.lengthOf(initialHashes, 1);
 
-          const empty = await this.provider.send("eth_getFilterChanges", [
+          const empty = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -897,7 +897,7 @@ describe("Eth module", function () {
           await this.provider.send("evm_mine", []);
           await this.provider.send("evm_mine", []);
 
-          const blockHashes = await this.provider.send("eth_getFilterChanges", [
+          const blockHashes = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -905,10 +905,10 @@ describe("Eth module", function () {
         });
 
         it("should return reorganized block", async function () {
-          const filterId = await this.provider.send("eth_newBlockFilter", []);
+          const filterId = await this.provider.send("qrl_newBlockFilter", []);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterChanges", [filterId]),
+            await this.provider.send("qrl_getFilterChanges", [filterId]),
             1
           );
 
@@ -918,20 +918,20 @@ describe("Eth module", function () {
           );
 
           await this.provider.send("evm_mine", []);
-          const block1 = await this.provider.send("eth_getBlockByNumber", [
-            await this.provider.send("eth_blockNumber"),
+          const block1 = await this.provider.send("qrl_getBlockByNumber", [
+            await this.provider.send("qrl_blockNumber"),
             false,
           ]);
 
           await this.provider.send("evm_revert", [snapshotId]);
 
           await this.provider.send("evm_mine", []);
-          const block2 = await this.provider.send("eth_getBlockByNumber", [
-            await this.provider.send("eth_blockNumber"),
+          const block2 = await this.provider.send("qrl_getBlockByNumber", [
+            await this.provider.send("qrl_blockNumber"),
             false,
           ]);
 
-          const blockHashes = await this.provider.send("eth_getFilterChanges", [
+          const blockHashes = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -939,7 +939,7 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getFilterLogs", async function () {
+      describe("qrl_getFilterLogs", async function () {
         it("Supports get filter logs", async function () {
           const exampleContract = await deployContract(
             this.provider,
@@ -949,9 +949,9 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          const filterId = await this.provider.send("eth_newFilter", [{}]);
+          const filterId = await this.provider.send("qrl_newFilter", [{}]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -959,7 +959,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          const logs = await this.provider.send("eth_getFilterLogs", [
+          const logs = await this.provider.send("qrl_getFilterLogs", [
             filterId,
           ]);
           assert.lengthOf(logs, 1);
@@ -974,8 +974,8 @@ describe("Eth module", function () {
         });
 
         it("Supports uninstalling an existing log filter", async function () {
-          const filterId = await this.provider.send("eth_newFilter", [{}]);
-          const uninstalled = await this.provider.send("eth_uninstallFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [{}]);
+          const uninstalled = await this.provider.send("qrl_uninstallFilter", [
             filterId,
           ]);
 
@@ -991,13 +991,13 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          const filterId = await this.provider.send("eth_newFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [
             {
               address: exampleContract,
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1006,7 +1006,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterLogs", [filterId]),
+            await this.provider.send("qrl_getFilterLogs", [filterId]),
             1
           );
         });
@@ -1020,7 +1020,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          const filterId = await this.provider.send("eth_newFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [
             {
               topics: [
                 "0x3359f789ea83a10b6e9605d460de1088ff290dd7b3c9a155c896d45cf495ed4d",
@@ -1029,7 +1029,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1038,7 +1038,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterLogs", [filterId]),
+            await this.provider.send("qrl_getFilterLogs", [filterId]),
             1
           );
         });
@@ -1052,7 +1052,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          const filterId = await this.provider.send("eth_newFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [
             {
               topics: [
                 "0x3359f789ea83a10b6e9605d460de1088ff290dd7b3c9a155c896d45cf495ed4d",
@@ -1061,7 +1061,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1070,7 +1070,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterLogs", [filterId]),
+            await this.provider.send("qrl_getFilterLogs", [filterId]),
             1
           );
         });
@@ -1084,7 +1084,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          const filterId = await this.provider.send("eth_newFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [
             {
               topics: [
                 [
@@ -1099,7 +1099,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1108,7 +1108,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterLogs", [filterId]),
+            await this.provider.send("qrl_getFilterLogs", [filterId]),
             1
           );
         });
@@ -1122,7 +1122,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1130,7 +1130,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          const filterId = await this.provider.send("eth_newFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [
             {
               fromBlock: "0x0",
               address: exampleContract,
@@ -1146,7 +1146,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1155,7 +1155,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterLogs", [filterId]),
+            await this.provider.send("qrl_getFilterLogs", [filterId]),
             2
           );
         });
@@ -1169,7 +1169,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1177,7 +1177,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          const filterId = await this.provider.send("eth_newFilter", [
+          const filterId = await this.provider.send("qrl_newFilter", [
             {
               fromBlock: "0x0",
               toBlock: "0x2",
@@ -1194,7 +1194,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1203,13 +1203,13 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getFilterLogs", [filterId]),
+            await this.provider.send("qrl_getFilterLogs", [filterId]),
             1
           );
         });
       });
 
-      describe("eth_getLogs", async function () {
+      describe("qrl_getLogs", async function () {
         it("Supports get logs", async function () {
           const exampleContract = await deployContract(
             this.provider,
@@ -1219,7 +1219,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000007b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1228,7 +1228,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 address: "0x0000000000000000000000000000000000000000",
               },
@@ -1236,7 +1236,7 @@ describe("Eth module", function () {
             0
           );
 
-          const logs = await this.provider.send("eth_getLogs", [
+          const logs = await this.provider.send("qrl_getLogs", [
             {
               address: exampleContract,
             },
@@ -1261,7 +1261,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1270,7 +1270,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 address: exampleContract,
               },
@@ -1279,7 +1279,7 @@ describe("Eth module", function () {
           );
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 address: "0x0000000000000000000000000000000000000000",
               },
@@ -1297,7 +1297,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1306,7 +1306,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 topics: [
                   "0x3359f789ea83a10b6e9605d460de1088ff290dd7b3c9a155c896d45cf495ed4d",
@@ -1317,7 +1317,7 @@ describe("Eth module", function () {
           );
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 topics: [
                   "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -1337,7 +1337,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1346,7 +1346,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 topics: [
                   null,
@@ -1367,7 +1367,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1375,7 +1375,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1384,7 +1384,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 fromBlock: "0x2",
                 topics: [
@@ -1411,7 +1411,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1419,7 +1419,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1428,7 +1428,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 fromBlock: "0x3",
               },
@@ -1446,7 +1446,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000003b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1454,7 +1454,7 @@ describe("Eth module", function () {
             },
           ]);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1463,7 +1463,7 @@ describe("Eth module", function () {
           ]);
 
           assert.lengthOf(
-            await this.provider.send("eth_getLogs", [
+            await this.provider.send("qrl_getLogs", [
               {
                 fromBlock: "0x0",
                 toBlock: "0x2",
@@ -1474,7 +1474,7 @@ describe("Eth module", function () {
         });
 
         it("should accept out of bound block numbers", async function () {
-          const logs = await this.provider.send("eth_getLogs", [
+          const logs = await this.provider.send("qrl_getLogs", [
             {
               address: "0x0000000000000000000000000000000000000000",
               fromBlock: "0x1111",
@@ -1482,7 +1482,7 @@ describe("Eth module", function () {
           ]);
           assert.lengthOf(logs, 0);
 
-          const logs2 = await this.provider.send("eth_getLogs", [
+          const logs2 = await this.provider.send("qrl_getLogs", [
             {
               address: "0x0000000000000000000000000000000000000000",
               toBlock: "0x1111",
@@ -1492,13 +1492,13 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getProof", async function () {
+      describe("qrl_getProof", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_getProof");
+          await assertNotSupported(this.provider, "qrl_getProof");
         });
       });
 
-      describe("eth_getStorageAt", async function () {
+      describe("qrl_getStorageAt", async function () {
         describe("Imitating Ganache", function () {
           describe("When a slot has not been written into", function () {
             it("Should return `0x0`, despite it not making any sense at all", async function () {
@@ -1508,7 +1508,7 @@ describe("Eth module", function () {
               );
 
               assert.strictEqual(
-                await this.provider.send("eth_getStorageAt", [
+                await this.provider.send("qrl_getStorageAt", [
                   exampleContract,
                   numberToRpcQuantity(3),
                 ]),
@@ -1516,7 +1516,7 @@ describe("Eth module", function () {
               );
 
               assert.strictEqual(
-                await this.provider.send("eth_getStorageAt", [
+                await this.provider.send("qrl_getStorageAt", [
                   exampleContract,
                   numberToRpcQuantity(4),
                 ]),
@@ -1524,7 +1524,7 @@ describe("Eth module", function () {
               );
 
               assert.strictEqual(
-                await this.provider.send("eth_getStorageAt", [
+                await this.provider.send("qrl_getStorageAt", [
                   DEFAULT_ACCOUNTS_ADDRESSES[0],
                   numberToRpcQuantity(0),
                 ]),
@@ -1542,7 +1542,7 @@ describe("Eth module", function () {
                 );
 
                 assert.strictEqual(
-                  await this.provider.send("eth_getStorageAt", [
+                  await this.provider.send("qrl_getStorageAt", [
                     exampleContract,
                     numberToRpcQuantity(2),
                   ]),
@@ -1564,7 +1564,7 @@ describe("Eth module", function () {
                 let newState =
                   "000000000000000000000000000000000000000000000000000000000000007b";
 
-                await this.provider.send("eth_sendTransaction", [
+                await this.provider.send("qrl_sendTransaction", [
                   {
                     to: exampleContract,
                     from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1573,7 +1573,7 @@ describe("Eth module", function () {
                 ]);
 
                 assert.strictEqual(
-                  await this.provider.send("eth_getStorageAt", [
+                  await this.provider.send("qrl_getStorageAt", [
                     exampleContract,
                     numberToRpcQuantity(0),
                   ]),
@@ -1583,7 +1583,7 @@ describe("Eth module", function () {
                 newState =
                   "000000000000000000000000000000000000000000000000000000000000007c";
 
-                await this.provider.send("eth_sendTransaction", [
+                await this.provider.send("qrl_sendTransaction", [
                   {
                     to: exampleContract,
                     from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -1592,7 +1592,7 @@ describe("Eth module", function () {
                 ]);
 
                 assert.strictEqual(
-                  await this.provider.send("eth_getStorageAt", [
+                  await this.provider.send("qrl_getStorageAt", [
                     exampleContract,
                     numberToRpcQuantity(0),
                   ]),
@@ -1604,10 +1604,10 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getTransactionByBlockHashAndIndex", async function () {
+      describe("qrl_getTransactionByBlockHashAndIndex", async function () {
         it("should return null for non-existing blocks", async function () {
           assert.isNull(
-            await this.provider.send("eth_getTransactionByBlockHashAndIndex", [
+            await this.provider.send("qrl_getTransactionByBlockHashAndIndex", [
               "0x1231231231231231231231231231231231231231231231231231231231231231",
               numberToRpcQuantity(0),
             ])
@@ -1615,20 +1615,20 @@ describe("Eth module", function () {
         });
 
         it("should return null for existing blocks but non-existing indexes", async function () {
-          const block = await this.provider.send("eth_getBlockByNumber", [
+          const block = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(0),
             false,
           ]);
 
           assert.isNull(
-            await this.provider.send("eth_getTransactionByBlockHashAndIndex", [
+            await this.provider.send("qrl_getTransactionByBlockHashAndIndex", [
               block.hash,
               numberToRpcQuantity(0),
             ])
           );
 
           assert.isNull(
-            await this.provider.send("eth_getTransactionByBlockHashAndIndex", [
+            await this.provider.send("qrl_getTransactionByBlockHashAndIndex", [
               block.hash,
               numberToRpcQuantity(0),
             ])
@@ -1651,13 +1651,13 @@ describe("Eth module", function () {
             txParams1
           );
 
-          const block = await this.provider.send("eth_getBlockByNumber", [
+          const block = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(1),
             false,
           ]);
 
           const tx: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByBlockHashAndIndex",
+            "qrl_getTransactionByBlockHashAndIndex",
             [block.hash, numberToRpcQuantity(0)]
           );
 
@@ -1678,13 +1678,13 @@ describe("Eth module", function () {
             txParams2
           );
 
-          const block2 = await this.provider.send("eth_getBlockByNumber", [
+          const block2 = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(2),
             false,
           ]);
 
           const tx2: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByBlockHashAndIndex",
+            "qrl_getTransactionByBlockHashAndIndex",
             [block2.hash, numberToRpcQuantity(0)]
           );
 
@@ -1692,11 +1692,11 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getTransactionByBlockNumberAndIndex", async function () {
+      describe("qrl_getTransactionByBlockNumberAndIndex", async function () {
         it("should return null for non-existing blocks", async function () {
           assert.isNull(
             await this.provider.send(
-              "eth_getTransactionByBlockNumberAndIndex",
+              "qrl_getTransactionByBlockNumberAndIndex",
               [numberToRpcQuantity(1), numberToRpcQuantity(0)]
             )
           );
@@ -1705,14 +1705,14 @@ describe("Eth module", function () {
         it("should return null for existing blocks but non-existing indexes", async function () {
           assert.isNull(
             await this.provider.send(
-              "eth_getTransactionByBlockNumberAndIndex",
+              "qrl_getTransactionByBlockNumberAndIndex",
               [numberToRpcQuantity(0), numberToRpcQuantity(0)]
             )
           );
 
           assert.isNull(
             await this.provider.send(
-              "eth_getTransactionByBlockNumberAndIndex",
+              "qrl_getTransactionByBlockNumberAndIndex",
               [numberToRpcQuantity(1), numberToRpcQuantity(0)]
             )
           );
@@ -1734,13 +1734,13 @@ describe("Eth module", function () {
             txParams1
           );
 
-          const block = await this.provider.send("eth_getBlockByNumber", [
+          const block = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(1),
             false,
           ]);
 
           const tx: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByBlockNumberAndIndex",
+            "qrl_getTransactionByBlockNumberAndIndex",
             [numberToRpcQuantity(1), numberToRpcQuantity(0)]
           );
 
@@ -1761,13 +1761,13 @@ describe("Eth module", function () {
             txParams2
           );
 
-          const block2 = await this.provider.send("eth_getBlockByNumber", [
+          const block2 = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(2),
             false,
           ]);
 
           const tx2: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByBlockNumberAndIndex",
+            "qrl_getTransactionByBlockNumberAndIndex",
             [numberToRpcQuantity(2), numberToRpcQuantity(0)]
           );
 
@@ -1775,16 +1775,16 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getTransactionByHash", async function () {
+      describe("qrl_getTransactionByHash", async function () {
         it("should return null for unknown txs", async function () {
           assert.isNull(
-            await this.provider.send("eth_getTransactionByHash", [
+            await this.provider.send("qrl_getTransactionByHash", [
               "0x1234567890123456789012345678901234567890123456789012345678902134",
             ])
           );
 
           assert.isNull(
-            await this.provider.send("eth_getTransactionByHash", [
+            await this.provider.send("qrl_getTransactionByHash", [
               "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             ])
           );
@@ -1806,13 +1806,13 @@ describe("Eth module", function () {
             txParams1
           );
 
-          const block = await this.provider.send("eth_getBlockByNumber", [
+          const block = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(1),
             false,
           ]);
 
           const tx: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByHash",
+            "qrl_getTransactionByHash",
             [txHash]
           );
 
@@ -1833,13 +1833,13 @@ describe("Eth module", function () {
             txParams2
           );
 
-          const block2 = await this.provider.send("eth_getBlockByNumber", [
+          const block2 = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(2),
             false,
           ]);
 
           const tx2: RpcTransactionOutput = await this.provider.send(
-            "eth_getTransactionByHash",
+            "qrl_getTransactionByHash",
             [txHash2]
           );
 
@@ -1873,10 +1873,10 @@ describe("Eth module", function () {
             "Transaction reverted without a reason"
           );
 
-          const tx = await this.provider.send("eth_getTransactionByHash", [
+          const tx = await this.provider.send("qrl_getTransactionByHash", [
             txHash,
           ]);
-          const block = await this.provider.send("eth_getBlockByNumber", [
+          const block = await this.provider.send("qrl_getBlockByNumber", [
             numberToRpcQuantity(1),
             false,
           ]);
@@ -1885,24 +1885,24 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getTransactionCount", async function () {
+      describe("qrl_getTransactionCount", async function () {
         it("Should return 0 for random accounts", async function () {
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               zeroAddress(),
             ]),
             0
           );
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               "0x0000000000000000000000000000000000000001",
             ]),
             0
           );
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               "0x0001231287316387168230000000000000000001",
             ]),
             0
@@ -1911,13 +1911,13 @@ describe("Eth module", function () {
 
         it("Should return the updated count after a transaction is made", async function () {
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[0],
             ]),
             0
           );
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[1],
@@ -1928,20 +1928,20 @@ describe("Eth module", function () {
           ]);
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[0],
             ]),
             1
           );
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[1],
             ]),
             0
           );
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[1],
               to: DEFAULT_ACCOUNTS_ADDRESSES[1],
@@ -1952,14 +1952,14 @@ describe("Eth module", function () {
           ]);
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[0],
             ]),
             1
           );
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[1],
             ]),
             1
@@ -1968,13 +1968,13 @@ describe("Eth module", function () {
 
         it("Should not be affected by calls", async function () {
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[0],
             ]),
             0
           );
 
-          await this.provider.send("eth_call", [
+          await this.provider.send("qrl_call", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[1],
@@ -1985,7 +1985,7 @@ describe("Eth module", function () {
           ]);
 
           assertQuantity(
-            await this.provider.send("eth_getTransactionCount", [
+            await this.provider.send("qrl_getTransactionCount", [
               DEFAULT_ACCOUNTS_ADDRESSES[0],
             ]),
             0
@@ -1993,10 +1993,10 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getTransactionReceipt", async function () {
+      describe("qrl_getTransactionReceipt", async function () {
         it("should return null for unknown txs", async function () {
           const receipt = await this.provider.send(
-            "eth_getTransactionReceipt",
+            "qrl_getTransactionReceipt",
             [
               "0x1234567876543234567876543456765434567aeaeaed67616732632762762373",
             ]
@@ -2011,7 +2011,7 @@ describe("Eth module", function () {
             `0x${EXAMPLE_CONTRACT.bytecode.object}`
           );
 
-          const txHash = await this.provider.send("eth_sendTransaction", [
+          const txHash = await this.provider.send("qrl_sendTransaction", [
             {
               to: contractAddress,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -2020,12 +2020,12 @@ describe("Eth module", function () {
           ]);
 
           const block: RpcBlockOutput = await this.provider.send(
-            "eth_getBlockByNumber",
+            "qrl_getBlockByNumber",
             [numberToRpcQuantity(2), false]
           );
 
           const receipt: RpcTransactionReceiptOutput = await this.provider.send(
-            "eth_getTransactionReceipt",
+            "qrl_getTransactionReceipt",
             [txHash]
           );
 
@@ -2090,7 +2090,7 @@ describe("Eth module", function () {
           );
 
           const receipt = await this.provider.send(
-            "eth_getTransactionReceipt",
+            "qrl_getTransactionReceipt",
             [txHash]
           );
 
@@ -2098,73 +2098,73 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_getUncleByBlockHashAndIndex", async function () {
+      describe("qrl_getUncleByBlockHashAndIndex", async function () {
         it("is not supported", async function () {
           await assertNotSupported(
             this.provider,
-            "eth_getUncleByBlockHashAndIndex"
+            "qrl_getUncleByBlockHashAndIndex"
           );
         });
       });
 
-      describe("eth_getUncleByBlockNumberAndIndex", async function () {
+      describe("qrl_getUncleByBlockNumberAndIndex", async function () {
         it("is not supported", async function () {
           await assertNotSupported(
             this.provider,
-            "eth_getUncleByBlockNumberAndIndex"
+            "qrl_getUncleByBlockNumberAndIndex"
           );
         });
       });
 
-      describe("eth_getUncleCountByBlockHash", async function () {
+      describe("qrl_getUncleCountByBlockHash", async function () {
         it("is not supported", async function () {
           await assertNotSupported(
             this.provider,
-            "eth_getUncleCountByBlockHash"
+            "qrl_getUncleCountByBlockHash"
           );
         });
       });
 
-      describe("eth_getUncleCountByBlockNumber", async function () {
+      describe("qrl_getUncleCountByBlockNumber", async function () {
         it("is not supported", async function () {
           await assertNotSupported(
             this.provider,
-            "eth_getUncleCountByBlockNumber"
+            "qrl_getUncleCountByBlockNumber"
           );
         });
       });
 
-      describe("eth_getWork", async function () {
+      describe("qrl_getWork", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_getWork");
+          await assertNotSupported(this.provider, "qrl_getWork");
         });
       });
 
-      describe("eth_hashrate", async function () {
+      describe("qrl_hashrate", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_hashrate");
+          await assertNotSupported(this.provider, "qrl_hashrate");
         });
       });
 
-      describe("eth_mining", async function () {
+      describe("qrl_mining", async function () {
         it("should return false", async function () {
-          assert.deepEqual(await this.provider.send("eth_mining"), false);
+          assert.deepEqual(await this.provider.send("qrl_mining"), false);
         });
       });
 
-      describe("eth_newPendingTransactionFilter", async function () {
+      describe("qrl_newPendingTransactionFilter", async function () {
         it("Supports pending transaction filter", async function () {
           assert.isString(
-            await this.provider.send("eth_newPendingTransactionFilter")
+            await this.provider.send("qrl_newPendingTransactionFilter")
           );
         });
 
         it("Supports uninstalling an existing filter", async function () {
           const filterId = await this.provider.send(
-            "eth_newPendingTransactionFilter",
+            "qrl_newPendingTransactionFilter",
             []
           );
-          const uninstalled = await this.provider.send("eth_uninstallFilter", [
+          const uninstalled = await this.provider.send("qrl_uninstallFilter", [
             filterId,
           ]);
 
@@ -2173,19 +2173,19 @@ describe("Eth module", function () {
 
         it("Should return new pending transactions", async function () {
           const filterId = await this.provider.send(
-            "eth_newPendingTransactionFilter",
+            "qrl_newPendingTransactionFilter",
             []
           );
 
-          const accounts = await this.provider.send("eth_accounts");
+          const accounts = await this.provider.send("qrl_accounts");
           const burnTxParams = {
             from: accounts[0],
             to: zeroAddress(),
             gas: numberToRpcQuantity(21000),
           };
 
-          await this.provider.send("eth_sendTransaction", [burnTxParams]);
-          const txHashes = await this.provider.send("eth_getFilterChanges", [
+          await this.provider.send("qrl_sendTransaction", [burnTxParams]);
+          const txHashes = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -2194,25 +2194,25 @@ describe("Eth module", function () {
 
         it("Should not return new pending transactions after uninstall", async function () {
           const filterId = await this.provider.send(
-            "eth_newPendingTransactionFilter",
+            "qrl_newPendingTransactionFilter",
             []
           );
 
-          const uninstalled = await this.provider.send("eth_uninstallFilter", [
+          const uninstalled = await this.provider.send("qrl_uninstallFilter", [
             filterId,
           ]);
 
           assert.isTrue(uninstalled);
 
-          const accounts = await this.provider.send("eth_accounts");
+          const accounts = await this.provider.send("qrl_accounts");
           const burnTxParams = {
             from: accounts[0],
             to: zeroAddress(),
             gas: numberToRpcQuantity(21000),
           };
 
-          await this.provider.send("eth_sendTransaction", [burnTxParams]);
-          const txHashes = await this.provider.send("eth_getFilterChanges", [
+          await this.provider.send("qrl_sendTransaction", [burnTxParams]);
+          const txHashes = await this.provider.send("qrl_getFilterChanges", [
             filterId,
           ]);
 
@@ -2220,26 +2220,26 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_pendingTransactions", async function () {
+      describe("qrl_pendingTransactions", async function () {
         it("should return an empty array, as there is no pending transactions support", async function () {
           assert.deepEqual(
-            await this.provider.send("eth_pendingTransactions"),
+            await this.provider.send("qrl_pendingTransactions"),
             []
           );
         });
       });
 
-      describe("eth_protocolVersion", async function () {
+      describe("qrl_protocolVersion", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_protocolVersion");
+          await assertNotSupported(this.provider, "qrl_protocolVersion");
         });
       });
 
-      describe("eth_sendRawTransaction", async function () {
+      describe("qrl_sendRawTransaction", async function () {
         it("Should throw if the data isn't a proper transaction", async function () {
           await assertInvalidInputError(
             this.provider,
-            "eth_sendRawTransaction",
+            "qrl_sendRawTransaction",
             ["0x123456"],
             "Invalid transaction"
           );
@@ -2248,9 +2248,9 @@ describe("Eth module", function () {
         it("Should throw if the signature is invalid", async function () {
           await assertInvalidInputError(
             this.provider,
-            "eth_sendRawTransaction",
+            "qrl_sendRawTransaction",
             [
-              // This transaction was obtained with eth_sendTransaction, and its r value was wiped
+              // This transaction was obtained with qrl_sendTransaction, and its r value was wiped
               "0xf3808501dcd6500083015f9080800082011a80a00dbd1a45b7823be518540ca77afb7178a470b8054281530a6cdfd0ad3328cf96",
             ],
             "Invalid transaction signature"
@@ -2260,7 +2260,7 @@ describe("Eth module", function () {
         it("Should throw if the signature is invalid but for another chain (EIP155)", async function () {
           await assertInvalidInputError(
             this.provider,
-            "eth_sendRawTransaction",
+            "qrl_sendRawTransaction",
             [
               "0xf86e820a0f843b9aca0083030d40941aad5e821c667e909c16a49363ca48f672b46c5d88169866e539efe0008025a07bc6a357d809c9d27f8f5a826861e7f9b4b7c9cff4f91f894b88e98212069b3da05dbadbdfa67bab1d76d2d81e33d90162d508431362331f266dd6aa0cb4b525aa",
             ],
@@ -2271,12 +2271,12 @@ describe("Eth module", function () {
         it("Should send the raw transaction", async function () {
           // This test is a copy of: Should work with just from and data
 
-          const hash = await this.provider.send("eth_sendRawTransaction", [
+          const hash = await this.provider.send("qrl_sendRawTransaction", [
             "0xf853808501dcd6500083015f9080800082011aa09c8def73818f79b6493b7a3f7ce47b557694ca195d1b54bb74e3d98990041b44a00dbd1a45b7823be518540ca77afb7178a470b8054281530a6cdfd0ad3328cf96",
           ]);
 
           const receipt = await this.provider.send(
-            "eth_getTransactionReceipt",
+            "qrl_getTransactionReceipt",
             [hash]
           );
 
@@ -2302,7 +2302,7 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_sendTransaction", async function () {
+      describe("qrl_sendTransaction", async function () {
         // Because of the way we are testing this (i.e. integration testing) it's almost impossible to
         // fully test this method in a reasonable amount of time. This is because it executes the core
         // of Ethereum: its state transition function.
@@ -2362,7 +2362,7 @@ describe("Eth module", function () {
         });
 
         it("Should work with just from and data", async function () {
-          const hash = await this.provider.send("eth_sendTransaction", [
+          const hash = await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               data: "0x00",
@@ -2370,7 +2370,7 @@ describe("Eth module", function () {
           ]);
 
           const receipt = await this.provider.send(
-            "eth_getTransactionReceipt",
+            "qrl_getTransactionReceipt",
             [hash]
           );
 
@@ -2495,7 +2495,7 @@ describe("Eth module", function () {
         });
 
         it("Should fail if a successful tx is sent more than once", async function () {
-          const hash = await this.provider.send("eth_sendTransaction", [
+          const hash = await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -2524,7 +2524,7 @@ describe("Eth module", function () {
           // This transaction is invalid now, because of its nonce
           await assertTransactionFailure(this.provider, txParams);
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
               to: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -2533,7 +2533,7 @@ describe("Eth module", function () {
           ]);
 
           // The transaction is now valid
-          const hash = await this.provider.send("eth_sendTransaction", [
+          const hash = await this.provider.send("qrl_sendTransaction", [
             txParams,
           ]);
 
@@ -2546,41 +2546,41 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_sign", async function () {
+      describe("qrl_sign", async function () {
         // TODO: Test this. Note that it's implementation is tested in one of
         // our provider wrappers, but re-test it here anyway.
       });
 
-      describe("eth_signTransaction", async function () {
+      describe("qrl_signTransaction", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_signTransaction");
+          await assertNotSupported(this.provider, "qrl_signTransaction");
         });
       });
 
-      describe("eth_signTypedData", async function () {
-        // TODO: Test this. Note that it just forwards to/from eth-sign-util
+      describe("qrl_signTypedData", async function () {
+        // TODO: Test this. Note that it just forwards to/from eth-sig-util
       });
 
-      describe("eth_submitHashrate", async function () {
+      describe("qrl_submitHashrate", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_submitHashrate");
+          await assertNotSupported(this.provider, "qrl_submitHashrate");
         });
       });
 
-      describe("eth_submitWork", async function () {
+      describe("qrl_submitWork", async function () {
         it("is not supported", async function () {
-          await assertNotSupported(this.provider, "eth_submitWork");
+          await assertNotSupported(this.provider, "qrl_submitWork");
         });
       });
 
-      describe("eth_subscribe", async function () {
+      describe("qrl_subscribe", async function () {
         if (provider.name === "JSON-RPC") {
           return;
         }
 
         it("Supports newHeads subscribe", async function () {
           const heads: any[] = [];
-          const filterId = await this.provider.send("eth_subscribe", [
+          const filterId = await this.provider.send("qrl_subscribe", [
             "newHeads",
           ]);
 
@@ -2597,7 +2597,7 @@ describe("Eth module", function () {
           await this.provider.send("evm_mine", []);
 
           assert.isTrue(
-            await this.provider.send("eth_unsubscribe", [filterId])
+            await this.provider.send("qrl_unsubscribe", [filterId])
           );
 
           assert.lengthOf(heads, 3);
@@ -2605,7 +2605,7 @@ describe("Eth module", function () {
 
         it("Supports newPendingTransactions subscribe", async function () {
           const pendingTransactions: string[] = [];
-          const filterId = await this.provider.send("eth_subscribe", [
+          const filterId = await this.provider.send("qrl_subscribe", [
             "newPendingTransactions",
           ]);
 
@@ -2617,20 +2617,20 @@ describe("Eth module", function () {
 
           this.provider.addListener("notifications", listener);
 
-          const accounts = await this.provider.send("eth_accounts");
+          const accounts = await this.provider.send("qrl_accounts");
           const burnTxParams = {
             from: accounts[0],
             to: zeroAddress(),
             gas: numberToRpcQuantity(21000),
           };
 
-          await this.provider.send("eth_sendTransaction", [burnTxParams]);
+          await this.provider.send("qrl_sendTransaction", [burnTxParams]);
 
           assert.isTrue(
-            await this.provider.send("eth_unsubscribe", [filterId])
+            await this.provider.send("qrl_unsubscribe", [filterId])
           );
 
-          await this.provider.send("eth_sendTransaction", [burnTxParams]);
+          await this.provider.send("qrl_sendTransaction", [burnTxParams]);
 
           assert.lengthOf(pendingTransactions, 1);
         });
@@ -2642,7 +2642,7 @@ describe("Eth module", function () {
           );
 
           const logs: RpcLogOutput[] = [];
-          const filterId = await this.provider.send("eth_subscribe", [
+          const filterId = await this.provider.send("qrl_subscribe", [
             "logs",
             {
               address: exampleContract,
@@ -2660,7 +2660,7 @@ describe("Eth module", function () {
           const newState =
             "000000000000000000000000000000000000000000000000000000000000007b";
 
-          await this.provider.send("eth_sendTransaction", [
+          await this.provider.send("qrl_sendTransaction", [
             {
               to: exampleContract,
               from: DEFAULT_ACCOUNTS_ADDRESSES[0],
@@ -2672,25 +2672,25 @@ describe("Eth module", function () {
         });
       });
 
-      describe("eth_syncing", async function () {
+      describe("qrl_syncing", async function () {
         it("Should return false", async function () {
-          assert.deepEqual(await this.provider.send("eth_syncing"), false);
+          assert.deepEqual(await this.provider.send("qrl_syncing"), false);
         });
       });
 
-      describe("eth_unsubscribe", async function () {
+      describe("qrl_unsubscribe", async function () {
         it("Supports unsubscribe", async function () {
-          const filterId = await this.provider.send("eth_subscribe", [
+          const filterId = await this.provider.send("qrl_subscribe", [
             "newHeads",
           ]);
 
           assert.isTrue(
-            await this.provider.send("eth_unsubscribe", [filterId])
+            await this.provider.send("qrl_unsubscribe", [filterId])
           );
         });
 
         it("Doesn't fail when unsubscribe is called for a non-existent filter", async function () {
-          assert.isFalse(await this.provider.send("eth_unsubscribe", ["0x1"]));
+          assert.isFalse(await this.provider.send("qrl_unsubscribe", ["0x1"]));
         });
       });
     });

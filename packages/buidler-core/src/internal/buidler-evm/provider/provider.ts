@@ -96,7 +96,7 @@ export class BuidlerEVMProvider extends EventEmitter
       // We log after running the method, because we want to use different
       // colors depending on whether it failed or not
 
-      // TODO: If an eth_call, eth_sendTransaction, or eth_sendRawTransaction
+      // TODO: If a qrl_call, qrl_sendTransaction, or qrl_sendRawTransaction
       //  fails without throwing, this will be displayed in green. It's unclear
       //  if this is correct. See Eth module's TODOs for more info.
 
@@ -187,7 +187,7 @@ export class BuidlerEVMProvider extends EventEmitter
   private async _send(method: string, params: any[] = []): Promise<any> {
     await this._init();
 
-    if (method.startsWith("eth_")) {
+    if (method.startsWith("qrl_")) {
       return this._ethModule!.processRequest(method, params);
     }
 
@@ -303,8 +303,8 @@ export class BuidlerEVMProvider extends EventEmitter
       });
     };
 
-    // Handle eth_subscribe events and proxy them to handler
-    this._node.addListener("ethEvent", listener);
+    // Handle qrl_subscribe events and proxy them to handler
+    this._node.addListener("qrlEvent", listener);
   }
 
   private _logModuleMessages(): boolean {

@@ -52,11 +52,11 @@ export function createLocalAccountsProvider(
       "ethereumjs-util"
     );
 
-    if (method === "eth_accounts" || method === "eth_requestAccounts") {
+    if (method === "qrl_accounts" || method === "qrl_requestAccounts") {
       return [...addresses];
     }
 
-    if (method === "eth_sign") {
+    if (method === "qrl_sign") {
       const [address, data] = params;
 
       if (address !== undefined) {
@@ -79,7 +79,7 @@ export function createLocalAccountsProvider(
       }
     }
 
-    if (method === "eth_signTypedData") {
+    if (method === "qrl_signTypedData") {
       const [address, data] = params;
 
       if (address !== undefined) {
@@ -101,7 +101,7 @@ export function createLocalAccountsProvider(
       }
     }
 
-    if (method === "eth_sendTransaction" && params.length > 0) {
+    if (method === "qrl_sendTransaction" && params.length > 0) {
       const tx: JsonRpcTransactionData = params[0];
 
       if (tx.gas === undefined) {
@@ -119,7 +119,7 @@ export function createLocalAccountsProvider(
       }
 
       if (tx.nonce === undefined) {
-        tx.nonce = await provider.send("eth_getTransactionCount", [
+        tx.nonce = await provider.send("qrl_getTransactionCount", [
           tx.from,
           "pending",
         ]);
@@ -141,7 +141,7 @@ export function createLocalAccountsProvider(
         privateKey
       );
 
-      return provider.send("eth_sendRawTransaction", [
+      return provider.send("qrl_sendRawTransaction", [
         bufferToHex(rawTransaction),
       ]);
     }
@@ -199,9 +199,9 @@ export function createSenderProvider(
 
   return wrapSend(provider, async (method: string, params: any[]) => {
     if (
-      method === "eth_sendTransaction" ||
-      method === "eth_call" ||
-      method === "eth_estimateGas"
+      method === "qrl_sendTransaction" ||
+      method === "qrl_call" ||
+      method === "qrl_estimateGas"
     ) {
       const tx: JsonRpcTransactionData = params[0];
 
@@ -210,7 +210,7 @@ export function createSenderProvider(
 
         if (senderAccount !== undefined) {
           tx.from = senderAccount;
-        } else if (method === "eth_sendTransaction") {
+        } else if (method === "qrl_sendTransaction") {
           throw new BuidlerError(ERRORS.NETWORK.NO_REMOTE_ACCOUNT_AVAILABLE);
         }
       }
@@ -224,7 +224,7 @@ export function createSenderProvider(
       return addresses;
     }
 
-    addresses = (await provider.send("eth_accounts")) as string[];
+    addresses = (await provider.send("qrl_accounts")) as string[];
     return addresses;
   }
 }
