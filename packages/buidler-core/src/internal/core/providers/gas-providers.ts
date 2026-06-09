@@ -28,13 +28,19 @@ export function createFixedGasPriceProvider(
   provider: IEthereumProvider,
   gasPrice: number
 ) {
-  const rpcGasPrice = numberToRpcQuantity(gasPrice);
+  const rpcMaxFeePerGas = numberToRpcQuantity(gasPrice);
 
   return wrapSend(provider, async (method, params) => {
     if (method === "qrl_sendTransaction") {
       const tx = params[0];
+      if (tx !== undefined && tx.maxFeePerGas === undefined) {
+        tx.maxFeePerGas = rpcMaxFeePerGas;
+      }
+      if (tx !== undefined && tx.maxPriorityFeePerGas === undefined) {
+        tx.maxPriorityFeePerGas = rpcMaxFeePerGas;
+      }
       if (tx !== undefined && tx.gasPrice === undefined) {
-        tx.gasPrice = rpcGasPrice;
+        tx.gasPrice = rpcMaxFeePerGas;
       }
     }
 
@@ -65,17 +71,29 @@ export function createAutomaticGasProvider(
 }
 
 export function createAutomaticGasPriceProvider(provider: IEthereumProvider) {
-  let gasPrice: string | undefined;
+  let maxFeePerGas: string | undefined;
 
   return wrapSend(provider, async (method, params) => {
     if (method === "qrl_sendTransaction") {
       const tx = params[0];
-      if (tx !== undefined && tx.gasPrice === undefined) {
-        if (gasPrice === undefined) {
-          gasPrice = await provider.send("qrl_gasPrice");
+      if (
+        tx !== undefined &&
+        (tx.maxFeePerGas === undefined ||
+          tx.maxPriorityFeePerGas === undefined)
+      ) {
+        if (maxFeePerGas === undefined) {
+          maxFeePerGas = await provider.send("qrl_gasPrice");
         }
 
-        tx.gasPrice = gasPrice;
+        if (tx.maxFeePerGas === undefined) {
+          tx.maxFeePerGas = maxFeePerGas;
+        }
+        if (tx.maxPriorityFeePerGas === undefined) {
+          tx.maxPriorityFeePerGas = maxFeePerGas;
+        }
+        if (tx.gasPrice === undefined) {
+          tx.gasPrice = maxFeePerGas;
+        }
       }
     }
 

@@ -253,6 +253,15 @@ Please make sure your node is running, and check your internet connection and ne
 
 Try using another mnemonic or deriving less keys.`,
     },
+    QRL_HD_ACCOUNTS_UNSUPPORTED: {
+      number: 113,
+      message:
+        "HD accounts are not supported by the QRL local accounts provider yet.",
+      title: "Unsupported QRL HD accounts",
+      description: `The QRL local accounts provider expects explicit ML-DSA-87 extended seeds.
+
+HD mnemonic derivation from the original Ethereum provider produced ECDSA private keys and cannot be reused for QRL signing.`,
+    },
   },
   TASK_DEFINITIONS: {
     PARAM_AFTER_VARIADIC: {

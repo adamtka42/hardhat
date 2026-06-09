@@ -1,63 +1,42 @@
-import { Transaction as TransactionT } from "ethereumjs-tx";
-import { bufferToHex } from "ethereumjs-util";
-
 import { IEthereumProvider } from "../../../types";
-import { deriveKeyFromMnemonicAndPath } from "../../util/keys-derivation";
 import { BuidlerError } from "../errors";
 import { ERRORS } from "../errors-list";
 
-import {
-  internalBufferToQrlAddress,
-  qrlAddressToInternalBuffer,
-} from "../../buidler-evm/provider/qrl-address";
 import { createChainIdGetter } from "./provider-utils";
 import { wrapSend } from "./wrapper";
-
-// This library's types are wrong, they don't type check
-// tslint:disable-next-line no-var-requires
-const ethSigUtil = require("eth-sig-util");
 
 export interface JsonRpcTransactionData {
   from?: string;
   to?: string;
   gas?: string | number;
+  gasLimit?: string | number;
   gasPrice?: string | number;
+  maxFeePerGas?: string | number;
+  maxPriorityFeePerGas?: string | number;
   value?: string | number;
   data?: string;
   nonce?: string | number;
+  chainId?: string | number;
 }
-
-const HD_PATH_REGEX = /^m(:?\/\d+'?)+\/?$/;
 
 export function createLocalAccountsProvider(
   provider: IEthereumProvider,
-  hexPrivateKeys: string[]
+  extendedSeeds: string[]
 ) {
-  const {
-    toBuffer,
-    privateToAddress,
-  } = require("ethereumjs-util");
-
-  const privateKeys = hexPrivateKeys.map((h) => toBuffer(h));
-  const addresses = privateKeys.map((pk) =>
-    internalBufferToQrlAddress(privateToAddress(pk))
-  );
+  const seeds = [...extendedSeeds];
+  const addresses = seeds.map((seed) => seedToQrlAccount(seed).address);
 
   const getChainId = createChainIdGetter(provider);
 
-  function getPrivateKey(address: string): Buffer | undefined {
+  function getSeed(address: string): string | undefined {
     for (let i = 0; i < addresses.length; i++) {
       if (addresses[i].toLowerCase() === address.toLowerCase()) {
-        return privateKeys[i];
+        return seeds[i];
       }
     }
   }
 
   return wrapSend(provider, async (method: string, params: any[]) => {
-    const { ecsign, hashPersonalMessage, toRpcSig } = await import(
-      "ethereumjs-util"
-    );
-
     if (method === "qrl_accounts" || method === "qrl_requestAccounts") {
       return [...addresses];
     }
@@ -70,57 +49,39 @@ export function createLocalAccountsProvider(
           throw new BuidlerError(ERRORS.NETWORK.ETHSIGN_MISSING_DATA_PARAM);
         }
 
-        const privateKey = getPrivateKey(address);
+        const seed = getSeed(address);
 
-        if (privateKey === undefined) {
+        if (seed === undefined) {
           throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
             account: address,
           });
         }
 
-        const messageHash = hashPersonalMessage(toBuffer(data));
-
-        const signature = ecsign(messageHash, privateKey);
-        return toRpcSig(signature.v, signature.r, signature.s);
-      }
-    }
-
-    if (method === "qrl_signTypedData") {
-      const [address, data] = params;
-
-      if (address !== undefined) {
-        if (data === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.ETHSIGN_MISSING_DATA_PARAM);
-        }
-
-        const privateKey = getPrivateKey(address);
-
-        if (privateKey === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
-            account: address,
-          });
-        }
-
-        return ethSigUtil.signTypedData_v4(privateKey, {
-          data,
-        });
+        return signQrlMessage(data, seed);
       }
     }
 
     if (method === "qrl_sendTransaction" && params.length > 0) {
       const tx: JsonRpcTransactionData = params[0];
 
-      if (tx.gas === undefined) {
+      if (tx.gas === undefined && tx.gasLimit === undefined) {
         throw new BuidlerError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
           { param: "gas" }
         );
       }
 
-      if (tx.gasPrice === undefined) {
+      if (tx.maxFeePerGas === undefined && tx.gasPrice === undefined) {
         throw new BuidlerError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
-          { param: "gasPrice" }
+          { param: "maxFeePerGas" }
+        );
+      }
+
+      if (tx.maxPriorityFeePerGas === undefined && tx.gasPrice === undefined) {
+        throw new BuidlerError(
+          ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
+          { param: "maxPriorityFeePerGas" }
         );
       }
 
@@ -131,9 +92,9 @@ export function createLocalAccountsProvider(
         ]);
       }
 
-      const privateKey = getPrivateKey(tx.from!);
+      const seed = getSeed(tx.from!);
 
-      if (privateKey === undefined) {
+      if (seed === undefined) {
         throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
           account: tx.from,
         });
@@ -141,15 +102,9 @@ export function createLocalAccountsProvider(
 
       const chainId = await getChainId();
 
-      const rawTransaction = await getSignedTransaction(
-        tx,
-        chainId,
-        privateKey
-      );
+      const rawTransaction = await getSignedTransaction(tx, chainId, seed);
 
-      return provider.send("qrl_sendRawTransaction", [
-        bufferToHex(rawTransaction),
-      ]);
+      return provider.send("qrl_sendRawTransaction", [rawTransaction]);
     }
 
     return provider.send(method, params);
@@ -157,44 +112,13 @@ export function createLocalAccountsProvider(
 }
 
 export function createHDWalletProvider(
-  provider: IEthereumProvider,
-  mnemonic: string,
-  hdpath: string = "m/44'/60'/0'/0/",
-  initialIndex: number = 0,
-  count: number = 10
+  _provider: IEthereumProvider,
+  _mnemonic: string,
+  _hdpath: string = "m/44'/60'/0'/0/",
+  _initialIndex: number = 0,
+  _count: number = 10
 ) {
-  if (hdpath.match(HD_PATH_REGEX) === null) {
-    throw new BuidlerError(ERRORS.NETWORK.INVALID_HD_PATH, { path: hdpath });
-  }
-
-  if (!hdpath.endsWith("/")) {
-    hdpath += "/";
-  }
-
-  const privateKeys: Buffer[] = [];
-
-  for (let i = initialIndex; i < initialIndex + count; i++) {
-    const privateKey = deriveKeyFromMnemonicAndPath(
-      mnemonic,
-      hdpath + i.toString()
-    );
-
-    if (privateKey === undefined) {
-      throw new BuidlerError(ERRORS.NETWORK.CANT_DERIVE_KEY, {
-        mnemonic,
-        path: hdpath,
-      });
-    }
-
-    privateKeys.push(privateKey);
-  }
-
-  const { bufferToHex } = require("ethereumjs-util");
-
-  return createLocalAccountsProvider(
-    provider,
-    privateKeys.map((pk) => bufferToHex(pk))
-  );
+  throw new BuidlerError(ERRORS.NETWORK.QRL_HD_ACCOUNTS_UNSUPPORTED);
 }
 
 export function createSenderProvider(
@@ -238,42 +162,39 @@ export function createSenderProvider(
 async function getSignedTransaction(
   tx: JsonRpcTransactionData,
   chainId: number,
-  privateKey: Buffer
-): Promise<Buffer> {
-  const chains = require("ethereumjs-common/dist/chains");
+  seed: string
+): Promise<string> {
+  const {
+    FeeMarketEIP1559Transaction,
+    signTransaction,
+  } = require("@theqrl/web3-qrl-accounts");
 
-  const { Transaction } = await import("ethereumjs-tx");
-  let transaction: TransactionT;
-  const normalizedTx: JsonRpcTransactionData = {
-    ...tx,
-    from:
-      tx.from !== undefined
-        ? bufferToHex(qrlAddressToInternalBuffer(tx.from))
-        : undefined,
-    to:
-      tx.to !== undefined
-        ? bufferToHex(qrlAddressToInternalBuffer(tx.to))
-        : undefined,
-  };
+  const gasLimit = tx.gasLimit ?? tx.gas;
+  const maxFeePerGas = tx.maxFeePerGas ?? tx.gasPrice;
+  const maxPriorityFeePerGas = tx.maxPriorityFeePerGas ?? tx.gasPrice;
 
-  if (chains.chains.names[chainId] !== undefined) {
-    transaction = new Transaction(normalizedTx, { chain: chainId });
-  } else {
-    const { default: Common } = await import("ethereumjs-common");
+  const transaction = FeeMarketEIP1559Transaction.fromTxData({
+    type: "0x2",
+    chainId: tx.chainId ?? chainId,
+    nonce: tx.nonce,
+    gasLimit,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    to: tx.to,
+    value: tx.value,
+    data: tx.data ?? "0x",
+    accessList: [],
+  });
 
-    const common = Common.forCustomChain(
-      "mainnet",
-      {
-        chainId,
-        networkId: chainId,
-      },
-      "istanbul"
-    );
+  const signed = await signTransaction(transaction, seed);
+  return signed.rawTransaction;
+}
 
-    transaction = new Transaction(normalizedTx, { common });
-  }
+function seedToQrlAccount(seed: string): any {
+  const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+  return seedToAccount(seed);
+}
 
-  transaction.sign(privateKey);
-
-  return transaction.serialize();
+function signQrlMessage(data: string, seed: string): string {
+  return seedToQrlAccount(seed).sign(data).signature;
 }
