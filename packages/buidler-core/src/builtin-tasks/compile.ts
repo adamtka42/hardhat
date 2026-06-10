@@ -13,13 +13,15 @@ import {
 import { internalTask, task, types } from "../internal/core/config/config-env";
 import { BuidlerError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
-import { Compiler } from "../internal/solidity/compiler";
-import { getInputFromDependencyGraph } from "../internal/solidity/compiler/compiler-input";
+import {
+  compileHyperion,
+  HyperionInput,
+} from "../internal/hyperion/compiler";
 import { DependencyGraph } from "../internal/solidity/dependencyGraph";
 import { Resolver } from "../internal/solidity/resolver";
 import { glob } from "../internal/util/glob";
 import { pluralize } from "../internal/util/strings";
-import { ResolvedBuidlerConfig, SolcInput } from "../types";
+import { ResolvedBuidlerConfig } from "../types";
 
 import {
   TASK_BUILD_ARTIFACTS,
@@ -70,7 +72,7 @@ function isConsoleLogError(error: any): boolean {
 
 export default function () {
   internalTask(TASK_COMPILE_GET_SOURCE_PATHS, async (_, { config }) => {
-    return glob(path.join(config.paths.sources, "**/*.sol"));
+    return glob(path.join(config.paths.sources, "**/*.hyp"));
   });
 
   internalTask(
@@ -95,15 +97,24 @@ export default function () {
   );
 
   internalTask(TASK_COMPILE_GET_COMPILER_INPUT, async (_, { config, run }) => {
-    const dependencyGraph: DependencyGraph = await run(
-      TASK_COMPILE_GET_DEPENDENCY_GRAPH
-    );
+    const sourcePaths: string[] = await run(TASK_COMPILE_GET_SOURCE_PATHS);
+    const sources: HyperionInput["sources"] = {};
 
-    return getInputFromDependencyGraph(
-      dependencyGraph,
-      config.solc.optimizer,
-      config.solc.evmVersion
-    );
+    for (const sourcePath of sourcePaths) {
+      const sourceName = path.relative(config.paths.root, sourcePath);
+      sources[sourceName] = {
+        content: await fsExtra.readFile(sourcePath, { encoding: "utf8" }),
+      };
+    }
+
+    return {
+      language: "Hyperion",
+      sourcePaths,
+      sources,
+      settings: {
+        optimizer: config.solc.optimizer,
+      },
+    };
   });
 
   internalTask(TASK_COMPILE_RUN_COMPILER)
@@ -113,19 +124,14 @@ export default function () {
       undefined,
       types.json
     )
-    .setAction(async ({ input }: { input: SolcInput }, { config }) => {
-      const compiler = new Compiler(
-        config.solc.version,
-        path.join(config.paths.cache, "compilers")
-      );
-
-      return compiler.compile(input);
+    .setAction(async ({ input }: { input: HyperionInput }, { config }) => {
+      return compileHyperion(input, config.paths.root);
     });
 
   internalTask(TASK_COMPILE_COMPILE, async (_, { config, run }) => {
     const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
 
-    console.log("Compiling...");
+    console.log("Compiling Hyperion sources...");
     const output = await run(TASK_COMPILE_RUN_COMPILER, { input });
 
     let hasErrors = false;
@@ -173,13 +179,12 @@ export default function () {
       return false;
     }
 
-    const dependencyGraph: DependencyGraph = await run(
-      TASK_COMPILE_GET_DEPENDENCY_GRAPH
+    const sourcePaths: string[] = await run(TASK_COMPILE_GET_SOURCE_PATHS);
+    const sourceTimestamps = await Promise.all(
+      sourcePaths.map(
+        async (sourcePath) => (await fsExtra.stat(sourcePath)).ctimeMs
+      )
     );
-
-    const sourceTimestamps = dependencyGraph
-      .getResolvedFiles()
-      .map((file) => file.lastModificationDate.getTime());
 
     return areArtifactsCached(sourceTimestamps, config.solc, config.paths);
   });
@@ -188,7 +193,7 @@ export default function () {
     const sources = await run(TASK_COMPILE_GET_SOURCE_PATHS);
 
     if (sources.length === 0) {
-      console.log("No Solidity source file available.");
+      console.log("No Hyperion source file available.");
       return;
     }
 
