@@ -304,6 +304,7 @@ export interface BuidlerRuntimeEnvironment {
   readonly run: RunTaskFunction;
   readonly network: Network;
   readonly ethereum: EthereumProvider; // DEPRECATED: Use network.provider
+  qrl: QrlRuntimeHelpers;
 }
 
 export interface Artifact {
@@ -319,4 +320,40 @@ export interface LinkReferences {
   [libraryFileName: string]: {
     [libraryName: string]: Array<{ length: number; start: number }>;
   };
+}
+
+export interface QrlTransactionRequest {
+  from?: string;
+  to?: string;
+  gas?: string | number;
+  gasLimit?: string | number;
+  gasPrice?: string | number;
+  maxFeePerGas?: string | number;
+  maxPriorityFeePerGas?: string | number;
+  value?: string | number;
+  data?: string;
+  nonce?: string | number;
+  chainId?: string | number;
+}
+
+export interface QrlDeploymentResult {
+  hash: string;
+  receipt: any;
+  address?: string;
+}
+
+export interface QrlRuntimeHelpers {
+  readArtifact(contractName: string): Promise<Artifact>;
+  sendTransaction(tx: QrlTransactionRequest): Promise<string>;
+  call(tx: QrlTransactionRequest, blockTag?: string): Promise<string>;
+  waitForTransaction(
+    txHash: string,
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ): Promise<any>;
+  deployContract(
+    contractName: string,
+    tx?: QrlTransactionRequest,
+    constructorData?: string
+  ): Promise<QrlDeploymentResult>;
 }

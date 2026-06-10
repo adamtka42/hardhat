@@ -34,6 +34,8 @@ export class Environment implements BuidlerRuntimeEnvironment {
    */
   public ethereum: EthereumProvider;
 
+  public qrl!: BuidlerRuntimeEnvironment["qrl"];
+
   public network: Network;
 
   private readonly _extenders: EnvironmentExtender[];
