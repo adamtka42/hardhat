@@ -517,6 +517,61 @@ describe("Config validation", function () {
               );
             });
           });
+
+          describe("QRL Ledger accounts", function () {
+            it("Should work with valid QRL Ledger accounts", function () {
+              assert.isEmpty(
+                getValidationErrors({
+                  networks: {
+                    asd: {
+                      accounts: {
+                        type: "ledger",
+                        accounts: [`Q${"a".repeat(128)}`],
+                      },
+                      url: "",
+                    },
+                  },
+                })
+              );
+            });
+
+            it("Shouldn't work without an accounts array", function () {
+              expectHardhatError(
+                () =>
+                  validateConfig({
+                    networks: {
+                      asd: {
+                        accounts: {
+                          type: "ledger",
+                        },
+                        url: "",
+                      },
+                    },
+                  }),
+                ERRORS.GENERAL.INVALID_CONFIG,
+                "64-byte QRL address array"
+              );
+            });
+
+            it("Shouldn't work with invalid QRL Ledger addresses", function () {
+              expectHardhatError(
+                () =>
+                  validateConfig({
+                    networks: {
+                      asd: {
+                        accounts: {
+                          type: "ledger",
+                          accounts: ["0x1234"],
+                        },
+                        url: "",
+                      },
+                    },
+                  }),
+                ERRORS.GENERAL.INVALID_CONFIG,
+                "64-byte QRL address"
+              );
+            });
+          });
         });
 
         describe("Other fields", function () {
@@ -659,10 +714,10 @@ describe("Config validation", function () {
             ],
             url: "",
           },
-          withOtherTypeOfAccounts: {
+          withLedgerAccounts: {
             accounts: {
               type: "ledger",
-              asd: 12,
+              accounts: [`Q${"a".repeat(128)}`],
             },
             url: "",
           },

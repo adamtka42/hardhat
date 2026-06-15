@@ -200,6 +200,34 @@ export function getValidationErrors(config: any): string[] {
             );
           }
         }
+      } else if (netConfig.accounts?.type === "ledger") {
+        if (!Array.isArray(netConfig.accounts.accounts)) {
+          errors.push(
+            getErrorMessage(
+              `HardhatConfig.networks.${networkName}.accounts.accounts`,
+              netConfig.accounts.accounts,
+              "64-byte QRL address array"
+            )
+          );
+        } else {
+          for (const [
+            accountIndex,
+            account,
+          ] of netConfig.accounts.accounts.entries()) {
+            if (
+              typeof account !== "string" ||
+              !QRL_ADDRESS_REGEX.test(account)
+            ) {
+              errors.push(
+                getErrorMessage(
+                  `HardhatConfig.networks.${networkName}.accounts.accounts.${accountIndex}`,
+                  account,
+                  "64-byte QRL address"
+                )
+              );
+            }
+          }
+        }
       }
 
       if (

@@ -21,6 +21,9 @@ export interface JsonRpcTransactionData {
   chainId?: string | number;
 }
 
+export const ML_DSA_87_DESCRIPTOR = new Uint8Array([0x01, 0x00, 0x00]);
+export const EMPTY_EXTRA_PARAMS = new Uint8Array();
+
 export function createLocalAccountsProvider(
   provider: IQrlProvider,
   extendedSeeds: string[]
@@ -164,30 +167,46 @@ async function getSignedTransaction(
   chainId: number,
   seed: string
 ): Promise<string> {
-  const {
-    FeeMarketEIP1559Transaction,
-    signTransaction,
-  } = require("@theqrl/web3-qrl-accounts");
+  const { signTransaction } = require("@theqrl/web3-qrl-accounts");
+  const transaction = createQrlDynamicFeeTransaction(tx, chainId);
 
-  const gasLimit = tx.gasLimit ?? tx.gas;
-  const maxFeePerGas = tx.maxFeePerGas ?? tx.gasPrice;
-  const maxPriorityFeePerGas = tx.maxPriorityFeePerGas ?? tx.gasPrice;
+  const signed = await signTransaction(transaction, seed);
+  return signed.rawTransaction;
+}
 
-  const transaction = FeeMarketEIP1559Transaction.fromTxData({
+export function createQrlDynamicFeeTransaction(
+  tx: JsonRpcTransactionData,
+  chainId: number
+): any {
+  const { FeeMarketEIP1559Transaction } = require("@theqrl/web3-qrl-accounts");
+
+  return FeeMarketEIP1559Transaction.fromTxData({
     type: "0x2",
     chainId: tx.chainId ?? chainId,
     nonce: tx.nonce,
-    gasLimit,
-    maxFeePerGas,
-    maxPriorityFeePerGas,
+    gasLimit: tx.gasLimit ?? tx.gas,
+    maxFeePerGas: tx.maxFeePerGas ?? tx.gasPrice,
+    maxPriorityFeePerGas: tx.maxPriorityFeePerGas ?? tx.gasPrice,
     to: tx.to,
     value: tx.value,
     data: tx.data ?? "0x",
     accessList: [],
   });
+}
 
-  const signed = await signTransaction(transaction, seed);
-  return signed.rawTransaction;
+export function encodeQrlSignedTransaction(
+  transaction: any,
+  signature: Uint8Array,
+  publicKey: Uint8Array
+): string {
+  const signed = transaction._processAuthValues(
+    ML_DSA_87_DESCRIPTOR,
+    EMPTY_EXTRA_PARAMS,
+    signature,
+    publicKey
+  );
+
+  return `0x${Buffer.from(signed.serialize()).toString("hex")}`;
 }
 
 function seedToQrlAccount(seed: string): any {

@@ -94,6 +94,9 @@
     "tsort": "0.0.1",
     "ws": "^7.2.1"
   },
+  "optionalDependencies": {
+    "@ledgerhq/hw-transport-node-hid": "^6.29.12"
+  },
   "nyc": {
     "extension": [
       ".ts"

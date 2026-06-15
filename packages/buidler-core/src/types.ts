@@ -19,11 +19,19 @@ export interface OtherAccountsConfig {
   type: string;
 }
 
+export interface QrlLedgerAccountsConfig extends OtherAccountsConfig {
+  type: "ledger";
+  accounts: string[];
+  derivationFunction?: (index: number) => string;
+  maxDerivationAccounts?: number;
+}
+
 export type QrlExtendedSeed = string;
 
 export type NetworkConfigAccounts =
   | "remote"
   | QrlExtendedSeed[]
+  | QrlLedgerAccountsConfig
   | OtherAccountsConfig;
 
 export interface HttpNetworkConfig extends CommonNetworkConfig {

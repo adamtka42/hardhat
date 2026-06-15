@@ -284,6 +284,25 @@ Configure a network with an HTTP URL that points to a running go-qrl node.`,
       title: "Invalid QRL ABI operation",
       description: `The requested QRL contract ABI operation can't be encoded or decoded.`,
     },
+    LEDGER_TRANSPORT_UNAVAILABLE: {
+      number: 118,
+      message: "QRL Ledger transport is unavailable: %message%.",
+      title: "QRL Ledger transport unavailable",
+      description: `The QRL Ledger provider couldn't load the Node HID transport.`,
+    },
+    LEDGER_INVALID_RESPONSE: {
+      number: 119,
+      message: "Invalid QRL Ledger response: %message%.",
+      title: "Invalid QRL Ledger response",
+      description: `The QRL Ledger app returned a response that Hardhat couldn't decode.`,
+    },
+    LEDGER_ACCOUNT_NOT_FOUND: {
+      number: 120,
+      message:
+        "Could not find QRL Ledger derivation path for account %account%.",
+      title: "QRL Ledger account not found",
+      description: `Hardhat couldn't derive a Ledger path matching the configured QRL account.`,
+    },
   },
   TASK_DEFINITIONS: {
     PARAM_AFTER_VARIADIC: {

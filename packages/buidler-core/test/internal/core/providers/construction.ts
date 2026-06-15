@@ -20,6 +20,7 @@ const QRL_SEEDS = [
   "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be402",
   "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be403",
 ];
+const LEDGER_ADDRESS = `Q${"a".repeat(128)}`;
 
 function seedToAddress(seed: string): string {
   const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
@@ -103,6 +104,20 @@ describe("Base providers wrapping", () => {
       await provider.send("qrl_accounts", ["param1", "param2"]);
       const params = mockedProvider.getLatestParams("qrl_accounts");
       assert.deepEqual(params, ["param1", "param2"]);
+    });
+
+    it("Should wrap with QRL Ledger accounts", async () => {
+      const provider = wrapQrlProvider(mockedProvider, {
+        accounts: {
+          type: "ledger",
+          accounts: [LEDGER_ADDRESS],
+        },
+        url: "",
+      });
+
+      const accounts = await provider.send("qrl_accounts");
+
+      assert.deepEqual(accounts, [seedToAddress(QRL_SEEDS[0]), LEDGER_ADDRESS]);
     });
   });
 

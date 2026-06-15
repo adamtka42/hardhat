@@ -6,6 +6,10 @@ import {
   createSenderProvider,
   JsonRpcTransactionData,
 } from "../../../../src/internal/core/providers/accounts";
+import {
+  createLedgerAccountsProvider,
+  LedgerTransport,
+} from "../../../../src/internal/core/providers/ledger";
 import { numberToRpcQuantity } from "../../../../src/internal/core/providers/provider-utils";
 import { wrapSend } from "../../../../src/internal/core/providers/wrapper";
 import { IQrlProvider } from "../../../../src/types";
@@ -20,6 +24,8 @@ const QRL_SEEDS = [
   "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
   "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be402",
 ];
+
+const LEDGER_ADDRESS = `Q${"a".repeat(128)}`;
 
 function seedToAddress(seed: string): string {
   const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
@@ -194,6 +200,95 @@ describe("Local accounts provider", () => {
   });
 });
 
+describe("Ledger accounts provider", () => {
+  let mock: MockedProvider;
+  let transport: MockLedgerTransport;
+  let wrapper: IQrlProvider;
+
+  beforeEach(() => {
+    mock = new MockedProvider();
+    mock.setReturnValue("net_version", numberToRpcQuantity(123));
+    mock.setReturnValue("qrl_getTransactionCount", numberToRpcQuantity(0x8));
+    mock.setReturnValue("qrl_accounts", [nonLocalAddress()]);
+    mock.setReturnValue("qrl_sendRawTransaction", `0x${"1".repeat(64)}`);
+
+    transport = new MockLedgerTransport(LEDGER_ADDRESS);
+    wrapper = createLedgerAccountsProvider(
+      mock,
+      {
+        type: "ledger",
+        accounts: [LEDGER_ADDRESS],
+      },
+      {
+        transportFactory: {
+          create: async () => transport,
+        },
+      }
+    );
+  });
+
+  it("Should include QRL Ledger addresses in qrl_accounts", async () => {
+    const response = await wrapper.send("qrl_accounts");
+
+    assert.deepEqual(response, [nonLocalAddress(), LEDGER_ADDRESS]);
+  });
+
+  it("Should sign and forward QRL Ledger dynamic fee transactions", async () => {
+    const result = await wrapper.send("qrl_sendTransaction", [
+      {
+        from: LEDGER_ADDRESS,
+        to: nonLocalAddress(),
+        gas: 21000,
+        maxFeePerGas: 2250000007,
+        maxPriorityFeePerGas: 2250000000,
+        nonce: 0,
+        chainId: 123,
+        value: 1,
+      },
+    ]);
+
+    assert.equal(result, `0x${"1".repeat(64)}`);
+    assert.equal(transport.signPath, "m/44'/238'/0'/0/0");
+    assert.equal(transport.signedPayload[0], 0x02);
+
+    const [rawTransaction] = mock.getLatestParams("qrl_sendRawTransaction");
+    assert.isString(rawTransaction);
+    assert.match(rawTransaction, /^0x02[0-9a-f]+$/i);
+  });
+
+  it("Should derive the nonce for QRL Ledger transactions", async () => {
+    await wrapper.send("qrl_sendTransaction", [
+      {
+        from: LEDGER_ADDRESS,
+        to: nonLocalAddress(),
+        gas: 21000,
+        gasPrice: 678912,
+        chainId: 123,
+        value: 1,
+      },
+    ]);
+
+    assert.equal(mock.getNumberOfCalls("qrl_getTransactionCount"), 1);
+  });
+
+  it("Should forward transactions from non-ledger accounts", async () => {
+    await wrapper.send("qrl_sendTransaction", [
+      {
+        from: nonLocalAddress(),
+        to: LEDGER_ADDRESS,
+        gas: 21000,
+        gasPrice: 678912,
+        nonce: 0,
+        chainId: 123,
+        value: 1,
+      },
+    ]);
+
+    assert.isUndefined(mock.getLatestParams("qrl_sendRawTransaction"));
+    assert.equal(mock.getNumberOfCalls("qrl_sendTransaction"), 1);
+  });
+});
+
 describe("Account provider", () => {
   let mock: MockedProvider;
   let provider: IQrlProvider;
@@ -280,3 +375,84 @@ describe("Account provider", () => {
     assert.equal(params[0].value, "asd");
   });
 });
+
+class MockLedgerTransport implements LedgerTransport {
+  public signPath?: string;
+  public signedPayload: Buffer = Buffer.alloc(0);
+
+  private readonly _addressResponse: Buffer;
+  private readonly _publicKeyChunks: Buffer[];
+  private readonly _signatureChunks: Buffer[];
+
+  constructor(address: string) {
+    this._addressResponse = Buffer.concat([
+      Buffer.from("Q"),
+      Buffer.from(address.slice(1), "hex"),
+    ]);
+    this._publicKeyChunks = splitFixed(Buffer.alloc(255 * 11, 0x11), 255);
+    this._signatureChunks = splitFixed(Buffer.alloc(255 * 18, 0x22), 255);
+  }
+
+  public async send(
+    _cla: number,
+    ins: number,
+    p1: number,
+    p2: number,
+    data?: Buffer
+  ): Promise<Buffer> {
+    if (ins === 0x03) {
+      return Buffer.from([1, 0, 0]);
+    }
+
+    if (ins === 0x05) {
+      if (p2 === 0) {
+        return this._addressResponse;
+      }
+
+      return this._publicKeyChunks[p2 - 1];
+    }
+
+    if (ins === 0x06) {
+      if (p1 === 0x00) {
+        this.signPath = unpackPath(data!);
+        return Buffer.alloc(0);
+      }
+
+      if (p1 === 0x01) {
+        this.signedPayload = Buffer.concat([this.signedPayload, data!]);
+        return Buffer.alloc(0);
+      }
+
+      if (p1 === 0x02) {
+        if (p2 === 0) {
+          this.signedPayload = Buffer.concat([this.signedPayload, data!]);
+        }
+
+        return this._signatureChunks[p2];
+      }
+    }
+
+    throw new Error(`Unexpected APDU ins=${ins} p1=${p1} p2=${p2}`);
+  }
+}
+
+function splitFixed(value: Buffer, size: number): Buffer[] {
+  const chunks: Buffer[] = [];
+  for (let offset = 0; offset < value.length; offset += size) {
+    chunks.push(value.slice(offset, offset + size));
+  }
+  return chunks;
+}
+
+function unpackPath(data: Buffer): string {
+  const parts: string[] = [];
+  for (let i = 0; i < data[0]; i++) {
+    const value = data.readUInt32BE(1 + i * 4);
+    const hardened = value >= 0x80000000;
+    parts.push(
+      `${hardened ? value - 0x80000000 : value}${hardened ? "'" : ""}`
+    );
+  }
+
+  return `m/${parts.join("/")}`;
+}

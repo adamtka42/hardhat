@@ -61,9 +61,10 @@ export function wrapQrlProvider(
     const accounts = httpNetConfig.accounts;
     if (Array.isArray(accounts)) {
       provider = createLocalAccountsProvider(provider, accounts);
+    } else if (isLedgerAccountsConfig(accounts)) {
+      const { createLedgerAccountsProvider } = require("./ledger");
+      provider = createLedgerAccountsProvider(provider, accounts);
     }
-
-    // TODO: Add some extension mechanism for account plugins here
   }
 
   provider = createSenderProvider(provider, netConfig.from);
@@ -87,4 +88,13 @@ export function wrapQrlProvider(
   }
 
   return provider;
+}
+
+function isLedgerAccountsConfig(accounts: any): boolean {
+  return (
+    accounts !== undefined &&
+    accounts !== null &&
+    typeof accounts === "object" &&
+    accounts.type === "ledger"
+  );
 }
