@@ -7,21 +7,18 @@ import {
   saveArtifact,
 } from "../internal/artifacts";
 import {
-  SOLC_INPUT_FILENAME,
-  SOLC_OUTPUT_FILENAME,
+  COMPILER_INPUT_FILENAME,
+  COMPILER_OUTPUT_FILENAME,
 } from "../internal/constants";
 import { internalTask, task, types } from "../internal/core/config/config-env";
-import { BuidlerError } from "../internal/core/errors";
+import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
-import {
-  compileHyperion,
-  HyperionInput,
-} from "../internal/hyperion/compiler";
-import { DependencyGraph } from "../internal/solidity/dependencyGraph";
-import { Resolver } from "../internal/solidity/resolver";
+import { compileHyperion, HyperionInput } from "../internal/hyperion/compiler";
+import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
+import { Resolver } from "../internal/hyperion/resolver";
 import { glob } from "../internal/util/glob";
 import { pluralize } from "../internal/util/strings";
-import { ResolvedBuidlerConfig } from "../types";
+import { ResolvedHardhatConfig } from "../types";
 
 import {
   TASK_BUILD_ARTIFACTS,
@@ -34,10 +31,10 @@ import {
   TASK_COMPILE_GET_SOURCE_PATHS,
   TASK_COMPILE_RUN_COMPILER,
 } from "./task-names";
-import { areArtifactsCached, cacheBuidlerConfig } from "./utils/cache";
+import { areArtifactsCached, cacheHardhatConfig } from "./utils/cache";
 
-async function cacheSolcJsonFiles(
-  config: ResolvedBuidlerConfig,
+async function cacheCompilerJsonFiles(
+  config: ResolvedHardhatConfig,
   input: any,
   output: any
 ) {
@@ -45,7 +42,7 @@ async function cacheSolcJsonFiles(
 
   // TODO: This could be much better. It feels somewhat hardcoded
   await fsExtra.writeFile(
-    path.join(config.paths.cache, SOLC_INPUT_FILENAME),
+    path.join(config.paths.cache, COMPILER_INPUT_FILENAME),
     JSON.stringify(input, undefined, 2),
     {
       encoding: "utf8",
@@ -53,7 +50,7 @@ async function cacheSolcJsonFiles(
   );
 
   await fsExtra.writeFile(
-    path.join(config.paths.cache, SOLC_OUTPUT_FILENAME),
+    path.join(config.paths.cache, COMPILER_OUTPUT_FILENAME),
     JSON.stringify(output, undefined, 2),
     {
       encoding: "utf8",
@@ -112,7 +109,7 @@ export default function () {
       sourcePaths,
       sources,
       settings: {
-        optimizer: config.solc.optimizer,
+        optimizer: config.hyperion.optimizer,
       },
     };
   });
@@ -157,19 +154,19 @@ export default function () {
     if (hasConsoleLogErrors) {
       console.error(
         chalk.red(
-          `The console.log call you made isn’t supported. See https://buidler.dev/console-log for the list of supported methods.`
+          `The console.log call you made isn’t supported. See https://github.com/cyyber/hardhat#console-log for the list of supported methods.`
         )
       );
       console.log();
     }
 
     if (hasErrors || !output.contracts) {
-      throw new BuidlerError(ERRORS.BUILTIN_TASKS.COMPILE_FAILURE);
+      throw new HardhatError(ERRORS.BUILTIN_TASKS.COMPILE_FAILURE);
     }
 
-    await cacheSolcJsonFiles(config, input, output);
+    await cacheCompilerJsonFiles(config, input, output);
 
-    await cacheBuidlerConfig(config.paths, config.solc);
+    await cacheHardhatConfig(config.paths, config.hyperion);
 
     return output;
   });
@@ -186,7 +183,7 @@ export default function () {
       )
     );
 
-    return areArtifactsCached(sourceTimestamps, config.solc, config.paths);
+    return areArtifactsCached(sourceTimestamps, config.hyperion, config.paths);
   });
 
   internalTask(TASK_BUILD_ARTIFACTS, async ({ force }, { config, run }) => {

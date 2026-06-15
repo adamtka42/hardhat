@@ -5,7 +5,7 @@ process.env.FORCE_COLOR = "3";
 
 shell.config.fatal = true; // throw if a command fails
 
-shell.exec("npx lerna bootstrap --no-ci --scope @nomiclabs/buidler");
+shell.exec("npx lerna bootstrap --no-ci --scope @theqrl/hardhat");
 
 // We delete these .bin folders because lerna creates them and then npm doesn't link the packages
 shell.rm("-rf", "packages/buidler-core/node_modules/.bin");

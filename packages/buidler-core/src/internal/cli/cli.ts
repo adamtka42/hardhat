@@ -6,26 +6,23 @@ import "source-map-support/register";
 
 import { TASK_HELP } from "../../builtin-tasks/task-names";
 import { TaskArguments } from "../../types";
-import { BUIDLER_NAME } from "../constants";
-import { BuidlerContext } from "../context";
+import { HARDHAT_NAME } from "../constants";
+import { HardhatContext } from "../context";
 import { loadConfigAndTasks } from "../core/config/config-loading";
-import { BuidlerError, BuidlerPluginError } from "../core/errors";
+import { HardhatError, HardhatPluginError } from "../core/errors";
 import { ERRORS, getErrorCode } from "../core/errors-list";
-import { BUIDLER_PARAM_DEFINITIONS } from "../core/params/buidler-params";
-import { getEnvBuidlerArguments } from "../core/params/env-variables";
+import { getEnvHardhatArguments } from "../core/params/env-variables";
+import { HARDHAT_PARAM_DEFINITIONS } from "../core/params/hardhat-params";
 import { isCwdInsideProject } from "../core/project-structure";
 import { Environment } from "../core/runtime-environment";
 import { loadTsNodeIfPresent } from "../core/typescript-support";
 import { getPackageJson, PackageJson } from "../util/packageInfo";
 
-import { Analytics } from "./analytics";
 import { ArgumentsParser } from "./ArgumentsParser";
 import { enableEmoji } from "./emoji";
 import { createProject } from "./project-creation";
 
-const log = debug("buidler:core:cli");
-
-const ANALYTICS_SLOW_TASK_THRESHOLD = 300;
+const log = debug("hardhat:core:cli");
 
 async function printVersionMessage(packageJson: PackageJson) {
   console.log(packageJson.version);
@@ -34,7 +31,7 @@ async function printVersionMessage(packageJson: PackageJson) {
 function ensureValidNodeVersion(packageJson: PackageJson) {
   const requirement = packageJson.engines.node;
   if (!semver.satisfies(process.version, requirement)) {
-    throw new BuidlerError(ERRORS.GENERAL.INVALID_NODE_VERSION, {
+    throw new HardhatError(ERRORS.GENERAL.INVALID_NODE_VERSION, {
       requirement,
     });
   }
@@ -50,35 +47,35 @@ async function main() {
 
     ensureValidNodeVersion(packageJson);
 
-    const envVariableArguments = getEnvBuidlerArguments(
-      BUIDLER_PARAM_DEFINITIONS,
+    const envVariableArguments = getEnvHardhatArguments(
+      HARDHAT_PARAM_DEFINITIONS,
       process.env
     );
 
     const argumentsParser = new ArgumentsParser();
 
     const {
-      buidlerArguments,
+      hardhatArguments,
       taskName: parsedTaskName,
       unparsedCLAs,
-    } = argumentsParser.parseBuidlerArguments(
-      BUIDLER_PARAM_DEFINITIONS,
+    } = argumentsParser.parseHardhatArguments(
+      HARDHAT_PARAM_DEFINITIONS,
       envVariableArguments,
       process.argv.slice(2)
     );
 
-    if (buidlerArguments.verbose) {
-      debug.enable("buidler*");
+    if (hardhatArguments.verbose) {
+      debug.enable("hardhat*");
     }
 
-    if (buidlerArguments.emoji) {
+    if (hardhatArguments.emoji) {
       enableEmoji();
     }
 
-    showStackTraces = buidlerArguments.showStackTraces;
+    showStackTraces = hardhatArguments.showStackTraces;
 
     if (
-      buidlerArguments.config === undefined &&
+      hardhatArguments.config === undefined &&
       !isCwdInsideProject() &&
       process.stdout.isTTY === true
     ) {
@@ -87,40 +84,32 @@ async function main() {
     }
 
     // --version is a special case
-    if (buidlerArguments.version) {
+    if (hardhatArguments.version) {
       await printVersionMessage(packageJson);
       return;
     }
 
     loadTsNodeIfPresent();
 
-    const ctx = BuidlerContext.createBuidlerContext();
-    const config = loadConfigAndTasks(buidlerArguments);
-
-    const analytics = await Analytics.getInstance(
-      config.paths.root,
-      config.analytics.enabled
-    );
+    const ctx = HardhatContext.createHardhatContext();
+    const config = loadConfigAndTasks(hardhatArguments);
 
     const envExtenders = ctx.extendersManager.getExtenders();
     const taskDefinitions = ctx.tasksDSL.getTaskDefinitions();
 
     let taskName = parsedTaskName !== undefined ? parsedTaskName : "help";
 
-    // tslint:disable-next-line: prefer-const
-    let [abortAnalytics, hitPromise] = await analytics.sendTaskHit(taskName);
-
     let taskArguments: TaskArguments;
 
     // --help is a also special case
-    if (buidlerArguments.help && taskName !== TASK_HELP) {
+    if (hardhatArguments.help && taskName !== TASK_HELP) {
       taskArguments = { task: taskName };
       taskName = TASK_HELP;
     } else {
       const taskDefinition = taskDefinitions[taskName];
 
       if (taskDefinition === undefined) {
-        throw new BuidlerError(ERRORS.ARGUMENTS.UNRECOGNIZED_TASK, {
+        throw new HardhatError(ERRORS.ARGUMENTS.UNRECOGNIZED_TASK, {
           task: taskName,
         });
       }
@@ -133,41 +122,30 @@ async function main() {
 
     // TODO: This is here for backwards compatibility
     // There are very few projects using this.
-    if (buidlerArguments.network === undefined) {
-      buidlerArguments.network = config.defaultNetwork;
+    if (hardhatArguments.network === undefined) {
+      hardhatArguments.network = config.defaultNetwork;
     }
 
     const env = new Environment(
       config,
-      buidlerArguments,
+      hardhatArguments,
       taskDefinitions,
       envExtenders
     );
 
-    ctx.setBuidlerRuntimeEnvironment(env);
-
-    const timestampBeforeRun = new Date().getTime();
+    ctx.setHardhatRuntimeEnvironment(env);
 
     await env.run(taskName, taskArguments);
 
-    const timestampAfterRun = new Date().getTime();
-    if (
-      timestampAfterRun - timestampBeforeRun >
-      ANALYTICS_SLOW_TASK_THRESHOLD
-    ) {
-      await hitPromise;
-    } else {
-      abortAnalytics();
-    }
-    log(`Killing Buidler after successfully running task ${taskName}`);
+    log(`Killing Hardhat after successfully running task ${taskName}`);
   } catch (error) {
-    let isBuidlerError = false;
+    let isHardhatError = false;
 
-    if (BuidlerError.isBuidlerError(error)) {
-      isBuidlerError = true;
+    if (HardhatError.isHardhatError(error)) {
+      isHardhatError = true;
       console.error(chalk.red(`Error ${error.message}`));
-    } else if (BuidlerPluginError.isBuidlerPluginError(error)) {
-      isBuidlerError = true;
+    } else if (HardhatPluginError.isHardhatPluginError(error)) {
+      isHardhatError = true;
       console.error(
         chalk.red(`Error in plugin ${error.pluginName}: ${error.message}`)
       );
@@ -184,23 +162,23 @@ async function main() {
     if (showStackTraces) {
       console.error(error.stack);
     } else {
-      if (!isBuidlerError) {
+      if (!isHardhatError) {
         console.error(
-          `If you think this is a bug in Buidler, please report it here: https://buidler.dev/reportbug`
+          `If you think this is a bug in Hardhat, please report it here: https://github.com/cyyber/hardhat/issues/new`
         );
       }
 
-      if (BuidlerError.isBuidlerError(error)) {
-        const link = `https://buidler.dev/${getErrorCode(
+      if (HardhatError.isHardhatError(error)) {
+        const link = `https://github.com/cyyber/hardhat#${getErrorCode(
           error.errorDescriptor
         )}`;
 
         console.error(
-          `For more info go to ${link} or run ${BUIDLER_NAME} with --show-stack-traces`
+          `For more info go to ${link} or run ${HARDHAT_NAME} with --show-stack-traces`
         );
       } else {
         console.error(
-          `For more info run ${BUIDLER_NAME} with --show-stack-traces`
+          `For more info run ${HARDHAT_NAME} with --show-stack-traces`
         );
       }
     }

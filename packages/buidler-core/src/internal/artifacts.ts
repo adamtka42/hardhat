@@ -3,32 +3,34 @@ import * as path from "path";
 
 import { Artifact } from "../types";
 
-import { BuidlerError } from "./core/errors";
+import { HardhatError } from "./core/errors";
 import { ERRORS } from "./core/errors-list";
 
 /**
  * Retrieves an artifact for the given `contractName` from the compilation output.
  *
  * @param contractName the contract's name.
- * @param contractOutput the contract's compilation output as emitted by `solc`.
+ * @param contractOutput the contract's compilation output as emitted by Hyperion.
  */
 export function getArtifactFromContractOutput(
   contractName: string,
   contractOutput: any
 ): Artifact {
-  const evmBytecode = contractOutput.evm && contractOutput.evm.bytecode;
+  const compilerBytecode =
+    contractOutput.bytecodeOutput && contractOutput.bytecodeOutput.bytecode;
   let bytecode: string =
-    evmBytecode && evmBytecode.object ? evmBytecode.object : "";
+    compilerBytecode && compilerBytecode.object ? compilerBytecode.object : "";
 
   if (bytecode.slice(0, 2).toLowerCase() !== "0x") {
     bytecode = `0x${bytecode}`;
   }
 
-  const evmDeployedBytecode =
-    contractOutput.evm && contractOutput.evm.deployedBytecode;
+  const compilerDeployedBytecode =
+    contractOutput.bytecodeOutput &&
+    contractOutput.bytecodeOutput.deployedBytecode;
   let deployedBytecode: string =
-    evmDeployedBytecode && evmDeployedBytecode.object
-      ? evmDeployedBytecode.object
+    compilerDeployedBytecode && compilerDeployedBytecode.object
+      ? compilerDeployedBytecode.object
       : "";
 
   if (deployedBytecode.slice(0, 2).toLowerCase() !== "0x") {
@@ -36,10 +38,12 @@ export function getArtifactFromContractOutput(
   }
 
   const linkReferences =
-    evmBytecode && evmBytecode.linkReferences ? evmBytecode.linkReferences : {};
+    compilerBytecode && compilerBytecode.linkReferences
+      ? compilerBytecode.linkReferences
+      : {};
   const deployedLinkReferences =
-    evmDeployedBytecode && evmDeployedBytecode.linkReferences
-      ? evmDeployedBytecode.linkReferences
+    compilerDeployedBytecode && compilerDeployedBytecode.linkReferences
+      ? compilerDeployedBytecode.linkReferences
       : {};
 
   return {
@@ -86,7 +90,7 @@ export async function readArtifact(
   const artifactPath = getArtifactPath(artifactsPath, contractName);
 
   if (!fsExtra.pathExistsSync(artifactPath)) {
-    throw new BuidlerError(ERRORS.ARTIFACTS.NOT_FOUND, { contractName });
+    throw new HardhatError(ERRORS.ARTIFACTS.NOT_FOUND, { contractName });
   }
 
   return fsExtra.readJson(artifactPath);
@@ -105,7 +109,7 @@ export function readArtifactSync(
   const artifactPath = getArtifactPath(artifactsPath, contractName);
 
   if (!fsExtra.pathExistsSync(artifactPath)) {
-    throw new BuidlerError(ERRORS.ARTIFACTS.NOT_FOUND, { contractName });
+    throw new HardhatError(ERRORS.ARTIFACTS.NOT_FOUND, { contractName });
   }
 
   return fsExtra.readJsonSync(artifactPath);

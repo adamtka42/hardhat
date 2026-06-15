@@ -2,7 +2,7 @@ import chalk from "chalk";
 import fsExtra from "fs-extra";
 import path from "path";
 
-import { BUIDLER_NAME } from "../constants";
+import { HARDHAT_NAME } from "../constants";
 import { ExecutionMode, getExecutionMode } from "../core/execution-mode";
 import { getRecommendedGitIgnore } from "../core/project-structure";
 import { getPackageJson, getPackageRoot } from "../util/packageInfo";
@@ -10,7 +10,7 @@ import { getPackageJson, getPackageRoot } from "../util/packageInfo";
 import { emoji } from "./emoji";
 
 const CREATE_SAMPLE_PROJECT_ACTION = "Create a sample project";
-const CREATE_EMPTY_BUIDLER_CONFIG_ACTION = "Create an empty buidler.config.js";
+const CREATE_EMPTY_HARDHAT_CONFIG_ACTION = "Create an empty hardhat.config.js";
 const QUIT_ACTION = "Quit";
 
 async function removeProjectDirIfPresent(projectRoot: string, dirName: string) {
@@ -44,7 +44,7 @@ async function printWelcomeMessage() {
 
   console.log(
     chalk.cyan(
-      `${emoji("👷 ")}Welcome to ${BUIDLER_NAME} v${packageJson.version}${emoji(
+      `${emoji("👷 ")}Welcome to ${HARDHAT_NAME} v${packageJson.version}${emoji(
         " 👷‍"
       )}‍\n`
     )
@@ -79,7 +79,7 @@ ${content}`;
 
 async function addGitAttributes(projectRoot: string) {
   const gitAttributesPath = path.join(projectRoot, ".gitattributes");
-  let content = "*.hyp linguist-language=Solidity";
+  let content = "*.hyp linguist-language=Hyperion";
 
   if (await fsExtra.pathExists(gitAttributesPath)) {
     const existingContent = await fsExtra.readFile(gitAttributesPath, "utf-8");
@@ -102,21 +102,22 @@ function printSuggestedCommands() {
       : "npx ";
 
   console.log(`Try running some of the following tasks:`);
-  console.log(`  ${npx}buidler accounts`);
-  console.log(`  ${npx}buidler compile`);
-  console.log(`  ${npx}buidler test`);
-  console.log(`  ${npx}buidler node`);
-  console.log(`  node scripts/sample-script.js`);
-  console.log(`  ${npx}buidler help`);
+  console.log(`  ${npx}hardhat accounts`);
+  console.log(`  ${npx}hardhat compile`);
+  console.log(`  ${npx}hardhat test`);
+  console.log(
+    `  ${npx}hardhat run scripts/sample-script.js --network localhost`
+  );
+  console.log(`  ${npx}hardhat help`);
 }
 
 async function printSampleProjectInfo() {
-  console.log(`The sample project uses Buidler's built-in QRL helpers.`);
+  console.log(`The sample project uses Hardhat's built-in QRL helpers.`);
 }
 
-async function writeEmptyBuidlerConfig() {
+async function writeEmptyHardhatConfig() {
   return fsExtra.writeFile(
-    "buidler.config.js",
+    "hardhat.config.js",
     "module.exports = {};\n",
     "utf-8"
   );
@@ -138,9 +139,9 @@ async function getAction() {
             value: CREATE_SAMPLE_PROJECT_ACTION,
           },
           {
-            name: CREATE_EMPTY_BUIDLER_CONFIG_ACTION,
-            message: CREATE_EMPTY_BUIDLER_CONFIG_ACTION,
-            value: CREATE_EMPTY_BUIDLER_CONFIG_ACTION,
+            name: CREATE_EMPTY_HARDHAT_CONFIG_ACTION,
+            message: CREATE_EMPTY_HARDHAT_CONFIG_ACTION,
+            value: CREATE_EMPTY_HARDHAT_CONFIG_ACTION,
           },
           { name: QUIT_ACTION, message: QUIT_ACTION, value: QUIT_ACTION },
         ],
@@ -153,7 +154,7 @@ async function getAction() {
       return QUIT_ACTION;
     }
 
-    // tslint:disable-next-line only-buidler-error
+    // tslint:disable-next-line only-hardhat-error
     throw e;
   }
 }
@@ -170,8 +171,8 @@ export async function createProject() {
     return;
   }
 
-  if (action === CREATE_EMPTY_BUIDLER_CONFIG_ACTION) {
-    await writeEmptyBuidlerConfig();
+  if (action === CREATE_EMPTY_HARDHAT_CONFIG_ACTION) {
+    await writeEmptyHardhatConfig();
     console.log(
       `${emoji("✨ ")}${chalk.cyan(`Config file created`)}${emoji(" ✨")}`
     );
@@ -190,7 +191,7 @@ export async function createProject() {
         name: "projectRoot",
         type: "input",
         initial: process.cwd(),
-        message: "Buidler project root:",
+        message: "Hardhat project root:",
       },
       createConfirmationPrompt(
         "shouldAddGitIgnore",
@@ -206,7 +207,7 @@ export async function createProject() {
       return;
     }
 
-    // tslint:disable-next-line only-buidler-error
+    // tslint:disable-next-line only-hardhat-error
     throw e;
   }
 

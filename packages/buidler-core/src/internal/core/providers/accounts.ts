@@ -1,5 +1,5 @@
-import { IEthereumProvider } from "../../../types";
-import { BuidlerError } from "../errors";
+import { IQrlProvider } from "../../../types";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 import { createChainIdGetter } from "./provider-utils";
@@ -20,7 +20,7 @@ export interface JsonRpcTransactionData {
 }
 
 export function createLocalAccountsProvider(
-  provider: IEthereumProvider,
+  provider: IQrlProvider,
   extendedSeeds: string[]
 ) {
   const seeds = [...extendedSeeds];
@@ -46,13 +46,13 @@ export function createLocalAccountsProvider(
 
       if (address !== undefined) {
         if (data === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.ETHSIGN_MISSING_DATA_PARAM);
+          throw new HardhatError(ERRORS.NETWORK.QRLSIGN_MISSING_DATA_PARAM);
         }
 
         const seed = getSeed(address);
 
         if (seed === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+          throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
             account: address,
           });
         }
@@ -65,21 +65,21 @@ export function createLocalAccountsProvider(
       const tx: JsonRpcTransactionData = params[0];
 
       if (tx.gas === undefined && tx.gasLimit === undefined) {
-        throw new BuidlerError(
+        throw new HardhatError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
           { param: "gas" }
         );
       }
 
       if (tx.maxFeePerGas === undefined && tx.gasPrice === undefined) {
-        throw new BuidlerError(
+        throw new HardhatError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
           { param: "maxFeePerGas" }
         );
       }
 
       if (tx.maxPriorityFeePerGas === undefined && tx.gasPrice === undefined) {
-        throw new BuidlerError(
+        throw new HardhatError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
           { param: "maxPriorityFeePerGas" }
         );
@@ -95,7 +95,7 @@ export function createLocalAccountsProvider(
       const seed = getSeed(tx.from!);
 
       if (seed === undefined) {
-        throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+        throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
           account: tx.from,
         });
       }
@@ -111,20 +111,7 @@ export function createLocalAccountsProvider(
   });
 }
 
-export function createHDWalletProvider(
-  _provider: IEthereumProvider,
-  _mnemonic: string,
-  _hdpath: string = "m/44'/60'/0'/0/",
-  _initialIndex: number = 0,
-  _count: number = 10
-) {
-  throw new BuidlerError(ERRORS.NETWORK.QRL_HD_ACCOUNTS_UNSUPPORTED);
-}
-
-export function createSenderProvider(
-  provider: IEthereumProvider,
-  from?: string
-) {
+export function createSenderProvider(provider: IQrlProvider, from?: string) {
   let addresses = from === undefined ? undefined : [from];
 
   return wrapSend(provider, async (method: string, params: any[]) => {
@@ -141,7 +128,7 @@ export function createSenderProvider(
         if (senderAccount !== undefined) {
           tx.from = senderAccount;
         } else if (method === "qrl_sendTransaction") {
-          throw new BuidlerError(ERRORS.NETWORK.NO_REMOTE_ACCOUNT_AVAILABLE);
+          throw new HardhatError(ERRORS.NETWORK.NO_REMOTE_ACCOUNT_AVAILABLE);
         }
       }
     }

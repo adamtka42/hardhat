@@ -1,11 +1,8 @@
-import chalk from "chalk";
 import path from "path";
 
-import { BUIDLEREVM_NETWORK_NAME } from "../internal/constants";
 import { internalTask, task } from "../internal/core/config/config-env";
 import { isTypescriptSupported } from "../internal/core/typescript-support";
 import { glob } from "../internal/util/glob";
-import { pluralize } from "../internal/util/strings";
 
 import {
   TASK_COMPILE,
@@ -74,7 +71,7 @@ export default function () {
           testFiles: string[];
           noCompile: boolean;
         },
-        { run, network }
+        { run }
       ) => {
         if (!noCompile) {
           await run(TASK_COMPILE);
@@ -83,27 +80,6 @@ export default function () {
         const files = await run(TASK_TEST_GET_TEST_FILES, { testFiles });
         await run(TASK_TEST_SETUP_TEST_ENVIRONMENT);
         await run(TASK_TEST_RUN_MOCHA_TESTS, { testFiles: files });
-
-        if (network.name !== BUIDLEREVM_NETWORK_NAME) {
-          return;
-        }
-
-        const failures = await network.provider.send(
-          "buidler_getStackTraceFailuresCount"
-        );
-
-        if (failures === 0) {
-          return;
-        }
-
-        console.warn(
-          chalk.yellow(
-            `Failed to generate ${failures} ${pluralize(
-              failures,
-              "stack trace"
-            )}. Run Buidler with --verbose to learn more.`
-          )
-        );
       }
     );
 }

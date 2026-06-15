@@ -1,79 +1,45 @@
 import {
-  BuidlerNetworkConfig,
-  EthereumProvider,
-  HDAccountsConfig,
   HttpNetworkConfig,
-  IEthereumProvider,
+  IQrlProvider,
   NetworkConfig,
-  NetworkConfigAccounts,
-  ProjectPaths,
+  QrlProvider,
 } from "../../../types";
-import { BUIDLEREVM_NETWORK_NAME } from "../../constants";
-import { parseDateString } from "../../util/date";
+import { LEGACY_IN_MEMORY_NETWORK_NAME } from "../../constants";
+import { HardhatError } from "../errors";
+import { ERRORS } from "../errors-list";
 
 import { HttpProvider } from "./http";
 
-export function isHDAccountsConfig(
-  accounts?: NetworkConfigAccounts
-): accounts is HDAccountsConfig {
-  return accounts !== undefined && Object.keys(accounts).includes("mnemonic");
-}
-
 export function createProvider(
   networkName: string,
-  networkConfig: NetworkConfig,
-  solcVersion?: string,
-  paths?: ProjectPaths
-): IEthereumProvider {
-  let provider: EthereumProvider;
+  networkConfig: NetworkConfig
+): IQrlProvider {
+  let provider: QrlProvider;
 
-  if (networkName === BUIDLEREVM_NETWORK_NAME) {
-    const buidlerNetConfig = networkConfig as BuidlerNetworkConfig;
-
-    const {
-      BuidlerEVMProvider,
-    } = require("../../buidler-evm/provider/provider");
-
-    provider = new BuidlerEVMProvider(
-      buidlerNetConfig.hardfork!,
-      BUIDLEREVM_NETWORK_NAME,
-      buidlerNetConfig.chainId!,
-      buidlerNetConfig.chainId!,
-      buidlerNetConfig.blockGasLimit!,
-      buidlerNetConfig.throwOnTransactionFailures!,
-      buidlerNetConfig.throwOnCallFailures!,
-      buidlerNetConfig.accounts,
-      solcVersion,
-      paths,
-      buidlerNetConfig.loggingEnabled,
-      buidlerNetConfig.allowUnlimitedContractSize,
-      buidlerNetConfig.initialDate !== undefined
-        ? parseDateString(buidlerNetConfig.initialDate)
-        : undefined
-    );
-  } else {
-    const httpNetConfig = networkConfig as HttpNetworkConfig;
-
-    provider = new HttpProvider(
-      httpNetConfig.url!,
-      networkName,
-      httpNetConfig.httpHeaders,
-      httpNetConfig.timeout
-    );
+  if (networkName === LEGACY_IN_MEMORY_NETWORK_NAME) {
+    throw new HardhatError(ERRORS.NETWORK.QRL_IN_MEMORY_NODE_UNSUPPORTED);
   }
 
-  return wrapEthereumProvider(provider, networkConfig);
+  const httpNetConfig = networkConfig as HttpNetworkConfig;
+
+  provider = new HttpProvider(
+    httpNetConfig.url!,
+    networkName,
+    httpNetConfig.httpHeaders,
+    httpNetConfig.timeout
+  );
+
+  return wrapQrlProvider(provider, networkConfig);
 }
 
-export function wrapEthereumProvider(
-  provider: IEthereumProvider,
+export function wrapQrlProvider(
+  provider: IQrlProvider,
   netConfig: Partial<NetworkConfig>
-): IEthereumProvider {
+): IQrlProvider {
   // These dependencies are lazy-loaded because they are really big.
   // We use require() instead of import() here, because we need it to be sync.
 
   const {
-    createHDWalletProvider,
     createLocalAccountsProvider,
     createSenderProvider,
   } = require("./accounts");
@@ -95,23 +61,9 @@ export function wrapEthereumProvider(
     const accounts = httpNetConfig.accounts;
     if (Array.isArray(accounts)) {
       provider = createLocalAccountsProvider(provider, accounts);
-    } else if (isHDAccountsConfig(accounts)) {
-      provider = createHDWalletProvider(
-        provider,
-        accounts.mnemonic,
-        accounts.path,
-        accounts.initialIndex,
-        accounts.count
-      );
     }
 
     // TODO: Add some extension mechanism for account plugins here
-
-    const { createGanacheGasMultiplierProvider } = require("./gas-providers");
-
-    if (typeof httpNetConfig.gas !== "number") {
-      provider = createGanacheGasMultiplierProvider(provider);
-    }
   }
 
   provider = createSenderProvider(provider, netConfig.from);

@@ -1,21 +1,20 @@
 import { assert } from "chai";
 import * as path from "path";
 
-import { BuidlerContext } from "../../../../src/internal/context";
+import { HardhatContext } from "../../../../src/internal/context";
 import { loadConfigAndTasks } from "../../../../src/internal/core/config/config-loading";
 import { resolveProjectPaths } from "../../../../src/internal/core/config/config-resolution";
-import { resetBuidlerContext } from "../../../../src/internal/reset";
-import { BuidlerNetworkConfig, HttpNetworkConfig } from "../../../../src/types";
-import { getLocalCompilerVersion } from "../../../helpers/compiler";
+import { resetHardhatContext } from "../../../../src/internal/reset";
+import { HttpNetworkConfig } from "../../../../src/types";
 import { useFixtureProject } from "../../../helpers/project";
 
 describe("Config resolution", () => {
   beforeEach(() => {
-    BuidlerContext.createBuidlerContext();
+    HardhatContext.createHardhatContext();
   });
 
   afterEach(() => {
-    resetBuidlerContext();
+    resetHardhatContext();
   });
 
   describe("Default config merging", () => {
@@ -24,16 +23,14 @@ describe("Config resolution", () => {
 
       it("should return the default config", () => {
         const config = loadConfigAndTasks();
-        assert.equal(config.solc.version, getLocalCompilerVersion());
+        assert.equal(config.hyperion.version, "local");
         assert.containsAllKeys(config.networks, ["localhost"]);
-        assert.isUndefined(config.solc.evmVersion);
-        assert.equal(config.defaultNetwork, "buidlerevm");
+        assert.equal(config.defaultNetwork, "localhost");
 
-        const buidlerEvmConfig: BuidlerNetworkConfig = config.networks
-          .buidlerevm as BuidlerNetworkConfig;
-
-        assert.equal(buidlerEvmConfig.throwOnTransactionFailures, true);
-        assert.equal(buidlerEvmConfig.throwOnCallFailures, true);
+        assert.equal(
+          (config.networks.localhost as HttpNetworkConfig).url,
+          "http://127.0.0.1:8545"
+        );
       });
     });
 
@@ -43,21 +40,21 @@ describe("Config resolution", () => {
       it("should return the config merged ", () => {
         const config = loadConfigAndTasks();
 
-        assert.equal(config.solc.version, getLocalCompilerVersion());
+        assert.equal(config.hyperion.version, "local");
         assert.containsAllKeys(config.networks, ["localhost", "custom"]);
         assert.equal(config.defaultNetwork, "custom");
       });
 
       it("should return the config merged ", () => {
         const config = loadConfigAndTasks();
-        assert.equal(config.solc.version, getLocalCompilerVersion());
+        assert.equal(config.hyperion.version, "local");
         assert.containsAllKeys(config.networks, ["localhost", "custom"]);
         assert.equal(
           (config.networks.localhost as HttpNetworkConfig).url,
           "http://127.0.0.1:8545"
         );
         assert.deepEqual(config.networks.localhost.accounts, [
-          "0xa95f9e3e7ae4e4865c5968828fe7c03fffa8a9f3bb52d36d26243f4c868ee166",
+          "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
         ]);
       });
 

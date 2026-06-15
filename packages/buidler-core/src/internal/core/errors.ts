@@ -6,10 +6,10 @@ import { ErrorDescriptor, ERRORS, getErrorCode } from "./errors-list";
 // For an explanation about these classes constructors go to:
 // https://github.com/Microsoft/TypeScript/wiki/Breaking-Changes#extending-built-ins-like-error-array-and-map-may-no-longer-work
 
-export class BuidlerError extends Error {
-  public static isBuidlerError(other: any): other is BuidlerError {
+export class HardhatError extends Error {
+  public static isHardhatError(other: any): other is HardhatError {
     return (
-      other !== undefined && other !== null && other._isBuidlerError === true
+      other !== undefined && other !== null && other._isHardhatError === true
     );
   }
 
@@ -17,7 +17,7 @@ export class BuidlerError extends Error {
   public readonly number: number;
   public readonly parent?: Error;
 
-  private readonly _isBuidlerError: boolean;
+  private readonly _isHardhatError: boolean;
 
   constructor(
     errorDescriptor: ErrorDescriptor,
@@ -39,30 +39,30 @@ export class BuidlerError extends Error {
       this.parent = parentError;
     }
 
-    this._isBuidlerError = true;
-    Object.setPrototypeOf(this, BuidlerError.prototype);
+    this._isHardhatError = true;
+    Object.setPrototypeOf(this, HardhatError.prototype);
   }
 }
 
 /**
- * This class is used to throw errors from buidler plugins.
+ * This class is used to throw errors from Hardhat plugins.
  */
-export class BuidlerPluginError extends Error {
-  public static isBuidlerPluginError(other: any): other is BuidlerPluginError {
+export class HardhatPluginError extends Error {
+  public static isHardhatPluginError(other: any): other is HardhatPluginError {
     return (
       other !== undefined &&
       other !== null &&
-      other._isBuidlerPluginError === true
+      other._isHardhatPluginError === true
     );
   }
 
   public readonly parent?: Error;
   public readonly pluginName: string;
 
-  private readonly _isBuidlerPluginError: boolean;
+  private readonly _isHardhatPluginError: boolean;
 
   /**
-   * Creates a BuidlerPluginError.
+   * Creates a HardhatPluginError.
    *
    * @param pluginName The name of the plugin.
    * @param message An error message that will be shown to the user.
@@ -96,8 +96,8 @@ export class BuidlerPluginError extends Error {
       this.parent = messageOrParent;
     }
 
-    this._isBuidlerPluginError = true;
-    Object.setPrototypeOf(this, BuidlerPluginError.prototype);
+    this._isHardhatPluginError = true;
+    Object.setPrototypeOf(this, HardhatPluginError.prototype);
   }
 }
 
@@ -131,7 +131,7 @@ function _applyErrorMessageTemplate(
   if (!isRecursiveCall) {
     for (const variableName of Object.keys(values)) {
       if (variableName.match(/^[a-zA-Z][a-zA-Z0-9]*$/) === null) {
-        throw new BuidlerError(ERRORS.INTERNAL.TEMPLATE_INVALID_VARIABLE_NAME, {
+        throw new HardhatError(ERRORS.INTERNAL.TEMPLATE_INVALID_VARIABLE_NAME, {
           variable: variableName,
         });
       }
@@ -139,7 +139,7 @@ function _applyErrorMessageTemplate(
       const variableTag = `%${variableName}%`;
 
       if (!template.includes(variableTag)) {
-        throw new BuidlerError(ERRORS.INTERNAL.TEMPLATE_VARIABLE_TAG_MISSING, {
+        throw new HardhatError(ERRORS.INTERNAL.TEMPLATE_VARIABLE_TAG_MISSING, {
           variable: variableName,
         });
       }
@@ -171,7 +171,7 @@ function _applyErrorMessageTemplate(
     const variableTag = `%${variableName}%`;
 
     if (value.match(/%([a-zA-Z][a-zA-Z0-9]*)?%/) !== null) {
-      throw new BuidlerError(
+      throw new HardhatError(
         ERRORS.INTERNAL.TEMPLATE_VALUE_CONTAINS_VARIABLE_TAG,
         { variable: variableName }
       );

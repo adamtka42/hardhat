@@ -1,8 +1,8 @@
 import { EventEmitter } from "events";
 
-import { IEthereumProvider } from "../../../../src/types";
+import { IQrlProvider } from "../../../../src/types";
 
-export class MockedProvider extends EventEmitter implements IEthereumProvider {
+export class MockedProvider extends EventEmitter implements IQrlProvider {
   private _returnValues: any = {};
   private _latestParams: any = {};
   private _numberOfCalls: { [call: string]: number } = {};

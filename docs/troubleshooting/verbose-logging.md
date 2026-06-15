@@ -24,7 +24,7 @@ pato@pmbp:asd% npx buidler --verbose
   buidler:core:analytics Project Id set to acce19ef71fcff30788e87c9d69ca4d0a5aee84c8f8cf696183a21b788730078 +1ms
   buidler:core:analytics Looking up Client Id at /Users/pato/.buidler/config.json +1ms
   buidler:core:analytics Client Id found: 61cf5dde-8c57-447b-bfe0-d57bdd80ab68 +1ms
-  buidler:core:bre Creating BuidlerRuntimeEnvironment +0ms
+  buidler:core:bre Creating HardhatRuntimeEnvironment +0ms
   buidler:core:bre Running task help +1ms
 Buidler version 1.0.0
 

@@ -1,10 +1,10 @@
-import { IEthereumProvider } from "../../../types";
-import { BuidlerError } from "../errors";
+import { IQrlProvider } from "../../../types";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 export function rpcQuantityToNumber(quantity?: string) {
   if (quantity === undefined) {
-    throw new BuidlerError(ERRORS.NETWORK.INVALID_RPC_QUANTITY_VALUE, {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_RPC_QUANTITY_VALUE, {
       value: quantity,
     });
   }
@@ -13,7 +13,7 @@ export function rpcQuantityToNumber(quantity?: string) {
     typeof quantity !== "string" ||
     quantity.match(/^0x(?:0|(?:[1-9a-fA-F][0-9a-fA-F]*))$/) === null
   ) {
-    throw new BuidlerError(ERRORS.NETWORK.INVALID_RPC_QUANTITY_VALUE, {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_RPC_QUANTITY_VALUE, {
       value: quantity,
     });
   }
@@ -26,7 +26,7 @@ export function numberToRpcQuantity(n: number) {
   return `0x${hex}`;
 }
 
-export function createChainIdGetter(provider: IEthereumProvider) {
+export function createChainIdGetter(provider: IQrlProvider) {
   let cachedChainId: number | undefined;
 
   return async function getRealChainId(): Promise<number> {
@@ -35,9 +35,7 @@ export function createChainIdGetter(provider: IEthereumProvider) {
         const id = await provider.send("qrl_chainId");
         cachedChainId = rpcQuantityToNumber(id);
       } catch (error) {
-        // If qrl_chainId fails we default to net_version
-        // TODO: This should be removed in the future.
-        // See: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-695.md
+        // If qrl_chainId fails, fall back to net_version for older QRL nodes.
         const id: string = await provider.send("net_version");
         cachedChainId = id.startsWith("0x")
           ? rpcQuantityToNumber(id)

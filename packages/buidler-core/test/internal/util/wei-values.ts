@@ -1,14 +1,14 @@
+import BN from "bn.js";
 import { assert } from "chai";
-import { BN } from "ethereumjs-util";
 
 import { weiToHumanReadableString } from "../../../src/internal/util/wei-values";
 
 describe("Wei values formatting", function () {
   const ONE_GWEI = new BN(10).pow(new BN(9));
-  const ONE_ETH = new BN(10).pow(new BN(18));
+  const ONE_QRL = new BN(10).pow(new BN(18));
 
-  it("Should show 0 wei as 0 ETH", function () {
-    assert.equal(weiToHumanReadableString(0), "0 ETH");
+  it("Should show 0 wei as 0 QRL", function () {
+    assert.equal(weiToHumanReadableString(0), "0 QRL");
   });
 
   it("Should show 1 wei as wei", function () {
@@ -51,30 +51,30 @@ describe("Wei values formatting", function () {
     assert.equal(weiToHumanReadableString(ONE_GWEI.muln(10000)), "10000 gwei");
   });
 
-  it("Should show 100000 gwei as ETH", function () {
-    assert.equal(weiToHumanReadableString(ONE_GWEI.muln(100000)), "0.0001 ETH");
+  it("Should show 100000 gwei as QRL", function () {
+    assert.equal(weiToHumanReadableString(ONE_GWEI.muln(100000)), "0.0001 QRL");
   });
 
-  it("Should show 0.0001 ETH as ETH", function () {
-    assert.equal(weiToHumanReadableString(ONE_ETH.divn(10000)), "0.0001 ETH");
+  it("Should show 0.0001 QRL as QRL", function () {
+    assert.equal(weiToHumanReadableString(ONE_QRL.divn(10000)), "0.0001 QRL");
   });
 
-  it("Should show 0.1 ETH as ETH", function () {
-    assert.equal(weiToHumanReadableString(ONE_ETH.divn(10)), "0.1 ETH");
+  it("Should show 0.1 QRL as QRL", function () {
+    assert.equal(weiToHumanReadableString(ONE_QRL.divn(10)), "0.1 QRL");
   });
 
-  it("Should show 1 ETH as ETH", function () {
-    assert.equal(weiToHumanReadableString(ONE_ETH), "1 ETH");
+  it("Should show 1 QRL as QRL", function () {
+    assert.equal(weiToHumanReadableString(ONE_QRL), "1 QRL");
   });
 
-  it("Should show 1.2 ETH as ETH", function () {
+  it("Should show 1.2 QRL as QRL", function () {
     assert.equal(
-      weiToHumanReadableString(ONE_ETH.add(ONE_ETH.divn(10).muln(2))),
-      "1.2 ETH"
+      weiToHumanReadableString(ONE_QRL.add(ONE_QRL.divn(10).muln(2))),
+      "1.2 QRL"
     );
   });
 
-  it("Should show 43 ETH as ETH", function () {
-    assert.equal(weiToHumanReadableString(ONE_ETH.muln(43)), "43 ETH");
+  it("Should show 43 QRL as QRL", function () {
+    assert.equal(weiToHumanReadableString(ONE_QRL.muln(43)), "43 QRL");
   });
 });

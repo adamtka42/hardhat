@@ -25,5 +25,5 @@ shell.exec("npm run build-test");
 
 const testRunCommand = `npm run test ${getTestArgsOrDefaults()}`;
 shell.exec(
-  `npx lerna exec --scope @nomiclabs/buidler -- ${testRunCommand}`
+  `npx lerna exec --scope @theqrl/hardhat -- ${testRunCommand}`
 );

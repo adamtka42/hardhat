@@ -1,28 +1,28 @@
 import { assert } from "chai";
 
-import { DEFAULT_GAS_MULTIPLIER } from "../../../../../buidler-truffle5/src/constants";
 import {
   createAutomaticGasPriceProvider,
   createAutomaticGasProvider,
   createFixedGasPriceProvider,
   createFixedGasProvider,
-  createGanacheGasMultiplierProvider,
-  GANACHE_GAS_MULTIPLIER,
+  DEFAULT_GAS_MULTIPLIER,
 } from "../../../../src/internal/core/providers/gas-providers";
 import {
   numberToRpcQuantity,
   rpcQuantityToNumber,
 } from "../../../../src/internal/core/providers/provider-utils";
-import { IEthereumProvider } from "../../../../src/types";
+import { IQrlProvider } from "../../../../src/types";
 
 import { MockedProvider } from "./mocks";
+
+const QRL_TEST_ADDRESS = `0x${"0".repeat(126)}11`;
 
 describe("createAutomaticGasProvider", () => {
   const FIXED_GAS_LIMIT = 1231;
   const GAS_MULTIPLIER = 1.337;
 
   let mockedProvider: MockedProvider;
-  let provider: IEthereumProvider;
+  let provider: IQrlProvider;
 
   beforeEach(() => {
     mockedProvider = new MockedProvider();
@@ -40,8 +40,8 @@ describe("createAutomaticGasProvider", () => {
   it("Should estimate gas automatically if not present", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
       },
     ]);
@@ -57,8 +57,8 @@ describe("createAutomaticGasProvider", () => {
 
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
       },
     ]);
@@ -73,8 +73,8 @@ describe("createAutomaticGasProvider", () => {
 
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
       },
     ]);
@@ -90,8 +90,8 @@ describe("createAutomaticGasProvider", () => {
   it("Shouldn't replace the provided gas", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
         gas: 567,
       },
@@ -113,7 +113,7 @@ describe("createAutomaticGasProvider", () => {
 
 describe("createAutomaticGasPriceProvider", () => {
   const FIXED_GAS_PRICE = 1232;
-  let provider: IEthereumProvider;
+  let provider: IQrlProvider;
   let mockedProvider: MockedProvider;
 
   beforeEach(() => {
@@ -128,8 +128,8 @@ describe("createAutomaticGasPriceProvider", () => {
   it("Should obtain the gas price automatically if not present", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
       },
     ]);
@@ -141,8 +141,8 @@ describe("createAutomaticGasPriceProvider", () => {
   it("Shouldn't replace the provided gasPrice", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
         gasPrice: 456,
       },
@@ -164,7 +164,7 @@ describe("createAutomaticGasPriceProvider", () => {
 describe("createFixedGasProvider", () => {
   const FIXED_GAS_LIMIT = 1233;
   let mockedProvider: MockedProvider;
-  let provider: IEthereumProvider;
+  let provider: IQrlProvider;
 
   const MOCKED_GAS_ESTIMATION_VALUE = {};
 
@@ -180,8 +180,8 @@ describe("createFixedGasProvider", () => {
   it("Should set the fixed gas if not present", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
       },
     ]);
@@ -193,8 +193,8 @@ describe("createFixedGasProvider", () => {
   it("Shouldn't replace the provided gas", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
         gas: 1456,
       },
@@ -207,8 +207,8 @@ describe("createFixedGasProvider", () => {
   it("Should forward direct calls to qrl_estimateGas", async () => {
     const estimated = await provider.send("qrl_estimateGas", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
         gas: 1456123,
       },
@@ -229,7 +229,7 @@ describe("createFixedGasProvider", () => {
 describe("createFixedGasPriceProvider", () => {
   const FIXED_GAS_PRICE = 1234;
   let mockedProvider: MockedProvider;
-  let provider: IEthereumProvider;
+  let provider: IQrlProvider;
 
   const MOCKED_GAS_PRICE_VALUE = {};
   beforeEach(() => {
@@ -241,8 +241,8 @@ describe("createFixedGasPriceProvider", () => {
   it("Should set the fixed gasPrice if not present", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
       },
     ]);
@@ -254,8 +254,8 @@ describe("createFixedGasPriceProvider", () => {
   it("Shouldn't replace the provided gasPrice", async () => {
     await provider.send("qrl_sendTransaction", [
       {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
         value: 1,
         gasPrice: 14567,
       },
@@ -277,56 +277,5 @@ describe("createFixedGasPriceProvider", () => {
 
     const params = mockedProvider.getLatestParams("A");
     assert.deepEqual(params, input);
-  });
-});
-
-describe("createGanacheGasMultiplierProvider", () => {
-  it("Should multiply the gas if connected to Ganache", async () => {
-    const mockedProvider = new MockedProvider();
-    mockedProvider.setReturnValue("qrl_estimateGas", numberToRpcQuantity(123));
-    mockedProvider.setReturnValue(
-      "web3_clientVersion",
-      "EthereumJS TestRPC/v2.5.5/ethereum-js"
-    );
-    mockedProvider.setReturnValue("qrl_getBlockByNumber", {
-      gasLimit: numberToRpcQuantity(12300000),
-    });
-
-    const wrapped = createGanacheGasMultiplierProvider(mockedProvider);
-
-    const estimation = await wrapped.send("qrl_estimateGas", [
-      {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
-        value: 1,
-      },
-    ]);
-
-    const gas = rpcQuantityToNumber(estimation);
-    assert.equal(gas, Math.floor(123 * GANACHE_GAS_MULTIPLIER));
-  });
-
-  it("Should not multiply the gas if connected to other node", async () => {
-    const mockedProvider = new MockedProvider();
-    mockedProvider.setReturnValue("qrl_estimateGas", numberToRpcQuantity(123));
-    mockedProvider.setReturnValue(
-      "web3_clientVersion",
-      "Parity-Ethereum//v2.5.1-beta-e0141f8-20190510/x86_64-linux-gnu/rustc1.34.1"
-    );
-    mockedProvider.setReturnValue("qrl_getBlockByNumber", {
-      gasLimit: numberToRpcQuantity(12300000),
-    });
-    const wrapped = createGanacheGasMultiplierProvider(mockedProvider);
-
-    const estimation = await wrapped.send("qrl_estimateGas", [
-      {
-        from: "0x0000000000000000000000000000000000000011",
-        to: "0x0000000000000000000000000000000000000011",
-        value: 1,
-      },
-    ]);
-
-    const gas = rpcQuantityToNumber(estimation);
-    assert.equal(gas, 123);
   });
 });

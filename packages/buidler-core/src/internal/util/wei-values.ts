@@ -1,8 +1,8 @@
-import { BN } from "ethereumjs-util";
+import BN from "bn.js";
 
 /**
  * This function turns a wei value in a human readable string. It shows values
- * in ETH, gwei or wei, depending on how large it is.
+ * in QRL, gwei or wei, depending on how large it is.
  *
  * It never show more than 99999 wei or gwei, moving to the larger denominator
  * when necessary.
@@ -16,7 +16,7 @@ export function weiToHumanReadableString(wei: BN | number): string {
   }
 
   if (wei.eqn(0)) {
-    return "0 ETH";
+    return "0 QRL";
   }
 
   if (wei.lt(new BN(10).pow(new BN(5)))) {
@@ -27,7 +27,7 @@ export function weiToHumanReadableString(wei: BN | number): string {
     return `${toDecimalString(wei, 9, 4)} gwei`;
   }
 
-  return `${toDecimalString(wei, 18, 4)} ETH`;
+  return `${toDecimalString(wei, 18, 4)} QRL`;
 }
 
 function toDecimalString(

@@ -1,9 +1,10 @@
 import { assert } from "chai";
 import * as fsExtra from "fs-extra";
 
+import { TASK_COMPILE } from "../../src/builtin-tasks/task-names";
 import { ERRORS } from "../../src/internal/core/errors-list";
 import { useEnvironment } from "../helpers/environment";
-import { expectBuidlerErrorAsync } from "../helpers/errors";
+import { expectHardhatErrorAsync } from "../helpers/errors";
 import { useFixtureProject } from "../helpers/project";
 
 describe("run task", function () {
@@ -11,7 +12,7 @@ describe("run task", function () {
   useEnvironment();
 
   it("Should fail if a script doesn't exist", async function () {
-    await expectBuidlerErrorAsync(
+    await expectHardhatErrorAsync(
       () =>
         this.env.run("run", { script: "./does-not-exist", noCompile: true }),
       ERRORS.BUILTIN_TASKS.RUN_FILE_NOT_FOUND
@@ -36,6 +37,10 @@ describe("run task", function () {
     if (await fsExtra.pathExists("artifacts")) {
       await fsExtra.remove("artifacts");
     }
+
+    this.env.tasks[TASK_COMPILE].setAction(async () => {
+      await fsExtra.outputJson("artifacts/A.json", {});
+    });
 
     await this.env.run("run", {
       script: "./successful-script.js",

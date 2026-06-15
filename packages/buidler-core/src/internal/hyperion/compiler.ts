@@ -1,7 +1,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 
-import { SolcOptimizerConfig } from "../../types";
+import { HyperionOptimizerConfig } from "../../types";
 
 const execFileAsync = promisify(execFile);
 
@@ -12,7 +12,7 @@ export interface HyperionInput {
   sourcePaths: string[];
   sources: { [sourceName: string]: { content: string } };
   settings: {
-    optimizer: SolcOptimizerConfig;
+    optimizer: HyperionOptimizerConfig;
   };
 }
 
@@ -21,7 +21,11 @@ export async function compileHyperion(
   projectRoot: string
 ): Promise<any> {
   const hypcPath =
-    process.env.HYPERION_HYPC_PATH || process.env.HYPC_PATH || "hypc";
+    process.env.HYPERION_HYPC_PATH !== undefined
+      ? process.env.HYPERION_HYPC_PATH
+      : process.env.HYPC_PATH !== undefined
+      ? process.env.HYPC_PATH
+      : "hypc";
   const args = [
     "--combined-json",
     HYPERION_OUTPUTS,
@@ -70,12 +74,18 @@ export async function compileHyperion(
 function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
   const jsonStart = stdout.indexOf("{");
   if (jsonStart === -1) {
+    const message =
+      stdout !== ""
+        ? stdout
+        : stderr !== ""
+        ? stderr
+        : "hypc did not return JSON output";
+
     return {
       errors: [
         {
           severity: "error",
-          formattedMessage:
-            stdout || stderr || "hypc did not return JSON output",
+          formattedMessage: message,
         },
       ],
     };
@@ -87,13 +97,16 @@ function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
     contracts: {},
   };
 
-  for (const fullName of Object.keys(combinedOutput.contracts || {})) {
+  const contracts =
+    combinedOutput.contracts !== undefined ? combinedOutput.contracts : {};
+
+  for (const fullName of Object.keys(contracts)) {
     const separator = fullName.lastIndexOf(":");
     const sourceName =
       separator === -1 ? fullName : fullName.slice(0, separator);
     const contractName =
       separator === -1 ? fullName : fullName.slice(separator + 1);
-    const contractOutput = combinedOutput.contracts[fullName];
+    const contractOutput = contracts[fullName];
     const abi =
       typeof contractOutput.abi === "string"
         ? JSON.parse(contractOutput.abi)
@@ -105,13 +118,19 @@ function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
 
     output.contracts[sourceName][contractName] = {
       abi,
-      evm: {
+      bytecodeOutput: {
         bytecode: {
-          object: stripHexPrefix(contractOutput.bin || ""),
+          object: stripHexPrefix(
+            contractOutput.bin !== undefined ? contractOutput.bin : ""
+          ),
           linkReferences: {},
         },
         deployedBytecode: {
-          object: stripHexPrefix(contractOutput["bin-runtime"] || ""),
+          object: stripHexPrefix(
+            contractOutput["bin-runtime"] !== undefined
+              ? contractOutput["bin-runtime"]
+              : ""
+          ),
           linkReferences: {},
         },
       },

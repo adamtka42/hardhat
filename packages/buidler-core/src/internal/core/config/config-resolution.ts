@@ -3,30 +3,30 @@ import * as fs from "fs";
 import path from "path";
 
 import {
-  BuidlerConfig,
   ConfigExtender,
+  HardhatConfig,
   ProjectPaths,
-  ResolvedBuidlerConfig,
+  ResolvedHardhatConfig,
 } from "../../../types";
 import { fromEntries } from "../../util/lang";
-import { BuidlerError } from "../errors";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 function mergeUserAndDefaultConfigs(
-  defaultConfig: BuidlerConfig,
-  userConfig: BuidlerConfig
-): Partial<ResolvedBuidlerConfig> {
+  defaultConfig: HardhatConfig,
+  userConfig: HardhatConfig
+): Partial<ResolvedHardhatConfig> {
   return deepmerge(defaultConfig, userConfig, {
     arrayMerge: (destination: any[], source: any[]) => source,
   }) as any;
 }
 
 /**
- * This functions resolves the buidler config by merging the user provided config
- * and the buidler default config.
+ * This functions resolves the Hardhat config by merging the user provided config
+ * and the default config.
  *
  * @param userConfigPath the user config filepath
- * @param defaultConfig  the buidler's default config object
+ * @param defaultConfig  the default config object
  * @param userConfig     the user config object
  * @param configExtenders An array of ConfigExtenders
  *
@@ -34,10 +34,10 @@ function mergeUserAndDefaultConfigs(
  */
 export function resolveConfig(
   userConfigPath: string,
-  defaultConfig: BuidlerConfig,
-  userConfig: BuidlerConfig,
+  defaultConfig: HardhatConfig,
+  userConfig: HardhatConfig,
   configExtenders: ConfigExtender[]
-): ResolvedBuidlerConfig {
+): ResolvedHardhatConfig {
   userConfig = deepFreezeUserConfig(userConfig);
 
   const config = mergeUserAndDefaultConfigs(defaultConfig, userConfig);
@@ -48,9 +48,8 @@ export function resolveConfig(
     ...config,
     paths,
     networks: config.networks!,
-    solc: config.solc!,
+    hyperion: config.hyperion!,
     defaultNetwork: config.defaultNetwork!,
-    analytics: config.analytics!,
   };
 
   for (const extender of configExtenders) {
@@ -131,7 +130,7 @@ function deepFreezeUserConfig(
       value: any,
       receiver: any
     ): boolean {
-      throw new BuidlerError(ERRORS.GENERAL.USER_CONFIG_MODIFIED, {
+      throw new HardhatError(ERRORS.GENERAL.USER_CONFIG_MODIFIED, {
         path: [...propertyPath, property]
           .map((pathPart) => pathPart.toString())
           .join("."),

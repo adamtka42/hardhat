@@ -15,13 +15,13 @@ interface CommonNetworkConfig {
   gasMultiplier?: number;
 }
 
-interface BuidlerNetworkAccount {
+interface HardhatNetworkAccount {
   privateKey: string;
   balance: string;
 }
 
-export interface BuidlerNetworkConfig extends CommonNetworkConfig {
-  accounts?: BuidlerNetworkAccount[];
+export interface HardhatNetworkConfig extends CommonNetworkConfig {
+  accounts?: HardhatNetworkAccount[];
   blockGasLimit?: number;
   hardfork?: string;
   throwOnTransactionFailures?: boolean;
@@ -31,21 +31,15 @@ export interface BuidlerNetworkConfig extends CommonNetworkConfig {
   initialDate?: string;
 }
 
-export interface HDAccountsConfig {
-  mnemonic: string;
-  initialIndex?: number;
-  count?: number;
-  path?: string;
-}
-
 export interface OtherAccountsConfig {
   type: string;
 }
 
+export type QrlExtendedSeed = string;
+
 export type NetworkConfigAccounts =
   | "remote"
-  | string[]
-  | HDAccountsConfig
+  | QrlExtendedSeed[]
   | OtherAccountsConfig;
 
 export interface HttpNetworkConfig extends CommonNetworkConfig {
@@ -55,7 +49,7 @@ export interface HttpNetworkConfig extends CommonNetworkConfig {
   accounts?: NetworkConfigAccounts;
 }
 
-export type NetworkConfig = BuidlerNetworkConfig | HttpNetworkConfig;
+export type NetworkConfig = HardhatNetworkConfig | HttpNetworkConfig;
 
 export interface Networks {
   [networkName: string]: NetworkConfig;
@@ -64,7 +58,7 @@ export interface Networks {
 /**
  * The project paths:
  * * root: the project's root.
- * * configFile: the buidler's config filepath.
+ * * configFile: Hardhat config filepath.
  * * cache: project's cache directory.
  * * artifacts: artifact's directory.
  * * sources: project's sources directory.
@@ -79,62 +73,52 @@ export interface ProjectPaths {
   tests: string;
 }
 
-type EVMVersion = string;
-
-export interface SolcConfig {
+export interface HyperionConfig {
   version: string;
-  optimizer: SolcOptimizerConfig;
-  evmVersion?: EVMVersion;
+  optimizer: HyperionOptimizerConfig;
 }
 
-export interface SolcOptimizerConfig {
+export interface HyperionOptimizerConfig {
   enabled: boolean;
   runs: number;
 }
 
-export interface AnalyticsConfig {
-  enabled: boolean;
-}
-
-export interface BuidlerConfig {
+export interface HardhatConfig {
   defaultNetwork?: string;
   networks?: Networks;
   paths?: Omit<Partial<ProjectPaths>, "configFile">;
-  solc?: DeepPartial<SolcConfig>;
+  hyperion?: DeepPartial<HyperionConfig>;
   mocha?: Mocha.MochaOptions;
-  analytics?: Partial<AnalyticsConfig>;
 }
 
-export interface ResolvedBuidlerConfig extends BuidlerConfig {
+export interface ResolvedHardhatConfig extends HardhatConfig {
   defaultNetwork: string;
   paths: ProjectPaths;
   networks: Networks;
-  solc: SolcConfig;
-  analytics: AnalyticsConfig;
+  hyperion: HyperionConfig;
 }
 
 // End config types
 
-export interface SolcInput {
+export interface CompilerInput {
   settings: {
     metadata: { useLiteralContent: boolean };
-    optimizer: SolcOptimizerConfig;
+    optimizer: HyperionOptimizerConfig;
     outputSelection: { "*": { "": string[]; "*": string[] } };
-    evmVersion?: string;
   };
   sources: { [p: string]: { content: string } };
   language: string;
 }
 
 /**
- * A function that receives a BuidlerRuntimeEnvironment and
+ * A function that receives a HardhatRuntimeEnvironment and
  * modify its properties or add new ones.
  */
-export type EnvironmentExtender = (env: BuidlerRuntimeEnvironment) => void;
+export type EnvironmentExtender = (env: HardhatRuntimeEnvironment) => void;
 
 export type ConfigExtender = (
-  config: ResolvedBuidlerConfig,
-  userConfig: DeepReadonly<BuidlerConfig>
+  config: ResolvedHardhatConfig,
+  userConfig: DeepReadonly<HardhatConfig>
 ) => void;
 
 export interface TasksMap {
@@ -214,15 +198,15 @@ export interface ParamDefinitionsMap {
 }
 
 /**
- * Buidler arguments:
+ * Hardhat arguments:
  * * network: the network to be used.
  * * showStackTraces: flag to show stack traces.
- * * version: flag to show buidler's version.
- * * help: flag to show buidler's help message.
+ * * version: flag to show Hardhat version.
+ * * help: flag to show Hardhat help message.
  * * emoji:
- * * config: used to specify buidler's config file.
+ * * config: used to specify Hardhat config file.
  */
-export interface BuidlerArguments {
+export interface HardhatArguments {
   network?: string;
   showStackTraces: boolean;
   version: boolean;
@@ -233,9 +217,9 @@ export interface BuidlerArguments {
   maxMemory?: number;
 }
 
-export type BuidlerParamDefinitions = {
-  [param in keyof Required<BuidlerArguments>]: OptionalParamDefinition<
-    BuidlerArguments[param]
+export type HardhatParamDefinitions = {
+  [param in keyof Required<HardhatArguments>]: OptionalParamDefinition<
+    HardhatArguments[param]
   >;
 };
 
@@ -280,30 +264,28 @@ export interface RunSuperFunction<ArgT extends TaskArguments> {
 
 export type ActionType<ArgsT extends TaskArguments> = (
   taskArgs: ArgsT,
-  env: BuidlerRuntimeEnvironment,
+  env: HardhatRuntimeEnvironment,
   runSuper: RunSuperFunction<ArgsT>
 ) => Promise<any>;
 
-export interface EthereumProvider extends EventEmitter {
+export interface QrlProvider extends EventEmitter {
   send(method: string, params?: any[]): Promise<any>;
 }
 
-// This alias is here for backwards compatibility
-export type IEthereumProvider = EthereumProvider;
+export type IQrlProvider = QrlProvider;
 
 export interface Network {
   name: string;
   config: NetworkConfig;
-  provider: EthereumProvider;
+  provider: QrlProvider;
 }
 
-export interface BuidlerRuntimeEnvironment {
-  readonly config: ResolvedBuidlerConfig;
-  readonly buidlerArguments: BuidlerArguments;
+export interface HardhatRuntimeEnvironment {
+  readonly config: ResolvedHardhatConfig;
+  readonly hardhatArguments: HardhatArguments;
   readonly tasks: TasksMap;
   readonly run: RunTaskFunction;
   readonly network: Network;
-  readonly ethereum: EthereumProvider; // DEPRECATED: Use network.provider
   qrl: QrlRuntimeHelpers;
 }
 

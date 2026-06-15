@@ -1,20 +1,21 @@
-import { readArtifact } from "../artifacts";
-
 import {
   Artifact,
-  BuidlerRuntimeEnvironment,
+  HardhatRuntimeEnvironment,
   QrlContract,
   QrlContractFactory,
   QrlDeploymentResult,
   QrlRuntimeHelpers,
   QrlTransactionRequest,
 } from "../../types";
+import { readArtifact } from "../artifacts";
+import { HardhatError } from "../core/errors";
+import { ERRORS } from "../core/errors-list";
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 120000;
 
 export function createQrlRuntimeHelpers(
-  bre: BuidlerRuntimeEnvironment
+  bre: HardhatRuntimeEnvironment
 ): QrlRuntimeHelpers {
   async function readQrlArtifact(contractName: string): Promise<Artifact> {
     return readArtifact(bre.config.paths.artifacts, contractName);
@@ -77,7 +78,7 @@ export function createQrlRuntimeHelpers(
       await sleep(pollIntervalMs);
     }
 
-    throw new Error(`Timed out waiting for transaction ${txHash}`);
+    throw new HardhatError(ERRORS.NETWORK.NETWORK_TIMEOUT);
   }
 
   async function deployContract(
