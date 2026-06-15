@@ -1,5 +1,5 @@
 import BN from "bn.js";
-import { keccak256 } from "ethereum-cryptography/keccak";
+import { keccak_256 } from "js-sha3";
 
 import { HardhatError } from "../core/errors";
 import { ERRORS } from "../core/errors-list";
@@ -252,7 +252,7 @@ function getFunctionSelector(fragment: QrlAbiFunction): string {
     .map((input) => canonicalType(input.type))
     .join(",")})`;
 
-  return keccak256(Buffer.from(signature)).slice(0, 4).toString("hex");
+  return keccak_256(signature).slice(0, 8);
 }
 
 function getEventTopic(fragment: QrlAbiFunction): string {
@@ -261,7 +261,7 @@ function getEventTopic(fragment: QrlAbiFunction): string {
     .map((input) => canonicalType(input.type))
     .join(",")})`;
 
-  return rightPadWord(keccak256(Buffer.from(signature)).toString("hex"));
+  return rightPadWord(keccak_256(signature));
 }
 
 function decodeKnownEventLog(

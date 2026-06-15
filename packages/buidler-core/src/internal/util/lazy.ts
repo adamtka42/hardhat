@@ -21,11 +21,6 @@ import { ERRORS } from "../core/errors-list";
  *
  *    import findUpT from "find-up";
  *    export const findUp = lazyFunction<typeof findUpT>(() => require("find-up"));
- *
- * You can also use it with named exports:
- *
- *    import { EthT } from "web3x/eth";
- *    const Eth = lazyFunction<typeof EthT>(() => require("web3x/eth").Eth);
  */
 
 export function lazyObject<T extends object>(objectCreator: () => T): T {
@@ -121,16 +116,9 @@ function createLazyProxy<ActualT extends GuardT, GuardT extends object>(
     },
 
     get(target, property, receiver) {
-      // We have this short-circuit logic here to avoid a cyclic require when
-      // loading Web3.js.
-      //
       // If a lazy object is somehow accessed while its real target is being
       // created, it would trigger an endless loop of recreation, which node
       // detects and resolve to an empty object.
-      //
-      // This can happen when a web3-compatible provider module accesses its
-      // own global object while it is still being lazily initialized.
-      //
       // We just return `undefined` in that case, to not enter into the loop.
       const stack = new Error().stack;
       if (

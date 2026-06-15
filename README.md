@@ -18,9 +18,8 @@ on top as focused commits.
 
 ## Current State
 
-This branch is the clean QRL integration base. The imported upstream code still
-contains the original Buidler package names, Ethereum JSON-RPC namespace,
-Ethereum address handling, ECDSA signing, and Solidity-first workflow. These
-will be replaced incrementally with QRL-specific behavior.
-
-See `QRL_PORT_PLAN.md` for the migration sequence.
+This branch contains the QRL-specific runtime, Hyperion compilation flow,
+QRL address handling, ML-DSA-87 signing, and live go-qrl HTTP provider support.
+Legacy Ethereum/EVM/Solidity surfaces have been removed where they are not
+needed, or rejected explicitly where preserving the old input boundary makes
+configuration errors clearer.

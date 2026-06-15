@@ -5,4 +5,3 @@ import "@scope/package/contracts/File.hyp";
 contract A {
     int a;
 }
-

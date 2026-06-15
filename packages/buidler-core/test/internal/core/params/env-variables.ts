@@ -9,7 +9,7 @@ import {
 import { HARDHAT_PARAM_DEFINITIONS } from "../../../../src/internal/core/params/hardhat-params";
 import { expectHardhatError } from "../../../helpers/errors";
 
-// This is testing an internal function, which may seem weird, but its behaviour
+// This is testing an internal function, which may seem unusual, but its behaviour
 // is 100% user facing.
 describe("paramNameToEnvVariable", () => {
   it("should convert camelCase to UPPER_CASE and prepend HARDHAT_", () => {
