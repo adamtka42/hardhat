@@ -15,7 +15,7 @@ import { IQrlProvider } from "../../../../src/types";
 
 import { MockedProvider } from "./mocks";
 
-const QRL_TEST_ADDRESS = `0x${"0".repeat(126)}11`;
+const QRL_TEST_ADDRESS = `Q${"0".repeat(126)}11`;
 
 describe("createAutomaticGasProvider", () => {
   const FIXED_GAS_LIMIT = 1231;

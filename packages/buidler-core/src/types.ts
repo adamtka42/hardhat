@@ -15,22 +15,6 @@ interface CommonNetworkConfig {
   gasMultiplier?: number;
 }
 
-interface HardhatNetworkAccount {
-  privateKey: string;
-  balance: string;
-}
-
-export interface HardhatNetworkConfig extends CommonNetworkConfig {
-  accounts?: HardhatNetworkAccount[];
-  blockGasLimit?: number;
-  hardfork?: string;
-  throwOnTransactionFailures?: boolean;
-  throwOnCallFailures?: boolean;
-  loggingEnabled?: boolean;
-  allowUnlimitedContractSize?: boolean;
-  initialDate?: string;
-}
-
 export interface OtherAccountsConfig {
   type: string;
 }
@@ -49,7 +33,7 @@ export interface HttpNetworkConfig extends CommonNetworkConfig {
   accounts?: NetworkConfigAccounts;
 }
 
-export type NetworkConfig = HardhatNetworkConfig | HttpNetworkConfig;
+export type NetworkConfig = HttpNetworkConfig;
 
 export interface Networks {
   [networkName: string]: NetworkConfig;
@@ -324,6 +308,11 @@ export interface QrlDeploymentResult {
   address?: string;
 }
 
+export interface QrlWaitOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
 export interface QrlRuntimeHelpers {
   readArtifact(contractName: string): Promise<Artifact>;
   getContractFactory(contractName: string): Promise<QrlContractFactory>;
@@ -338,7 +327,8 @@ export interface QrlRuntimeHelpers {
   deployContract(
     contractName: string,
     tx?: QrlTransactionRequest,
-    constructorData?: string
+    constructorDataOrArgs?: string | any[],
+    waitOptions?: QrlWaitOptions
   ): Promise<QrlDeploymentResult>;
 }
 
@@ -347,7 +337,8 @@ export interface QrlContractFactory {
   readonly artifact: Artifact;
   deploy(
     tx?: QrlTransactionRequest,
-    constructorData?: string
+    constructorDataOrArgs?: string | any[],
+    waitOptions?: QrlWaitOptions
   ): Promise<QrlDeploymentResult>;
   attach(address: string): QrlContract;
 }
@@ -356,6 +347,24 @@ export interface QrlContract {
   readonly address: string;
   readonly contractName: string;
   readonly artifact: Artifact;
+  readonly functions: QrlContractFunctionMap;
+  readonly callStatic: QrlContractFunctionMap;
+  readonly send: QrlContractFunctionMap;
+  encodeFunctionData(functionName: string, args?: any[]): string;
+  decodeFunctionResult(functionName: string, data: string): any[];
+  decodeEventLog(eventName: string, log: any): any;
+  decodeReceiptLogs(receipt: any): any[];
+  callFunction(
+    functionName: string,
+    args?: any[],
+    tx?: Omit<QrlTransactionRequest, "to" | "data">,
+    blockTag?: string
+  ): Promise<any[]>;
+  sendFunction(
+    functionName: string,
+    args?: any[],
+    tx?: Omit<QrlTransactionRequest, "to" | "data">
+  ): Promise<string>;
   call(
     data: string,
     tx?: Omit<QrlTransactionRequest, "to" | "data">,
@@ -365,4 +374,8 @@ export interface QrlContract {
     data: string,
     tx?: Omit<QrlTransactionRequest, "to" | "data">
   ): Promise<string>;
+}
+
+export interface QrlContractFunctionMap {
+  [functionName: string]: (...args: any[]) => Promise<any>;
 }

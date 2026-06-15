@@ -1,0 +1,554 @@
+import { assert } from "chai";
+
+import { saveArtifact } from "../../../src/internal/artifacts";
+import { ERRORS } from "../../../src/internal/core/errors-list";
+import { createQrlRuntimeHelpers } from "../../../src/internal/qrl/helpers";
+import { Artifact, HardhatRuntimeEnvironment } from "../../../src/types";
+import { expectHardhatErrorAsync } from "../../helpers/errors";
+import { useTmpDir } from "../../helpers/fs";
+import { MockedProvider } from "../core/providers/mocks";
+
+describe("QRL runtime helpers", () => {
+  const contractAddress = `Q${"a".repeat(128)}`;
+  const txHash = `0x${"1".repeat(64)}`;
+  let provider: MockedProvider;
+  let artifact: Artifact;
+  let helpers: ReturnType<typeof createQrlRuntimeHelpers>;
+
+  useTmpDir("qrl-runtime-helpers");
+
+  beforeEach(async function () {
+    provider = new MockedProvider();
+    artifact = {
+      abi: [
+        {
+          inputs: [
+            { name: "initialValue", type: "uint256" },
+            { name: "initialOwner", type: "address" },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [{ name: "newValue", type: "uint256" }],
+          name: "store",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "retrieve",
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [{ name: "owner", type: "address" }],
+          name: "setOwner",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [{ name: "key", type: "bytes32" }],
+          name: "setKey",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [{ name: "newMessage", type: "string" }],
+          name: "setMessage",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [{ name: "data", type: "bytes" }],
+          name: "setBlob",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [{ name: "values", type: "uint256[]" }],
+          name: "setAmounts",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "message",
+          outputs: [{ name: "", type: "string" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "blob",
+          outputs: [{ name: "", type: "bytes" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "amounts",
+          outputs: [{ name: "", type: "uint256[]" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            { indexed: true, name: "from", type: "address" },
+            { indexed: true, name: "to", type: "address" },
+            { indexed: false, name: "value", type: "uint256" },
+          ],
+          name: "Transfer",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [{ indexed: false, name: "value", type: "string" }],
+          name: "MessageChanged",
+          type: "event",
+        },
+      ],
+      bytecode: "0x1234",
+      contractName: "Sample",
+      deployedBytecode: "0xabcd",
+      deployedLinkReferences: {},
+      linkReferences: {},
+    };
+
+    await saveArtifact(this.tmpDir, artifact);
+
+    helpers = createQrlRuntimeHelpers(({
+      config: {
+        paths: {
+          artifacts: this.tmpDir,
+        },
+      },
+      network: {
+        provider,
+      },
+    } as any) as HardhatRuntimeEnvironment);
+  });
+
+  it("deploys a contract and returns the mined receipt address", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x1",
+    });
+
+    const result = await helpers.deployContract(
+      "Sample",
+      { from: contractAddress },
+      "0xbeef"
+    );
+
+    assert.equal(result.hash, txHash);
+    assert.equal(result.address, contractAddress);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: "0x1234beef",
+        from: contractAddress,
+      },
+    ]);
+  });
+
+  it("deploys a contract with ABI-encoded constructor arguments", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x1",
+    });
+
+    const factory = await helpers.getContractFactory("Sample");
+    const result = await factory.deploy({ from: contractAddress }, [
+      42,
+      contractAddress,
+    ]);
+
+    assert.equal(result.hash, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: `0x1234${"0".repeat(126)}2a${contractAddress.slice(1)}`,
+        from: contractAddress,
+      },
+    ]);
+  });
+
+  it("deploys a contract with custom wait options", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x1",
+    });
+
+    const factory = await helpers.getContractFactory("Sample");
+    await factory.deploy({ from: contractAddress }, [42, contractAddress], {
+      pollIntervalMs: 1,
+      timeoutMs: 1,
+    });
+
+    assert.deepEqual(provider.getLatestParams("qrl_getTransactionReceipt"), [
+      txHash,
+    ]);
+  });
+
+  it("rejects invalid constructor data", async () => {
+    await expectHardhatErrorAsync(
+      () => helpers.deployContract("Sample", {}, "0xz"),
+      ERRORS.NETWORK.INVALID_HEX_DATA,
+      "0xz"
+    );
+  });
+
+  it("rejects invalid artifact bytecode", async function () {
+    artifact.bytecode = "0x123";
+    await saveArtifact(this.tmpDir, artifact);
+
+    await expectHardhatErrorAsync(
+      () => helpers.deployContract("Sample"),
+      ERRORS.NETWORK.INVALID_HEX_DATA,
+      "0x123"
+    );
+  });
+
+  it("rejects a failed deployment receipt", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x0",
+    });
+
+    await expectHardhatErrorAsync(
+      () => helpers.deployContract("Sample"),
+      ERRORS.NETWORK.DEPLOYMENT_FAILED,
+      txHash
+    );
+  });
+
+  it("rejects a deployment receipt without a contract address", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      status: "0x1",
+    });
+
+    await expectHardhatErrorAsync(
+      () => helpers.deployContract("Sample"),
+      ERRORS.NETWORK.MISSING_CONTRACT_ADDRESS,
+      txHash
+    );
+  });
+
+  it("rejects a deployment receipt with an invalid contract address", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress: `Q${"a".repeat(96)}`,
+      status: "0x1",
+    });
+
+    await expectHardhatErrorAsync(
+      () => helpers.deployContract("Sample"),
+      ERRORS.NETWORK.INVALID_QRL_ADDRESS
+    );
+  });
+
+  it("times out while waiting for a missing transaction receipt", async () => {
+    provider.setReturnValue("qrl_getTransactionReceipt", null);
+
+    await expectHardhatErrorAsync(
+      () => helpers.waitForTransaction(txHash, 1, 1),
+      ERRORS.NETWORK.NETWORK_TIMEOUT
+    );
+  });
+
+  it("attaches contracts and forwards call/send requests", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    await contract.call("0x1122", { from: contractAddress }, "latest");
+    await contract.sendTransaction("0x3344", { from: contractAddress });
+
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: "0x1122",
+        from: contractAddress,
+        to: contractAddress,
+      },
+      "latest",
+    ]);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: "0x3344",
+        from: contractAddress,
+        to: contractAddress,
+      },
+    ]);
+  });
+
+  it("encodes QRL function calldata using 64-byte words", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    assert.equal(
+      contract.encodeFunctionData("store", [42]),
+      `0x6057361d${"0".repeat(126)}2a`
+    );
+    assert.equal(
+      contract.encodeFunctionData("setOwner", [contractAddress]),
+      `0x13af4035${contractAddress.slice(1)}`
+    );
+    assert.equal(
+      contract.encodeFunctionData("setKey", [`0x${"11".repeat(32)}`]),
+      `0xc3d2c355${"11".repeat(32)}${"0".repeat(64)}`
+    );
+  });
+
+  it("encodes dynamic QRL function calldata using 64-byte offsets", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const offset = `${"0".repeat(126)}40`;
+    const hello = "68656c6c6f";
+
+    assert.equal(
+      contract.encodeFunctionData("setMessage", ["hello"]),
+      `0x368b8772${offset}${"0".repeat(127)}5${hello}${"0".repeat(118)}`
+    );
+    assert.equal(
+      contract.encodeFunctionData("setBlob", ["0x123456"]),
+      `0xdd7d5edb${offset}${"0".repeat(127)}3${"123456"}${"0".repeat(122)}`
+    );
+    assert.equal(
+      contract.encodeFunctionData("setAmounts", [[1, 2]]),
+      `0x4331153c${offset}${"0".repeat(127)}2${"0".repeat(127)}1${"0".repeat(
+        127
+      )}2`
+    );
+  });
+
+  it("sends ABI-encoded contract functions", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.sendFunction("store", [42], {
+      from: contractAddress,
+    });
+
+    assert.equal(result, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: `0x6057361d${"0".repeat(126)}2a`,
+        from: contractAddress,
+        to: contractAddress,
+      },
+    ]);
+  });
+
+  it("sends contract functions through ergonomic wrappers", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.functions.store(42, {
+      from: contractAddress,
+    });
+
+    assert.equal(result, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: `0x6057361d${"0".repeat(126)}2a`,
+        from: contractAddress,
+        to: contractAddress,
+      },
+    ]);
+  });
+
+  it("calls and decodes ABI-encoded contract functions", async () => {
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.callFunction(
+      "retrieve",
+      [],
+      { from: contractAddress },
+      "latest"
+    );
+
+    assert.equal(result[0].toString(10), "42");
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: "0x2e64cec1",
+        from: contractAddress,
+        to: contractAddress,
+      },
+      "latest",
+    ]);
+  });
+
+  it("calls contract functions through ergonomic wrappers", async () => {
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.functions.retrieve(
+      { from: contractAddress },
+      "latest"
+    );
+
+    assert.equal(result[0].toString(10), "42");
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: "0x2e64cec1",
+        from: contractAddress,
+        to: contractAddress,
+      },
+      "latest",
+    ]);
+  });
+
+  it("supports explicit callStatic and send wrappers", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+    const result = await contract.callStatic.retrieve();
+    assert.equal(result[0].toString(10), "42");
+
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    const hash = await contract.send.store(42, { from: contractAddress });
+    assert.equal(hash, txHash);
+  });
+
+  it("calls and decodes dynamic ABI-encoded contract functions", async () => {
+    const offset = `${"0".repeat(126)}40`;
+    const hello = "68656c6c6f";
+    provider.setReturnValue(
+      "qrl_call",
+      `0x${offset}${"0".repeat(127)}5${hello}${"0".repeat(118)}`
+    );
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.callFunction("message");
+
+    assert.equal(result[0], "hello");
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: "0xe21f37ce",
+        to: contractAddress,
+      },
+      "latest",
+    ]);
+  });
+
+  it("decodes dynamic QRL bytes and array results", async () => {
+    const offset = `${"0".repeat(126)}40`;
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue(
+      "qrl_call",
+      `0x${offset}${"0".repeat(127)}3${"123456"}${"0".repeat(122)}`
+    );
+    assert.equal((await contract.callFunction("blob"))[0], "0x123456");
+
+    provider.setReturnValue(
+      "qrl_call",
+      `0x${offset}${"0".repeat(127)}2${"0".repeat(127)}1${"0".repeat(127)}2`
+    );
+
+    const amounts = (await contract.callFunction("amounts"))[0];
+    assert.equal(amounts[0].toString(10), "1");
+    assert.equal(amounts[1].toString(10), "2");
+  });
+
+  it("decodes QRL event logs using 64-byte topics and data words", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const recipient = `Q${"b".repeat(128)}`;
+    const log = {
+      address: contractAddress,
+      data: `0x${"0".repeat(126)}2a`,
+      topics: [
+        `0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef${"0".repeat(
+          64
+        )}`,
+        `0x${contractAddress.slice(1)}`,
+        `0x${recipient.slice(1)}`,
+      ],
+    };
+
+    const decoded = contract.decodeEventLog("Transfer", log);
+
+    assert.equal(decoded.eventName, "Transfer");
+    assert.equal(decoded.args.from, contractAddress);
+    assert.equal(decoded.args.to, recipient);
+    assert.equal(decoded.args.value.toString(10), "42");
+  });
+
+  it("decodes QRL event logs with dynamic data", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const offset = `${"0".repeat(126)}40`;
+    const hello = "68656c6c6f";
+    const log = {
+      address: contractAddress,
+      data: `0x${offset}${"0".repeat(127)}5${hello}${"0".repeat(118)}`,
+      topics: [
+        `0xbb4847942d98bb5bb249692c72ce235605e41502e705831e609875320ef2cac7${"0".repeat(
+          64
+        )}`,
+      ],
+    };
+
+    const decoded = contract.decodeEventLog("MessageChanged", log);
+
+    assert.equal(decoded.eventName, "MessageChanged");
+    assert.equal(decoded.args.value, "hello");
+  });
+
+  it("decodes matching QRL receipt logs", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const recipient = `Q${"b".repeat(128)}`;
+    const transferLog = {
+      address: contractAddress,
+      data: `0x${"0".repeat(126)}2a`,
+      topics: [
+        `0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef${"0".repeat(
+          64
+        )}`,
+        `0x${contractAddress.slice(1)}`,
+        `0x${recipient.slice(1)}`,
+      ],
+    };
+    const receipt = {
+      logs: [
+        {
+          address: `Q${"c".repeat(128)}`,
+          data: "0x",
+          topics: [],
+        },
+        transferLog,
+      ],
+    };
+
+    const decoded = contract.decodeReceiptLogs(receipt);
+
+    assert.lengthOf(decoded, 1);
+    assert.equal(decoded[0].eventName, "Transfer");
+    assert.equal(decoded[0].args.value.toString(10), "42");
+  });
+
+  it("rejects invalid contract call data", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    await expectHardhatErrorAsync(
+      () => contract.call("0xz"),
+      ERRORS.NETWORK.INVALID_HEX_DATA,
+      "0xz"
+    );
+  });
+
+  it("rejects attaching a contract with an invalid QRL address", async () => {
+    await expectHardhatErrorAsync(
+      () => helpers.getContractAt("Sample", `Q${"a".repeat(96)}`),
+      ERRORS.NETWORK.INVALID_QRL_ADDRESS
+    );
+  });
+});

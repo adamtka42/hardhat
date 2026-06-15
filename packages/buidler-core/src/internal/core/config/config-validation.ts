@@ -72,27 +72,6 @@ function optional<TypeT, OutputT>(
 
 // IMPORTANT: This t.types MUST be kept in sync with the actual types.
 
-const HardhatNetworkAccount = t.type({
-  privateKey: t.string,
-  balance: t.string,
-});
-
-const HardhatNetworkConfig = t.type({
-  hardfork: optional(t.string),
-  chainId: optional(t.number),
-  from: optional(t.string),
-  gas: optional(t.union([t.literal("auto"), t.number])),
-  gasPrice: optional(t.union([t.literal("auto"), t.number])),
-  gasMultiplier: optional(t.number),
-  accounts: optional(t.array(HardhatNetworkAccount)),
-  blockGasLimit: optional(t.number),
-  throwOnTransactionFailures: optional(t.boolean),
-  throwOnCallFailures: optional(t.boolean),
-  loggingEnabled: optional(t.boolean),
-  allowUnlimitedContractSize: optional(t.boolean),
-  initialDate: optional(t.string),
-});
-
 const OtherAccountsConfig = t.type({
   type: t.string,
 });
@@ -102,6 +81,9 @@ const NetworkConfigAccounts = t.union([
   t.array(t.string),
   OtherAccountsConfig,
 ]);
+
+const QRL_EXTENDED_SEED_REGEX = /^0x[0-9a-fA-F]{102}$/;
+const QRL_ADDRESS_REGEX = /^Q[0-9a-fA-F]{128}$/;
 
 const HttpHeaders = t.record(t.string, t.string, "httpHeaders");
 
@@ -116,9 +98,7 @@ const HttpNetworkConfig = t.type({
   httpHeaders: optional(HttpHeaders),
 });
 
-const NetworkConfig = t.union([HardhatNetworkConfig, HttpNetworkConfig]);
-
-const Networks = t.record(t.string, NetworkConfig);
+const Networks = t.record(t.string, HttpNetworkConfig);
 
 const ProjectPaths = t.type({
   root: optional(t.string),
@@ -201,6 +181,36 @@ export function getValidationErrors(config: any): string[] {
             `HardhatConfig.networks.${networkName}`,
             netConfig,
             "HttpNetworkConfig"
+          )
+        );
+      }
+
+      if (Array.isArray(netConfig.accounts)) {
+        for (const [accountIndex, account] of netConfig.accounts.entries()) {
+          if (
+            typeof account === "string" &&
+            !QRL_EXTENDED_SEED_REGEX.test(account)
+          ) {
+            errors.push(
+              getErrorMessage(
+                `HardhatConfig.networks.${networkName}.accounts.${accountIndex}`,
+                account,
+                "51-byte QRL extended seed hex string"
+              )
+            );
+          }
+        }
+      }
+
+      if (
+        typeof netConfig.from === "string" &&
+        !QRL_ADDRESS_REGEX.test(netConfig.from)
+      ) {
+        errors.push(
+          getErrorMessage(
+            `HardhatConfig.networks.${networkName}.from`,
+            netConfig.from,
+            "64-byte QRL address"
           )
         );
       }

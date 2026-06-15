@@ -240,6 +240,26 @@ describe("Account provider", () => {
     assert.equal(params[0].from, nonLocalAddress());
   });
 
+  it("Should reject invalid transaction from addresses", async () => {
+    tx.from = "0x0001";
+
+    await expectHardhatErrorAsync(
+      () => wrapper.send("qrl_sendTransaction", [tx]),
+      ERRORS.NETWORK.INVALID_QRL_ADDRESS,
+      "0x0001"
+    );
+  });
+
+  it("Should reject invalid transaction to addresses", async () => {
+    tx.to = "0x0001";
+
+    await expectHardhatErrorAsync(
+      () => wrapper.send("qrl_call", [tx]),
+      ERRORS.NETWORK.INVALID_QRL_ADDRESS,
+      "0x0001"
+    );
+  });
+
   it("Should use the first account if from is missing", async () => {
     wrapper = createSenderProvider(provider);
 

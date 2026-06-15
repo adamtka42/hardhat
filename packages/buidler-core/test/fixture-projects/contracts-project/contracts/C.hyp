@@ -1,2 +1,2 @@
 pragma hyperion >=0.0;
-contract C {};
+contract C {}

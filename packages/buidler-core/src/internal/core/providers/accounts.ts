@@ -5,6 +5,8 @@ import { ERRORS } from "../errors-list";
 import { createChainIdGetter } from "./provider-utils";
 import { wrapSend } from "./wrapper";
 
+const QRL_ADDRESS_REGEX = /^Q[0-9a-fA-F]{128}$/;
+
 export interface JsonRpcTransactionData {
   from?: string;
   to?: string;
@@ -131,6 +133,11 @@ export function createSenderProvider(provider: IQrlProvider, from?: string) {
           throw new HardhatError(ERRORS.NETWORK.NO_REMOTE_ACCOUNT_AVAILABLE);
         }
       }
+
+      if (tx !== undefined) {
+        validateTransactionAddress(tx.from);
+        validateTransactionAddress(tx.to);
+      }
     }
 
     return provider.send(method, params);
@@ -143,6 +150,12 @@ export function createSenderProvider(provider: IQrlProvider, from?: string) {
 
     addresses = (await provider.send("qrl_accounts")) as string[];
     return addresses;
+  }
+}
+
+function validateTransactionAddress(address: string | undefined) {
+  if (address !== undefined && !QRL_ADDRESS_REGEX.test(address)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, { address });
   }
 }
 

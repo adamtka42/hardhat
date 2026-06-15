@@ -63,6 +63,38 @@ describe("Base providers wrapping", () => {
       );
     });
 
+    it("Should compose sender, gas and local signing wrappers", async () => {
+      const txHash = `0x${"1".repeat(64)}`;
+      mockedProvider.setReturnValue("qrl_getTransactionCount", "0x0");
+      mockedProvider.setReturnValue("qrl_gasPrice", numberToRpcQuantity(123));
+      mockedProvider.setReturnValue(
+        "qrl_estimateGas",
+        numberToRpcQuantity(21000)
+      );
+      mockedProvider.setReturnValue("qrl_sendRawTransaction", txHash);
+
+      const provider = wrapQrlProvider(mockedProvider, {
+        accounts: QRL_SEEDS,
+        url: "",
+      });
+
+      const result = await provider.send("qrl_sendTransaction", [
+        {
+          to: seedToAddress(QRL_SEEDS[1]),
+          value: 1,
+        },
+      ]);
+
+      assert.equal(result, txHash);
+
+      const [rawTransaction] = mockedProvider.getLatestParams(
+        "qrl_sendRawTransaction"
+      );
+      assert.isString(rawTransaction);
+      assert.match(rawTransaction, /^0x[0-9a-f]+$/i);
+      assert.isAbove(rawTransaction.length, 1000);
+    });
+
     it("Shouldn't wrap with an accounts-managing provider if not necessary", async () => {
       const provider = wrapQrlProvider(mockedProvider, {
         url: "",
@@ -123,7 +155,9 @@ describe("Base providers wrapping", () => {
         gas: "auto",
       });
 
-      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      await provider.send("qrl_sendTransaction", [
+        { from: seedToAddress(QRL_SEEDS[0]) },
+      ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.gas, numberToRpcQuantity(123));
     });
@@ -133,7 +167,9 @@ describe("Base providers wrapping", () => {
         url: "",
       });
 
-      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      await provider.send("qrl_sendTransaction", [
+        { from: seedToAddress(QRL_SEEDS[0]) },
+      ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(
         tx.gas,
@@ -147,7 +183,9 @@ describe("Base providers wrapping", () => {
         gasMultiplier: OTHER_GAS_MULTIPLIER,
       });
 
-      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      await provider.send("qrl_sendTransaction", [
+        { from: seedToAddress(QRL_SEEDS[0]) },
+      ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(
         tx.gas,
@@ -161,7 +199,9 @@ describe("Base providers wrapping", () => {
         gas: 678,
       });
 
-      await provider.send("qrl_sendTransaction", [{ from: "0x0" }]);
+      await provider.send("qrl_sendTransaction", [
+        { from: seedToAddress(QRL_SEEDS[0]) },
+      ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.gas, numberToRpcQuantity(678));
     });

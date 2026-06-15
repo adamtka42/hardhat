@@ -464,6 +464,28 @@ describe("Config validation", function () {
                 ERRORS.GENERAL.INVALID_CONFIG
               );
             });
+
+            it("Shouldn't work with invalid QRL extended seed strings", function () {
+              for (const seed of [
+                "0x010000",
+                "0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
+                "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be40z",
+              ]) {
+                expectHardhatError(
+                  () =>
+                    validateConfig({
+                      networks: {
+                        asd: {
+                          accounts: [seed],
+                          url: "",
+                        },
+                      },
+                    }),
+                  ERRORS.GENERAL.INVALID_CONFIG,
+                  "51-byte QRL extended seed hex string"
+                );
+              }
+            });
           });
 
           describe("Remote accounts", function () {
@@ -576,6 +598,22 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
           });
+
+          it("Shouldn't accept invalid QRL sender addresses", function () {
+            expectHardhatError(
+              () =>
+                validateConfig({
+                  networks: {
+                    asd: {
+                      from: "0x0001",
+                      url: "",
+                    },
+                  },
+                }),
+              ERRORS.GENERAL.INVALID_CONFIG,
+              "64-byte QRL address"
+            );
+          });
         });
       });
     });
@@ -599,7 +637,7 @@ describe("Config validation", function () {
         networks: {
           commonThings: {
             chainId: 1,
-            from: "0x0001",
+            from: `Q${"1".repeat(128)}`,
             gas: "auto",
             gasPrice: "auto",
             gasMultiplier: 123,

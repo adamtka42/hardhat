@@ -243,6 +243,20 @@ Please make sure your node is running, and check your internet connection and ne
 
 Please make sure your node is running, and check your internet connection and networks config.`,
     },
+    DEPLOYMENT_FAILED: {
+      number: 112,
+      message:
+        "Contract deployment transaction %txHash% failed with status %status%.",
+      title: "Contract deployment failed",
+      description: `A contract deployment transaction was mined, but its receipt reports failure.`,
+    },
+    MISSING_CONTRACT_ADDRESS: {
+      number: 113,
+      message:
+        "Contract deployment transaction %txHash% did not return a contract address.",
+      title: "Missing contract address",
+      description: `A contract deployment transaction was mined, but its receipt didn't include a contract address.`,
+    },
     QRL_IN_MEMORY_NODE_UNSUPPORTED: {
       number: 114,
       message:
@@ -251,6 +265,24 @@ Please make sure your node is running, and check your internet connection and ne
       description: `This fork currently supports live go-qrl networks only.
 
 Configure a network with an HTTP URL that points to a running go-qrl node.`,
+    },
+    INVALID_QRL_ADDRESS: {
+      number: 115,
+      message: "Invalid QRL address %address%.",
+      title: "Invalid QRL address",
+      description: `A QRL address must use the Q prefix followed by 128 hexadecimal characters.`,
+    },
+    INVALID_HEX_DATA: {
+      number: 116,
+      message: "Invalid hex data %value%.",
+      title: "Invalid hex data",
+      description: `QRL transaction data and bytecode values must be hexadecimal strings, optionally prefixed with 0x.`,
+    },
+    INVALID_QRL_ABI: {
+      number: 117,
+      message: "Invalid QRL ABI operation: %message%.",
+      title: "Invalid QRL ABI operation",
+      description: `The requested QRL contract ABI operation can't be encoded or decoded.`,
     },
   },
   TASK_DEFINITIONS: {
