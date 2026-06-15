@@ -3,6 +3,8 @@ import { readArtifact } from "../artifacts";
 import {
   Artifact,
   BuidlerRuntimeEnvironment,
+  QrlContract,
+  QrlContractFactory,
   QrlDeploymentResult,
   QrlRuntimeHelpers,
   QrlTransactionRequest,
@@ -16,6 +18,32 @@ export function createQrlRuntimeHelpers(
 ): QrlRuntimeHelpers {
   async function readQrlArtifact(contractName: string): Promise<Artifact> {
     return readArtifact(bre.config.paths.artifacts, contractName);
+  }
+
+  async function getContractFactory(
+    contractName: string
+  ): Promise<QrlContractFactory> {
+    const artifact = await readQrlArtifact(contractName);
+
+    return {
+      contractName,
+      artifact,
+      deploy: (
+        tx: QrlTransactionRequest = {},
+        constructorData: string = "0x"
+      ) => deployContract(contractName, tx, constructorData),
+      attach: (address: string) =>
+        getContractFromArtifact(artifact, address, call, sendTransaction),
+    };
+  }
+
+  async function getContractAt(
+    contractName: string,
+    address: string
+  ): Promise<QrlContract> {
+    const artifact = await readQrlArtifact(contractName);
+
+    return getContractFromArtifact(artifact, address, call, sendTransaction);
   }
 
   async function sendTransaction(tx: QrlTransactionRequest): Promise<string> {
@@ -75,9 +103,33 @@ export function createQrlRuntimeHelpers(
   return {
     call,
     deployContract,
+    getContractAt,
+    getContractFactory,
     readArtifact: readQrlArtifact,
     sendTransaction,
     waitForTransaction,
+  };
+}
+
+function getContractFromArtifact(
+  artifact: Artifact,
+  address: string,
+  call: QrlRuntimeHelpers["call"],
+  sendTransaction: QrlRuntimeHelpers["sendTransaction"]
+): QrlContract {
+  return {
+    address,
+    artifact,
+    contractName: artifact.contractName,
+    call: (
+      data: string,
+      tx: Omit<QrlTransactionRequest, "to" | "data"> = {},
+      blockTag?: string
+    ) => call({ ...tx, to: address, data }, blockTag),
+    sendTransaction: (
+      data: string,
+      tx: Omit<QrlTransactionRequest, "to" | "data"> = {}
+    ) => sendTransaction({ ...tx, to: address, data }),
   };
 }
 

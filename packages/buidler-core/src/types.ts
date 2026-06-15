@@ -344,6 +344,8 @@ export interface QrlDeploymentResult {
 
 export interface QrlRuntimeHelpers {
   readArtifact(contractName: string): Promise<Artifact>;
+  getContractFactory(contractName: string): Promise<QrlContractFactory>;
+  getContractAt(contractName: string, address: string): Promise<QrlContract>;
   sendTransaction(tx: QrlTransactionRequest): Promise<string>;
   call(tx: QrlTransactionRequest, blockTag?: string): Promise<string>;
   waitForTransaction(
@@ -356,4 +358,29 @@ export interface QrlRuntimeHelpers {
     tx?: QrlTransactionRequest,
     constructorData?: string
   ): Promise<QrlDeploymentResult>;
+}
+
+export interface QrlContractFactory {
+  readonly contractName: string;
+  readonly artifact: Artifact;
+  deploy(
+    tx?: QrlTransactionRequest,
+    constructorData?: string
+  ): Promise<QrlDeploymentResult>;
+  attach(address: string): QrlContract;
+}
+
+export interface QrlContract {
+  readonly address: string;
+  readonly contractName: string;
+  readonly artifact: Artifact;
+  call(
+    data: string,
+    tx?: Omit<QrlTransactionRequest, "to" | "data">,
+    blockTag?: string
+  ): Promise<string>;
+  sendTransaction(
+    data: string,
+    tx?: Omit<QrlTransactionRequest, "to" | "data">
+  ): Promise<string>;
 }

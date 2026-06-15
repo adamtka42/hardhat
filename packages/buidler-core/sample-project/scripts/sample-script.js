@@ -11,12 +11,10 @@ async function main() {
   // await bre.run('compile');
 
   // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Buidler!");
+  const Sample = await bre.qrl.getContractFactory("Sample");
+  const deployment = await Sample.deploy();
 
-  await greeter.deployed();
-
-  console.log("Greeter deployed to:", greeter.address);
+  console.log("Sample deployed to:", deployment.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

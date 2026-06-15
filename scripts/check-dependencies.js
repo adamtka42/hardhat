@@ -1,20 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 
-// An array of dependencies whose version checks are ignored for all the
-// packages
-const IGNORE_FROM_ALL = ["web3"];
-
-// A map from dependencies to package names where it should be ignored
-const IGNORE_FOR_PACKAGES = {
-  chai: ["@nomiclabs/buidler-truffle4", "@nomiclabs/buidler-truffle5"],
-  "@types/chai": ["@nomiclabs/buidler-truffle4", "@nomiclabs/buidler-truffle5"],
-  "truffle-contract": [
-    "@nomiclabs/buidler-truffle4",
-    "@nomiclabs/buidler-truffle5"
-  ]
-};
-
 function checkPeerDepedencies(packageJson) {
   if (packageJson.peerDependencies === undefined) {
     return true;
@@ -65,17 +51,6 @@ function addDependencies(packageName, dependenciesToAdd, allDependenciesMap) {
   }
 
   for (const [name, spec] of Object.entries(dependenciesToAdd)) {
-    if (IGNORE_FROM_ALL.includes(name)) {
-      continue;
-    }
-
-    if (
-      IGNORE_FOR_PACKAGES[name] !== undefined &&
-      IGNORE_FOR_PACKAGES[name].includes(packageName)
-    ) {
-      continue;
-    }
-
     if (allDependenciesMap[name] === undefined) {
       allDependenciesMap[name] = {};
     }
@@ -125,15 +100,10 @@ function mergeDependenciesMap(dependencyMaps) {
 }
 
 function getAllPackageJsonPaths() {
-  const packageNames = fs.readdirSync(path.join(__dirname, "..", "packages"));
-
-  const packageJsons = packageNames.map(p =>
-    path.join(__dirname, "..", "packages", p, "package.json")
-  );
-
-  packageJsons.push(path.join(__dirname, "..", "package.json"));
-
-  return packageJsons;
+  return [
+    path.join(__dirname, "..", "packages", "buidler-core", "package.json"),
+    path.join(__dirname, "..", "package.json")
+  ];
 }
 
 function main() {

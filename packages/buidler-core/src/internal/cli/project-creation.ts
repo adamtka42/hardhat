@@ -1,6 +1,5 @@
 import chalk from "chalk";
 import fsExtra from "fs-extra";
-import os from "os";
 import path from "path";
 
 import { BUIDLER_NAME } from "../constants";
@@ -13,14 +12,6 @@ import { emoji } from "./emoji";
 const CREATE_SAMPLE_PROJECT_ACTION = "Create a sample project";
 const CREATE_EMPTY_BUIDLER_CONFIG_ACTION = "Create an empty buidler.config.js";
 const QUIT_ACTION = "Quit";
-
-const SAMPLE_PROJECT_DEPENDENCIES = [
-  "@nomiclabs/buidler-waffle",
-  "ethereum-waffle",
-  "chai",
-  "@nomiclabs/buidler-ethers",
-  "ethers",
-];
 
 async function removeProjectDirIfPresent(projectRoot: string, dirName: string) {
   const dirPath = path.join(projectRoot, dirName);
@@ -88,7 +79,7 @@ ${content}`;
 
 async function addGitAttributes(projectRoot: string) {
   const gitAttributesPath = path.join(projectRoot, ".gitattributes");
-  let content = "*.sol linguist-language=Solidity";
+  let content = "*.hyp linguist-language=Solidity";
 
   if (await fsExtra.pathExists(gitAttributesPath)) {
     const existingContent = await fsExtra.readFile(gitAttributesPath, "utf-8");
@@ -119,14 +110,8 @@ function printSuggestedCommands() {
   console.log(`  ${npx}buidler help`);
 }
 
-async function printTrufflePluginInstallationInstructions() {
-  console.log(
-    `You need to install these dependencies to run the sample project:`
-  );
-
-  const cmd = await getRecommendedDependenciesInstallationCommand();
-
-  console.log(`  ${cmd.join(" ")}`);
+async function printSampleProjectInfo() {
+  console.log(`The sample project uses Buidler's built-in QRL helpers.`);
 }
 
 async function writeEmptyBuidlerConfig() {
@@ -213,7 +198,7 @@ export async function createProject() {
       ),
       createConfirmationPrompt(
         "shouldAddGitAttributes",
-        "Do you want to add a .gitattributes to enable Soldity highlighting on GitHub?"
+        "Do you want to add a .gitattributes to enable Hyperion highlighting on GitHub?"
       ),
     ]);
   } catch (e) {
@@ -237,37 +222,8 @@ export async function createProject() {
     await addGitAttributes(projectRoot);
   }
 
-  let shouldShowInstallationInstructions = true;
-
-  if (await canInstallTrufflePlugin()) {
-    const installedRecommendedDeps = SAMPLE_PROJECT_DEPENDENCIES.filter(
-      isInstalled
-    );
-
-    if (
-      installedRecommendedDeps.length === SAMPLE_PROJECT_DEPENDENCIES.length
-    ) {
-      shouldShowInstallationInstructions = false;
-    } else if (installedRecommendedDeps.length === 0) {
-      const shouldInstall = await confirmTrufflePluginInstallation();
-      if (shouldInstall) {
-        const installed = await installRecommendedDependencies();
-
-        if (!installed) {
-          console.warn(
-            chalk.red("Failed to install the sample project's dependencies")
-          );
-        }
-
-        shouldShowInstallationInstructions = !installed;
-      }
-    }
-  }
-
-  if (shouldShowInstallationInstructions) {
-    console.log(``);
-    await printTrufflePluginInstallationInstructions();
-  }
+  console.log(``);
+  await printSampleProjectInfo();
 
   console.log(
     `\n${emoji("✨ ")}${chalk.cyan("Project created")}${emoji(" ✨")}`
@@ -310,116 +266,4 @@ function createConfirmationPrompt(name: string, message: string) {
       return value;
     },
   };
-}
-
-async function canInstallTrufflePlugin() {
-  return (
-    (await fsExtra.pathExists("package.json")) &&
-    (getExecutionMode() === ExecutionMode.EXECUTION_MODE_LOCAL_INSTALLATION ||
-      getExecutionMode() === ExecutionMode.EXECUTION_MODE_LINKED) &&
-    // TODO: Figure out why this doesn't work on Win
-    os.type() !== "Windows_NT"
-  );
-}
-
-function isInstalled(dep: string) {
-  const packageJson = fsExtra.readJSONSync("package.json");
-
-  const allDependencies = {
-    ...packageJson.dependencies,
-    ...packageJson.devDependencies,
-    ...packageJson.optionalDependencies,
-  };
-
-  return dep in allDependencies;
-}
-
-async function isYarnProject() {
-  return fsExtra.pathExists("yarn.lock");
-}
-
-async function installRecommendedDependencies() {
-  console.log("");
-  const installCmd = await getRecommendedDependenciesInstallationCommand();
-  return installDependencies(installCmd[0], installCmd.slice(1));
-}
-
-async function confirmTrufflePluginInstallation(): Promise<boolean> {
-  const { default: enquirer } = await import("enquirer");
-
-  let responses: {
-    shouldInstallPlugin: boolean;
-  };
-
-  const packageManager = (await isYarnProject()) ? "yarn" : "npm";
-
-  try {
-    responses = await enquirer.prompt<typeof responses>([
-      createConfirmationPrompt(
-        "shouldInstallPlugin",
-        `Do you want to install the sample project's dependencies with ${packageManager} (${SAMPLE_PROJECT_DEPENDENCIES.join(
-          " "
-        )})?`
-      ),
-    ]);
-  } catch (e) {
-    if (e === "") {
-      return false;
-    }
-
-    // tslint:disable-next-line only-buidler-error
-    throw e;
-  }
-
-  return responses.shouldInstallPlugin === true;
-}
-
-async function installDependencies(
-  packageManager: string,
-  args: string[]
-): Promise<boolean> {
-  const { spawn } = await import("child_process");
-
-  console.log(`${packageManager} ${args.join(" ")}`);
-
-  const childProcess = spawn(packageManager, args, {
-    stdio: "inherit" as any, // There's an error in the TS definition of ForkOptions
-  });
-
-  return new Promise((resolve, reject) => {
-    childProcess.once("close", (status) => {
-      childProcess.removeAllListeners("error");
-
-      if (status === 0) {
-        resolve(true);
-        return;
-      }
-
-      reject(false);
-    });
-
-    childProcess.once("error", (status) => {
-      childProcess.removeAllListeners("close");
-      reject(false);
-    });
-  });
-}
-
-async function getRecommendedDependenciesInstallationCommand(): Promise<
-  string[]
-> {
-  const isGlobal =
-    getExecutionMode() === ExecutionMode.EXECUTION_MODE_GLOBAL_INSTALLATION;
-
-  if (!isGlobal && (await isYarnProject())) {
-    return ["yarn", "add", "--dev", ...SAMPLE_PROJECT_DEPENDENCIES];
-  }
-
-  const npmInstall = ["npm", "install"];
-
-  if (isGlobal) {
-    npmInstall.push("--global");
-  }
-
-  return [...npmInstall, "--save-dev", ...SAMPLE_PROJECT_DEPENDENCIES];
 }

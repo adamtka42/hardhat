@@ -1,14 +1,11 @@
-const { expect } = require("chai");
+const assert = require("assert");
 
-describe("Greeter", function() {
-  it("Should return the new greeting once it's changed", async function() {
-    const Greeter = await ethers.getContractFactory("Greeter");
-    const greeter = await Greeter.deploy("Hello, world!");
-    
-    await greeter.deployed();
-    expect(await greeter.greet()).to.equal("Hello, world!");
+describe("Sample", function() {
+  it("deploys a Hyperion contract", async function() {
+    const Sample = await qrl.getContractFactory("Sample");
+    const deployment = await Sample.deploy();
 
-    await greeter.setGreeting("Hola, mundo!");
-    expect(await greeter.greet()).to.equal("Hola, mundo!");
+    assert.ok(deployment.hash);
+    assert.ok(deployment.address);
   });
 });
