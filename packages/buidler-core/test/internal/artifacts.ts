@@ -103,10 +103,12 @@ describe("Artifacts utils", function () {
     it("Should return the right artifact for a contract without libs", function () {
       const artifact = getArtifactFromContractOutput(
         "WithBytecodeNoLibs",
-        COMPILER_OUTPUTS.WithBytecodeNoLibs
+        COMPILER_OUTPUTS.WithBytecodeNoLibs,
+        "contracts/WithBytecodeNoLibs.hyp"
       );
 
       const expectedArtifact: Artifact = {
+        sourceName: "contracts/WithBytecodeNoLibs.hyp",
         contractName: "WithBytecodeNoLibs",
         abi: COMPILER_OUTPUTS.WithBytecodeNoLibs.abi,
         bytecode: `0x${COMPILER_OUTPUTS.WithBytecodeNoLibs.bytecodeOutput.bytecode.object}`,
@@ -217,6 +219,25 @@ describe("Artifacts utils", function () {
 
         assert.deepEqual(storedArtifact, artifact);
       }
+    });
+
+    it("Should write and read source-qualified artifacts", async function () {
+      const sourceName = "contracts/folder/C.hyp";
+      const artifact = getArtifactFromContractOutput(
+        "C",
+        COMPILER_OUTPUTS.WithBytecodeNoLibs,
+        sourceName
+      );
+
+      await saveArtifact(this.tmpDir, artifact, false);
+
+      const storedArtifact = await readArtifact(this.tmpDir, `${sourceName}:C`);
+      assert.deepEqual(storedArtifact, artifact);
+
+      await expectHardhatErrorAsync(
+        () => readArtifact(this.tmpDir, "C"),
+        ERRORS.ARTIFACTS.NOT_FOUND
+      );
     });
 
     it("Should throw when reading a non-existent contract (async)", async function () {

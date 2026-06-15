@@ -2,14 +2,19 @@ import { assert } from "chai";
 
 import { saveArtifact } from "../../../src/internal/artifacts";
 import { ERRORS } from "../../../src/internal/core/errors-list";
+import { toQrlChecksumAddress } from "../../../src/internal/qrl/address";
 import { createQrlRuntimeHelpers } from "../../../src/internal/qrl/helpers";
 import { Artifact, HardhatRuntimeEnvironment } from "../../../src/types";
-import { expectHardhatErrorAsync } from "../../helpers/errors";
+import {
+  expectHardhatError,
+  expectHardhatErrorAsync,
+} from "../../helpers/errors";
 import { useTmpDir } from "../../helpers/fs";
 import { MockedProvider } from "../core/providers/mocks";
 
 describe("QRL runtime helpers", () => {
   const contractAddress = `Q${"a".repeat(128)}`;
+  const checksummedContractAddress = toQrlChecksumAddress(contractAddress);
   const txHash = `0x${"1".repeat(64)}`;
   let provider: MockedProvider;
   let artifact: Artifact;
@@ -40,6 +45,13 @@ describe("QRL runtime helpers", () => {
           inputs: [],
           name: "retrieve",
           outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [{ name: "", type: "address" }],
           stateMutability: "view",
           type: "function",
         },
@@ -141,6 +153,7 @@ describe("QRL runtime helpers", () => {
     provider.setReturnValue("qrl_sendTransaction", txHash);
     provider.setReturnValue("qrl_getTransactionReceipt", {
       contractAddress,
+      transactionHash: txHash.toUpperCase(),
       status: "0x1",
     });
 
@@ -151,7 +164,7 @@ describe("QRL runtime helpers", () => {
     );
 
     assert.equal(result.hash, txHash);
-    assert.equal(result.address, contractAddress);
+    assert.equal(result.address, checksummedContractAddress);
     assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
       {
         data: "0x1234beef",
@@ -268,8 +281,23 @@ describe("QRL runtime helpers", () => {
     );
   });
 
+  it("rejects a transaction receipt for a different hash", async () => {
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      status: "0x1",
+      transactionHash: `0x${"2".repeat(64)}`,
+    });
+
+    await expectHardhatErrorAsync(
+      () => helpers.waitForTransaction(txHash, 1, 1),
+      ERRORS.NETWORK.TRANSACTION_RECEIPT_MISMATCH,
+      txHash
+    );
+  });
+
   it("attaches contracts and forwards call/send requests", async () => {
     const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    assert.equal(contract.address, checksummedContractAddress);
 
     await contract.call("0x1122", { from: contractAddress }, "latest");
     await contract.sendTransaction("0x3344", { from: contractAddress });
@@ -278,7 +306,7 @@ describe("QRL runtime helpers", () => {
       {
         data: "0x1122",
         from: contractAddress,
-        to: contractAddress,
+        to: checksummedContractAddress,
       },
       "latest",
     ]);
@@ -286,7 +314,7 @@ describe("QRL runtime helpers", () => {
       {
         data: "0x3344",
         from: contractAddress,
-        to: contractAddress,
+        to: checksummedContractAddress,
       },
     ]);
   });
@@ -305,6 +333,18 @@ describe("QRL runtime helpers", () => {
     assert.equal(
       contract.encodeFunctionData("setKey", [`0x${"11".repeat(32)}`]),
       `0xc3d2c355${"11".repeat(32)}${"0".repeat(64)}`
+    );
+  });
+
+  it("rejects invalid QIP-55 checksum addresses in ABI calldata", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const invalidMixedCaseAddress =
+      "Qa73C065F7018CC0cFFf98028D8Ef1Ff746f5Cb425bC8840A4CDC2A6Eb717faa121A2e959A6A0Dac2D7C38252d70E4541397b0967880f00b9bD0c4C5d0FC46b2D";
+
+    expectHardhatError(
+      () => contract.encodeFunctionData("setOwner", [invalidMixedCaseAddress]),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Invalid QRL address"
     );
   });
 
@@ -342,7 +382,7 @@ describe("QRL runtime helpers", () => {
       {
         data: `0x6057361d${"0".repeat(126)}2a`,
         from: contractAddress,
-        to: contractAddress,
+        to: checksummedContractAddress,
       },
     ]);
   });
@@ -360,7 +400,7 @@ describe("QRL runtime helpers", () => {
       {
         data: `0x6057361d${"0".repeat(126)}2a`,
         from: contractAddress,
-        to: contractAddress,
+        to: checksummedContractAddress,
       },
     ]);
   });
@@ -381,7 +421,7 @@ describe("QRL runtime helpers", () => {
       {
         data: "0x2e64cec1",
         from: contractAddress,
-        to: contractAddress,
+        to: checksummedContractAddress,
       },
       "latest",
     ]);
@@ -401,7 +441,24 @@ describe("QRL runtime helpers", () => {
       {
         data: "0x2e64cec1",
         from: contractAddress,
-        to: contractAddress,
+        to: checksummedContractAddress,
+      },
+      "latest",
+    ]);
+  });
+
+  it("decodes QRL address return values as checksummed addresses", async () => {
+    const owner = `Q${"b".repeat(128)}`;
+    provider.setReturnValue("qrl_call", `0x${owner.slice(1)}`);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.callFunction("owner");
+
+    assert.equal(result[0], toQrlChecksumAddress(owner));
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: "0x8da5cb5b",
+        to: checksummedContractAddress,
       },
       "latest",
     ]);
@@ -434,7 +491,7 @@ describe("QRL runtime helpers", () => {
     assert.deepEqual(provider.getLatestParams("qrl_call"), [
       {
         data: "0xe21f37ce",
-        to: contractAddress,
+        to: checksummedContractAddress,
       },
       "latest",
     ]);
@@ -478,8 +535,8 @@ describe("QRL runtime helpers", () => {
     const decoded = contract.decodeEventLog("Transfer", log);
 
     assert.equal(decoded.eventName, "Transfer");
-    assert.equal(decoded.args.from, contractAddress);
-    assert.equal(decoded.args.to, recipient);
+    assert.equal(decoded.args.from, toQrlChecksumAddress(contractAddress));
+    assert.equal(decoded.args.to, toQrlChecksumAddress(recipient));
     assert.equal(decoded.args.value.toString(10), "42");
   });
 
@@ -533,6 +590,49 @@ describe("QRL runtime helpers", () => {
     assert.lengthOf(decoded, 1);
     assert.equal(decoded[0].eventName, "Transfer");
     assert.equal(decoded[0].args.value.toString(10), "42");
+  });
+
+  it("matches receipt logs with differently cased QRL addresses", async () => {
+    const contract = await helpers.getContractAt(
+      "Sample",
+      toQrlChecksumAddress(contractAddress)
+    );
+    const recipient = `Q${"b".repeat(128)}`;
+    const receipt = {
+      logs: [
+        {
+          address: contractAddress.toLowerCase().replace(/^q/, "Q"),
+          data: `0x${"0".repeat(126)}2a`,
+          topics: [
+            `0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef${"0".repeat(
+              64
+            )}`,
+            `0x${contractAddress.slice(1)}`,
+            `0x${recipient.slice(1)}`,
+          ],
+        },
+      ],
+    };
+
+    const decoded = contract.decodeReceiptLogs(receipt);
+
+    assert.lengthOf(decoded, 1);
+    assert.equal(decoded[0].eventName, "Transfer");
+  });
+
+  it("ignores unknown receipt logs from the same QRL contract", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const receipt = {
+      logs: [
+        {
+          address: contractAddress,
+          data: "0x",
+          topics: [`0x${"1".repeat(128)}`],
+        },
+      ],
+    };
+
+    assert.deepEqual(contract.decodeReceiptLogs(receipt), []);
   });
 
   it("rejects invalid contract call data", async () => {

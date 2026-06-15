@@ -1,24 +1,17 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-// When running the script with `hardhat run <script>` you'll find the Hardhat
-// Runtime Environment's members available in the global scope.
-const bre = require("@theqrl/hardhat");
-
 async function main() {
-  // Hardhat always runs the compile task when running scripts through it.
-  // If this runs in a standalone fashion you may want to call compile manually
-  // to make sure everything is compiled
-  // await bre.run('compile');
+  const [from] = await network.provider.send("qrl_accounts");
+  const Sample = await qrl.getContractFactory("Sample");
+  const deployment = await Sample.deploy({ from });
+  const sample = await qrl.getContractAt("Sample", deployment.address);
 
-  // We get the contract to deploy
-  const Sample = await bre.qrl.getContractFactory("Sample");
-  const deployment = await Sample.deploy();
+  const txHash = await sample.functions.store(42, { from });
+  await qrl.waitForTransaction(txHash);
+  const [stored] = await sample.callStatic.retrieve();
 
   console.log("Sample deployed to:", deployment.address);
+  console.log("Stored value:", stored.toString(10));
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main()
   .then(() => process.exit(0))
   .catch(error => {

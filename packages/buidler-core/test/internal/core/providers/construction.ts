@@ -8,6 +8,7 @@ import {
 import { DEFAULT_GAS_MULTIPLIER } from "../../../../src/internal/core/providers/gas-providers";
 import { HttpProvider } from "../../../../src/internal/core/providers/http";
 import { numberToRpcQuantity } from "../../../../src/internal/core/providers/provider-utils";
+import { toQrlChecksumAddress } from "../../../../src/internal/qrl/address";
 import {
   expectHardhatError,
   expectHardhatErrorAsync,
@@ -40,7 +41,7 @@ describe("Base providers wrapping", () => {
 
   beforeEach(() => {
     mockedProvider = new MockedProvider();
-    mockedProvider.setReturnValue("net_version", "1337");
+    mockedProvider.setReturnValue("qrl_chainId", numberToRpcQuantity(1337));
     mockedProvider.setReturnValue("qrl_getBlockByNumber", {
       gasLimit: numberToRpcQuantity(8000000),
     });
@@ -117,7 +118,10 @@ describe("Base providers wrapping", () => {
 
       const accounts = await provider.send("qrl_accounts");
 
-      assert.deepEqual(accounts, [seedToAddress(QRL_SEEDS[0]), LEDGER_ADDRESS]);
+      assert.deepEqual(accounts, [
+        seedToAddress(QRL_SEEDS[0]),
+        toQrlChecksumAddress(LEDGER_ADDRESS),
+      ]);
     });
   });
 

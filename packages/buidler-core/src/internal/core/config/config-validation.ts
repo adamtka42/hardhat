@@ -3,6 +3,7 @@ import { Context, getFunctionName, ValidationError } from "io-ts/lib";
 import { Reporter } from "io-ts/lib/Reporter";
 
 import { LEGACY_IN_MEMORY_NETWORK_NAME } from "../../constants";
+import { isValidQrlAddress } from "../../qrl/address";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
@@ -83,7 +84,6 @@ const NetworkConfigAccounts = t.union([
 ]);
 
 const QRL_EXTENDED_SEED_REGEX = /^0x[0-9a-fA-F]{102}$/;
-const QRL_ADDRESS_REGEX = /^Q[0-9a-fA-F]{128}$/;
 
 const HttpHeaders = t.record(t.string, t.string, "httpHeaders");
 
@@ -115,6 +115,7 @@ const HyperionOptimizerConfig = t.type({
 
 const HyperionConfig = t.type({
   version: optional(t.string),
+  compilerPath: optional(t.string),
   optimizer: optional(HyperionOptimizerConfig),
 });
 
@@ -214,10 +215,7 @@ export function getValidationErrors(config: any): string[] {
             accountIndex,
             account,
           ] of netConfig.accounts.accounts.entries()) {
-            if (
-              typeof account !== "string" ||
-              !QRL_ADDRESS_REGEX.test(account)
-            ) {
+            if (typeof account !== "string" || !isValidQrlAddress(account)) {
               errors.push(
                 getErrorMessage(
                   `HardhatConfig.networks.${networkName}.accounts.accounts.${accountIndex}`,
@@ -232,7 +230,7 @@ export function getValidationErrors(config: any): string[] {
 
       if (
         typeof netConfig.from === "string" &&
-        !QRL_ADDRESS_REGEX.test(netConfig.from)
+        !isValidQrlAddress(netConfig.from)
       ) {
         errors.push(
           getErrorMessage(

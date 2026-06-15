@@ -9,7 +9,7 @@ describe("Hardhat lib", () => {
   useEnvironment();
 
   before(() => {
-    process.env.HARDHAT_NETWORK = "localhost";
+    process.env.HARDHAT_NETWORK = "qrl";
   });
 
   it("should load environment", function () {

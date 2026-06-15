@@ -67,6 +67,7 @@ export interface ProjectPaths {
 
 export interface HyperionConfig {
   version: string;
+  compilerPath?: string;
   optimizer: HyperionOptimizerConfig;
 }
 
@@ -282,6 +283,7 @@ export interface HardhatRuntimeEnvironment {
 }
 
 export interface Artifact {
+  sourceName?: string;
   contractName: string;
   abi: any;
   bytecode: string; // "0x"-prefixed hex string

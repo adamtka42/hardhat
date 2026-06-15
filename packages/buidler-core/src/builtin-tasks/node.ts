@@ -5,17 +5,17 @@ import { ERRORS } from "../internal/core/errors-list";
 import { TASK_NODE } from "./task-names";
 
 export default function () {
-  task(TASK_NODE, "Starts a local QRL JSON-RPC server")
+  task(TASK_NODE, "Fails because the QRL in-memory network is unsupported")
     .addOptionalParam(
       "hostname",
       "The host to which to bind to for new connections",
-      "localhost",
+      "127.0.0.1",
       types.string
     )
     .addOptionalParam(
       "port",
       "The port on which to listen for new connections",
-      8545,
+      33462,
       types.int
     )
     .setAction(async () => {

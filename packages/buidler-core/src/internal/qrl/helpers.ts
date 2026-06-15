@@ -20,10 +20,10 @@ import {
   encodeQrlConstructorArgs,
   encodeQrlFunctionData,
 } from "./abi";
+import { normalizeQrlAddress } from "./address";
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 120000;
-const QRL_ADDRESS_REGEX = /^Q[0-9a-fA-F]{128}$/;
 const HEX_DATA_REGEX = /^(0x)?[0-9a-fA-F]*$/;
 
 interface QrlFunctionFragment {
@@ -93,6 +93,7 @@ export function createQrlRuntimeHelpers(
       );
 
       if (receipt !== null && receipt !== undefined) {
+        assertReceiptMatchesTransaction(receipt, txHash);
         return receipt;
       }
 
@@ -139,12 +140,12 @@ export function createQrlRuntimeHelpers(
       });
     }
 
-    assertQrlAddress(receipt.contractAddress);
+    const contractAddress = normalizeQrlAddress(receipt.contractAddress);
 
     return {
       hash,
       receipt,
-      address: receipt.contractAddress,
+      address: contractAddress,
     };
   }
 
@@ -165,13 +166,29 @@ function isFailedReceipt(receipt: any): boolean {
   );
 }
 
+function assertReceiptMatchesTransaction(receipt: any, txHash: string) {
+  if (
+    receipt.transactionHash === undefined ||
+    receipt.transactionHash === null
+  ) {
+    return;
+  }
+
+  if (String(receipt.transactionHash).toLowerCase() !== txHash.toLowerCase()) {
+    throw new HardhatError(ERRORS.NETWORK.TRANSACTION_RECEIPT_MISMATCH, {
+      actual: receipt.transactionHash,
+      expected: txHash,
+    });
+  }
+}
+
 function getContractFromArtifact(
   artifact: Artifact,
   address: string,
   call: QrlRuntimeHelpers["call"],
   sendTransaction: QrlRuntimeHelpers["sendTransaction"]
 ): QrlContract {
-  assertQrlAddress(address);
+  const contractAddress = normalizeQrlAddress(address);
 
   const callFunction = async (
     functionName: string,
@@ -180,7 +197,7 @@ function getContractFromArtifact(
     blockTag?: string
   ) => {
     const data = encodeQrlFunctionData(artifact.abi, functionName, args);
-    const result = await call({ ...tx, to: address, data }, blockTag);
+    const result = await call({ ...tx, to: contractAddress, data }, blockTag);
     return decodeQrlFunctionResult(artifact.abi, functionName, result);
   };
   const sendFunction = (
@@ -189,7 +206,7 @@ function getContractFromArtifact(
     tx: Omit<QrlTransactionRequest, "to" | "data"> = {}
   ) => {
     const data = encodeQrlFunctionData(artifact.abi, functionName, args);
-    return sendTransaction({ ...tx, to: address, data });
+    return sendTransaction({ ...tx, to: contractAddress, data });
   };
   const functionMaps = createContractFunctionMaps(
     artifact,
@@ -198,7 +215,7 @@ function getContractFromArtifact(
   );
 
   return {
-    address,
+    address: contractAddress,
     artifact,
     contractName: artifact.contractName,
     callStatic: functionMaps.callStatic,
@@ -209,7 +226,7 @@ function getContractFromArtifact(
     decodeEventLog: (eventName: string, log: any) =>
       decodeQrlEventLog(artifact.abi, eventName, log),
     decodeReceiptLogs: (receipt: any) =>
-      decodeQrlReceiptLogs(artifact.abi, address, receipt),
+      decodeQrlReceiptLogs(artifact.abi, contractAddress, receipt),
     callFunction,
     functions: functionMaps.functions,
     send: functionMaps.send,
@@ -220,14 +237,14 @@ function getContractFromArtifact(
       blockTag?: string
     ) => {
       assertHexData(data);
-      return call({ ...tx, to: address, data }, blockTag);
+      return call({ ...tx, to: contractAddress, data }, blockTag);
     },
     sendTransaction: (
       data: string,
       tx: Omit<QrlTransactionRequest, "to" | "data"> = {}
     ) => {
       assertHexData(data);
-      return sendTransaction({ ...tx, to: address, data });
+      return sendTransaction({ ...tx, to: contractAddress, data });
     },
   };
 }
@@ -383,12 +400,6 @@ function assertHexData(value: string) {
     value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
   if (normalized.length % 2 !== 0) {
     throw new HardhatError(ERRORS.NETWORK.INVALID_HEX_DATA, { value });
-  }
-}
-
-function assertQrlAddress(address: string) {
-  if (!QRL_ADDRESS_REGEX.test(address)) {
-    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, { address });
   }
 }
 

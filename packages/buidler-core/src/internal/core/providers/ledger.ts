@@ -1,4 +1,5 @@
 import { IQrlProvider, QrlLedgerAccountsConfig } from "../../../types";
+import { normalizeQrlAddress } from "../../qrl/address";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
@@ -130,7 +131,7 @@ async function getRemoteAccounts(
 }
 
 function mergeAccounts(remoteAccounts: string[], ledgerAccounts: string[]) {
-  const result = [...remoteAccounts];
+  const result = remoteAccounts.map(normalizeQrlAddress);
   for (const ledgerAccount of ledgerAccounts) {
     if (
       !result.some(
@@ -492,14 +493,6 @@ function parseAddress(response: Uint8Array): string {
       "hex"
     )}`
   );
-}
-
-function normalizeQrlAddress(address: string): string {
-  if (!/^Q[0-9a-fA-F]{128}$/.test(address)) {
-    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, { address });
-  }
-
-  return address;
 }
 
 function splitIntoChunks(message: Uint8Array, maxSize: number): Uint8Array[] {

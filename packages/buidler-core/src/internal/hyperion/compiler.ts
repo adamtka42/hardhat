@@ -18,10 +18,13 @@ export interface HyperionInput {
 
 export async function compileHyperion(
   input: HyperionInput,
-  projectRoot: string
+  projectRoot: string,
+  compilerPath?: string
 ): Promise<any> {
   const hypcPath =
-    process.env.HYPERION_HYPC_PATH !== undefined
+    compilerPath !== undefined
+      ? compilerPath
+      : process.env.HYPERION_HYPC_PATH !== undefined
       ? process.env.HYPERION_HYPC_PATH
       : process.env.HYPC_PATH !== undefined
       ? process.env.HYPC_PATH
@@ -92,7 +95,21 @@ function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
   }
 
   const compilerMessages = stdout.slice(0, jsonStart).trim();
-  const combinedOutput = JSON.parse(stdout.slice(jsonStart));
+  let combinedOutput: any;
+  try {
+    combinedOutput = JSON.parse(stdout.slice(jsonStart));
+  } catch (error) {
+    return {
+      errors: [
+        {
+          severity: "error",
+          formattedMessage: `hypc returned invalid JSON output: ${
+            (error as Error).message
+          }`,
+        },
+      ],
+    };
+  }
   const output: any = {
     contracts: {},
   };
@@ -107,10 +124,24 @@ function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
     const contractName =
       separator === -1 ? fullName : fullName.slice(separator + 1);
     const contractOutput = contracts[fullName];
-    const abi =
-      typeof contractOutput.abi === "string"
-        ? JSON.parse(contractOutput.abi)
-        : contractOutput.abi;
+    let abi: any;
+    try {
+      abi =
+        typeof contractOutput.abi === "string"
+          ? JSON.parse(contractOutput.abi)
+          : contractOutput.abi;
+    } catch (error) {
+      return {
+        errors: [
+          {
+            severity: "error",
+            formattedMessage: `hypc returned invalid ABI JSON for ${fullName}: ${
+              (error as Error).message
+            }`,
+          },
+        ],
+      };
+    }
 
     if (output.contracts[sourceName] === undefined) {
       output.contracts[sourceName] = {};

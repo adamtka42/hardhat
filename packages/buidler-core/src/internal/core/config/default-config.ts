@@ -1,7 +1,7 @@
 import { HardhatConfig } from "../../../types";
 
 const defaultConfig: HardhatConfig = {
-  defaultNetwork: "localhost",
+  defaultNetwork: "qrl",
   hyperion: {
     version: "local",
     optimizer: {
@@ -10,8 +10,8 @@ const defaultConfig: HardhatConfig = {
     },
   },
   networks: {
-    localhost: {
-      url: "http://127.0.0.1:8545",
+    qrl: {
+      url: "http://127.0.0.1:33462",
     },
   },
   mocha: {

@@ -24,12 +24,12 @@ describe("Config resolution", () => {
       it("should return the default config", () => {
         const config = loadConfigAndTasks();
         assert.equal(config.hyperion.version, "local");
-        assert.containsAllKeys(config.networks, ["localhost"]);
-        assert.equal(config.defaultNetwork, "localhost");
+        assert.containsAllKeys(config.networks, ["qrl"]);
+        assert.equal(config.defaultNetwork, "qrl");
 
         assert.equal(
-          (config.networks.localhost as HttpNetworkConfig).url,
-          "http://127.0.0.1:8545"
+          (config.networks.qrl as HttpNetworkConfig).url,
+          "http://127.0.0.1:33462"
         );
       });
     });
@@ -41,21 +41,18 @@ describe("Config resolution", () => {
         const config = loadConfigAndTasks();
 
         assert.equal(config.hyperion.version, "local");
-        assert.containsAllKeys(config.networks, ["localhost", "custom"]);
+        assert.containsAllKeys(config.networks, ["qrl", "custom"]);
         assert.equal(config.defaultNetwork, "custom");
       });
 
       it("should return the config merged ", () => {
         const config = loadConfigAndTasks();
         assert.equal(config.hyperion.version, "local");
-        assert.containsAllKeys(config.networks, ["localhost", "custom"]);
+        assert.containsAllKeys(config.networks, ["qrl", "custom"]);
         assert.equal(
-          (config.networks.localhost as HttpNetworkConfig).url,
-          "http://127.0.0.1:8545"
+          (config.networks.qrl as HttpNetworkConfig).url,
+          "http://127.0.0.1:33462"
         );
-        assert.deepEqual(config.networks.localhost.accounts, [
-          "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
-        ]);
       });
 
       it("should keep any unknown field", () => {

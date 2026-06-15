@@ -4,9 +4,10 @@ import { keccak256 } from "ethereum-cryptography/keccak";
 import { HardhatError } from "../core/errors";
 import { ERRORS } from "../core/errors-list";
 
+import { isValidQrlAddress, toQrlChecksumAddress } from "./address";
+
 const WORD_BYTES = 64;
 const WORD_HEX_LENGTH = WORD_BYTES * 2;
-const QRL_ADDRESS_REGEX = /^Q[0-9a-fA-F]{128}$/;
 const HEX_DATA_REGEX = /^(0x)?[0-9a-fA-F]*$/;
 
 export interface QrlAbiFunction {
@@ -483,7 +484,7 @@ function decodeStaticValue(type: string, word: string): any {
   }
 
   if (canonical === "address") {
-    return `Q${word}`;
+    return toQrlChecksumAddress(`Q${word}`);
   }
 
   const fixedBytes = parseFixedBytesType(canonical);
@@ -761,7 +762,7 @@ function encodeBool(value: any): string {
 }
 
 function encodeAddress(value: any): string {
-  if (typeof value !== "string" || !QRL_ADDRESS_REGEX.test(value)) {
+  if (typeof value !== "string" || !isValidQrlAddress(value)) {
     throw qrlAbiError(`Invalid QRL address ${value}`);
   }
 

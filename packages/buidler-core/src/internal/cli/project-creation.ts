@@ -105,9 +105,7 @@ function printSuggestedCommands() {
   console.log(`  ${npx}hardhat accounts`);
   console.log(`  ${npx}hardhat compile`);
   console.log(`  ${npx}hardhat test`);
-  console.log(
-    `  ${npx}hardhat run scripts/sample-script.js --network localhost`
-  );
+  console.log(`  ${npx}hardhat run scripts/sample-script.js --network qrl`);
   console.log(`  ${npx}hardhat help`);
 }
 

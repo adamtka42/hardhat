@@ -12,6 +12,7 @@ import {
 } from "../../../../src/internal/core/providers/ledger";
 import { numberToRpcQuantity } from "../../../../src/internal/core/providers/provider-utils";
 import { wrapSend } from "../../../../src/internal/core/providers/wrapper";
+import { toQrlChecksumAddress } from "../../../../src/internal/qrl/address";
 import { IQrlProvider } from "../../../../src/types";
 import {
   expectHardhatError,
@@ -47,7 +48,7 @@ describe("Local accounts provider", () => {
 
   beforeEach(() => {
     mock = new MockedProvider();
-    mock.setReturnValue("net_version", numberToRpcQuantity(123));
+    mock.setReturnValue("qrl_chainId", numberToRpcQuantity(123));
     mock.setReturnValue("qrl_getTransactionCount", numberToRpcQuantity(0x8));
     mock.setReturnValue("qrl_accounts", []);
 
@@ -105,6 +106,44 @@ describe("Local accounts provider", () => {
     );
   });
 
+  it("Should throw when locally signing without from", async () => {
+    await expectHardhatErrorAsync(
+      () =>
+        wrapper.send("qrl_sendTransaction", [
+          {
+            to: qrlAddresses[1],
+            gas: 21000,
+            maxFeePerGas: 1,
+            maxPriorityFeePerGas: 1,
+            nonce: 0,
+            value: 1,
+          },
+        ]),
+      ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
+      "from"
+    );
+  });
+
+  it("Should reject invalid local transaction data", async () => {
+    await expectHardhatErrorAsync(
+      () =>
+        wrapper.send("qrl_sendTransaction", [
+          {
+            from: qrlAddresses[0],
+            to: qrlAddresses[1],
+            gas: 21000,
+            maxFeePerGas: 1,
+            maxPriorityFeePerGas: 1,
+            nonce: 0,
+            value: 1,
+            data: "0x123",
+          },
+        ]),
+      ERRORS.NETWORK.INVALID_HEX_DATA,
+      "0x123"
+    );
+  });
+
   it("Should sign and forward a QRL dynamic fee transaction", async () => {
     await wrapper.send("qrl_sendTransaction", [
       {
@@ -142,6 +181,23 @@ describe("Local accounts provider", () => {
         ]),
       ERRORS.NETWORK.NOT_LOCAL_ACCOUNT,
       nonLocalAddress()
+    );
+  });
+
+  it("Should reject invalid mixed-case QRL recipient addresses", async () => {
+    await expectHardhatErrorAsync(
+      () =>
+        wrapper.send("qrl_sendTransaction", [
+          {
+            from: qrlAddresses[0],
+            to:
+              "QA73C065F7018CC0cFFf98028D8Ef1Ff746f5Cb425bC8840A4CDC2A6Eb717faa121A2e959A6A0Dac2D7C38252d70E4541397b0967880f00b9bD0c4C5d0FC46b2d",
+            gas: 21000,
+            maxFeePerGas: 1,
+            maxPriorityFeePerGas: 1,
+          },
+        ]),
+      ERRORS.NETWORK.INVALID_QRL_ADDRESS
     );
   });
 
@@ -186,6 +242,22 @@ describe("Local accounts provider", () => {
       );
     });
 
+    it("Should reject invalid qrl_sign data", async () => {
+      await expectHardhatErrorAsync(
+        () => wrapper.send("qrl_sign", [qrlAddresses[0], "0xz"]),
+        ERRORS.NETWORK.INVALID_HEX_DATA,
+        "0xz"
+      );
+    });
+
+    it("Should reject odd-length qrl_sign data", async () => {
+      await expectHardhatErrorAsync(
+        () => wrapper.send("qrl_sign", [qrlAddresses[0], "0x1"]),
+        ERRORS.NETWORK.INVALID_HEX_DATA,
+        "0x1"
+      );
+    });
+
     it("Should throw if the address isnt one of the local ones", async () => {
       await expectHardhatErrorAsync(
         () => wrapper.send("qrl_sign", [nonLocalAddress(), "0x00"]),
@@ -207,7 +279,7 @@ describe("Ledger accounts provider", () => {
 
   beforeEach(() => {
     mock = new MockedProvider();
-    mock.setReturnValue("net_version", numberToRpcQuantity(123));
+    mock.setReturnValue("qrl_chainId", numberToRpcQuantity(123));
     mock.setReturnValue("qrl_getTransactionCount", numberToRpcQuantity(0x8));
     mock.setReturnValue("qrl_accounts", [nonLocalAddress()]);
     mock.setReturnValue("qrl_sendRawTransaction", `0x${"1".repeat(64)}`);
@@ -230,7 +302,10 @@ describe("Ledger accounts provider", () => {
   it("Should include QRL Ledger addresses in qrl_accounts", async () => {
     const response = await wrapper.send("qrl_accounts");
 
-    assert.deepEqual(response, [nonLocalAddress(), LEDGER_ADDRESS]);
+    assert.deepEqual(response, [
+      toQrlChecksumAddress(nonLocalAddress()),
+      toQrlChecksumAddress(LEDGER_ADDRESS),
+    ]);
   });
 
   it("Should sign and forward QRL Ledger dynamic fee transactions", async () => {
@@ -269,6 +344,26 @@ describe("Ledger accounts provider", () => {
     ]);
 
     assert.equal(mock.getNumberOfCalls("qrl_getTransactionCount"), 1);
+  });
+
+  it("Should reject invalid QRL Ledger transaction data", async () => {
+    await expectHardhatErrorAsync(
+      () =>
+        wrapper.send("qrl_sendTransaction", [
+          {
+            from: LEDGER_ADDRESS,
+            to: nonLocalAddress(),
+            gas: 21000,
+            gasPrice: 678912,
+            nonce: 0,
+            chainId: 123,
+            value: 1,
+            data: "0x123",
+          },
+        ]),
+      ERRORS.NETWORK.INVALID_HEX_DATA,
+      "0x123"
+    );
   });
 
   it("Should forward transactions from non-ledger accounts", async () => {
@@ -326,6 +421,16 @@ describe("Account provider", () => {
     assert.equal(params[0].from, qrlAddresses[0]);
   });
 
+  it("Should normalize fixed sender addresses", async () => {
+    const lowercaseSender = qrlAddresses[0].toLowerCase().replace(/^q/, "Q");
+    wrapper = createSenderProvider(provider, lowercaseSender);
+
+    await wrapper.send("qrl_sendTransaction", [tx]);
+
+    const params = mock.getLatestParams("qrl_sendTransaction");
+    assert.equal(params[0].from, qrlAddresses[0]);
+  });
+
   it("Should not replace transaction from", async () => {
     tx.from = nonLocalAddress();
     await wrapper.send("qrl_sendTransaction", [tx]);
@@ -356,6 +461,24 @@ describe("Account provider", () => {
   });
 
   it("Should use the first account if from is missing", async () => {
+    wrapper = createSenderProvider(provider);
+
+    await wrapper.send("qrl_sendTransaction", [tx]);
+
+    const params = mock.getLatestParams("qrl_sendTransaction");
+    assert.equal(params[0].from, qrlAddresses[0]);
+  });
+
+  it("Should normalize remote sender accounts", async () => {
+    const lowercaseRemoteAccount = qrlAddresses[0]
+      .toLowerCase()
+      .replace(/^q/, "Q");
+    provider = wrapSend(mock, async (method, requestParams) => {
+      if (method === "qrl_accounts") {
+        return [lowercaseRemoteAccount];
+      }
+      return mock.send(method, requestParams);
+    });
     wrapper = createSenderProvider(provider);
 
     await wrapper.send("qrl_sendTransaction", [tx]);

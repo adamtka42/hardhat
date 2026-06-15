@@ -95,7 +95,7 @@ async function getLastUsedConfig(
     return undefined;
   }
 
-  return module.require(pathToConfig);
+  return fsExtra.readJson(pathToConfig);
 }
 
 async function getLastUsedConfigTimestamp(

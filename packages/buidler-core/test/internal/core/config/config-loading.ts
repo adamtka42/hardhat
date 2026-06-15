@@ -19,10 +19,9 @@ describe("config loading", function () {
     useEnvironment();
 
     it("should load the default config if none is given", function () {
-      assert.isDefined(this.env.config.networks.localhost);
-      assert.deepEqual(this.env.config.networks.localhost.accounts, [
-        "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
-      ]);
+      assert.isDefined(this.env.config.networks.qrl);
+      assert.equal(this.env.config.defaultNetwork, "custom");
+      assert.equal(this.env.config.networks.qrl.url, "http://127.0.0.1:33462");
     });
   });
 

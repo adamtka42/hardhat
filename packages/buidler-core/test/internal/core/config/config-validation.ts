@@ -35,6 +35,12 @@ describe("Config validation", function () {
       },
     };
 
+    const invalidCompilerPathType = {
+      hyperion: {
+        compilerPath: 123,
+      },
+    };
+
     const invalidOptimizerEnabledType = {
       hyperion: {
         optimizer: {
@@ -68,6 +74,11 @@ describe("Config validation", function () {
       );
 
       expectHardhatError(
+        () => validateConfig(invalidCompilerPathType),
+        ERRORS.GENERAL.INVALID_CONFIG
+      );
+
+      expectHardhatError(
         () => validateConfig(invalidOptimizerEnabledType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
@@ -96,6 +107,7 @@ describe("Config validation", function () {
       const errors = getValidationErrors({
         hyperion: {
           version: "123",
+          compilerPath: "/usr/local/bin/hypc",
           optimizer: {
             enabled: true,
             runs: 123,
@@ -562,6 +574,27 @@ describe("Config validation", function () {
                         accounts: {
                           type: "ledger",
                           accounts: ["0x1234"],
+                        },
+                        url: "",
+                      },
+                    },
+                  }),
+                ERRORS.GENERAL.INVALID_CONFIG,
+                "64-byte QRL address"
+              );
+            });
+
+            it("Shouldn't work with invalid mixed-case QRL Ledger addresses", function () {
+              expectHardhatError(
+                () =>
+                  validateConfig({
+                    networks: {
+                      asd: {
+                        accounts: {
+                          type: "ledger",
+                          accounts: [
+                            "QA73C065F7018CC0cFFf98028D8Ef1Ff746f5Cb425bC8840A4CDC2A6Eb717faa121A2e959A6A0Dac2D7C38252d70E4541397b0967880f00b9bD0c4C5d0FC46b2d",
+                          ],
                         },
                         url: "",
                       },

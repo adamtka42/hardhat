@@ -136,6 +136,8 @@ describe("createAutomaticGasPriceProvider", () => {
 
     const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
     assert.equal(tx.gasPrice, FIXED_GAS_PRICE);
+    assert.equal(tx.maxFeePerGas, FIXED_GAS_PRICE);
+    assert.equal(tx.maxPriorityFeePerGas, FIXED_GAS_PRICE);
   });
 
   it("Shouldn't replace the provided gasPrice", async () => {
@@ -150,6 +152,22 @@ describe("createAutomaticGasPriceProvider", () => {
 
     const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
     assert.equal(tx.gasPrice, 456);
+  });
+
+  it("Shouldn't replace provided EIP-1559 fee fields", async () => {
+    await provider.send("qrl_sendTransaction", [
+      {
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
+        value: 1,
+        maxFeePerGas: 456,
+        maxPriorityFeePerGas: 789,
+      },
+    ]);
+
+    const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
+    assert.equal(tx.maxFeePerGas, 456);
+    assert.equal(tx.maxPriorityFeePerGas, 789);
   });
 
   it("Should forward the other calls", async () => {
@@ -249,6 +267,8 @@ describe("createFixedGasPriceProvider", () => {
 
     const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
     assert.equal(tx.gasPrice, FIXED_GAS_PRICE);
+    assert.equal(tx.maxFeePerGas, FIXED_GAS_PRICE);
+    assert.equal(tx.maxPriorityFeePerGas, FIXED_GAS_PRICE);
   });
 
   it("Shouldn't replace the provided gasPrice", async () => {
@@ -263,6 +283,22 @@ describe("createFixedGasPriceProvider", () => {
 
     const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
     assert.equal(tx.gasPrice, 14567);
+  });
+
+  it("Shouldn't replace provided fixed EIP-1559 fee fields", async () => {
+    await provider.send("qrl_sendTransaction", [
+      {
+        from: QRL_TEST_ADDRESS,
+        to: QRL_TEST_ADDRESS,
+        value: 1,
+        maxFeePerGas: 4567,
+        maxPriorityFeePerGas: 8910,
+      },
+    ]);
+
+    const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
+    assert.equal(tx.maxFeePerGas, 4567);
+    assert.equal(tx.maxPriorityFeePerGas, 8910);
   });
 
   it("Should forward direct calls to qrl_gasPrice", async () => {

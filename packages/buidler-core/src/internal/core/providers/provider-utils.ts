@@ -31,16 +31,8 @@ export function createChainIdGetter(provider: IQrlProvider) {
 
   return async function getRealChainId(): Promise<number> {
     if (cachedChainId === undefined) {
-      try {
-        const id = await provider.send("qrl_chainId");
-        cachedChainId = rpcQuantityToNumber(id);
-      } catch (error) {
-        // If qrl_chainId fails, fall back to net_version for older QRL nodes.
-        const id: string = await provider.send("net_version");
-        cachedChainId = id.startsWith("0x")
-          ? rpcQuantityToNumber(id)
-          : parseInt(id, 10);
-      }
+      const id = await provider.send("qrl_chainId");
+      cachedChainId = rpcQuantityToNumber(id);
     }
 
     return cachedChainId;

@@ -65,7 +65,6 @@ describe("Provider utils", function () {
     it("Should call the provider only once", async function () {
       const mockedProvider = new MockedProvider();
       mockedProvider.setReturnValue("qrl_chainId", numberToRpcQuantity(1));
-      mockedProvider.setReturnValue("net_version", "2");
 
       const chainIdGetter = createChainIdGetter(mockedProvider);
 
@@ -76,46 +75,20 @@ describe("Provider utils", function () {
       assert.equal(mockedProvider.getTotalNumberOfCalls(), 1);
       await chainIdGetter();
       assert.equal(mockedProvider.getTotalNumberOfCalls(), 1);
-
-      const mockedProvider2 = new MockedProvider();
-      mockedProvider2.setReturnValue("net_version", "2");
-      const netVersionGetter = createChainIdGetter(mockedProvider2);
-
-      assert.equal(mockedProvider2.getTotalNumberOfCalls(), 0);
-      await netVersionGetter();
-
-      // First qrl_chainId is called, then net_version, hence 2
-      assert.equal(mockedProvider2.getTotalNumberOfCalls(), 2);
-      await netVersionGetter();
-      assert.equal(mockedProvider2.getTotalNumberOfCalls(), 2);
-      await netVersionGetter();
-      assert.equal(mockedProvider2.getTotalNumberOfCalls(), 2);
     });
 
-    it("Should use qrl_chainId if supported", async function () {
+    it("Should use qrl_chainId", async function () {
       const mockedProvider = new MockedProvider();
       mockedProvider.setReturnValue("qrl_chainId", numberToRpcQuantity(1));
-      mockedProvider.setReturnValue("net_version", "2");
 
       const chainIdGetter = createChainIdGetter(mockedProvider);
 
       assert.equal(await chainIdGetter(), 1);
     });
 
-    it("Should use net_version if qrl_chainId is not supported", async function () {
-      const mockedProvider = new MockedProvider();
-      mockedProvider.setReturnValue("net_version", "2");
-      const netVersionGetter = createChainIdGetter(mockedProvider);
-
-      assert.equal(await netVersionGetter(), 2);
-    });
-
-    it("Should throw if both qrl_chainId and net_version fail", async function () {
+    it("Should throw if qrl_chainId fails", async function () {
       const mockedProvider = new MockedProvider();
       mockedProvider.setReturnValue("qrl_chainId", () => {
-        throw new Error("Unsupported method");
-      });
-      mockedProvider.setReturnValue("net_version", () => {
         throw new Error("Unsupported method");
       });
 

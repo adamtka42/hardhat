@@ -284,6 +284,12 @@ Configure a network with an HTTP URL that points to a running go-qrl node.`,
       title: "Invalid QRL ABI operation",
       description: `The requested QRL contract ABI operation can't be encoded or decoded.`,
     },
+    LEGACY_ETH_RPC_UNSUPPORTED: {
+      number: 121,
+      message: "Legacy eth_* JSON-RPC method %method% is not supported.",
+      title: "Unsupported legacy JSON-RPC method",
+      description: `This project is QRL-only. Use the equivalent qrl_* JSON-RPC method instead.`,
+    },
     LEDGER_TRANSPORT_UNAVAILABLE: {
       number: 118,
       message: "QRL Ledger transport is unavailable: %message%.",
@@ -302,6 +308,13 @@ Configure a network with an HTTP URL that points to a running go-qrl node.`,
         "Could not find QRL Ledger derivation path for account %account%.",
       title: "QRL Ledger account not found",
       description: `Hardhat couldn't derive a Ledger path matching the configured QRL account.`,
+    },
+    TRANSACTION_RECEIPT_MISMATCH: {
+      number: 122,
+      message:
+        "Transaction receipt hash mismatch. Expected %expected%, got %actual%.",
+      title: "Transaction receipt hash mismatch",
+      description: `The QRL node returned a transaction receipt for a different transaction hash than the one Hardhat requested.`,
     },
   },
   TASK_DEFINITIONS: {

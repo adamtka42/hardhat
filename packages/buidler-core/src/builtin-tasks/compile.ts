@@ -122,7 +122,11 @@ export default function () {
       types.json
     )
     .setAction(async ({ input }: { input: HyperionInput }, { config }) => {
-      return compileHyperion(input, config.paths.root);
+      return compileHyperion(
+        input,
+        config.paths.root,
+        config.hyperion.compilerPath
+      );
     });
 
   internalTask(TASK_COMPILE_COMPILE, async (_, { config, run }) => {
@@ -211,16 +215,26 @@ export default function () {
 
     await fsExtra.ensureDir(config.paths.artifacts);
     let numberOfContracts = 0;
+    const contractNameCounts = getContractNameCounts(
+      compilationOutput.contracts
+    );
 
-    for (const file of Object.values<any>(compilationOutput.contracts)) {
+    for (const [sourceName, file] of Object.entries<any>(
+      compilationOutput.contracts
+    )) {
       for (const [contractName, contractOutput] of Object.entries(file)) {
         const artifact = getArtifactFromContractOutput(
           contractName,
-          contractOutput
+          contractOutput,
+          sourceName
         );
         numberOfContracts += 1;
 
-        await saveArtifact(config.paths.artifacts, artifact);
+        await saveArtifact(
+          config.paths.artifacts,
+          artifact,
+          contractNameCounts[contractName] === 1
+        );
       }
     }
 
@@ -237,4 +251,18 @@ export default function () {
     .setAction(async ({ force: force }: { force: boolean }, { run }) =>
       run(TASK_BUILD_ARTIFACTS, { force })
     );
+}
+
+function getContractNameCounts(
+  contracts: any
+): { [contractName: string]: number } {
+  const counts: { [contractName: string]: number } = {};
+
+  for (const file of Object.values<any>(contracts)) {
+    for (const contractName of Object.keys(file)) {
+      counts[contractName] = (counts[contractName] ?? 0) + 1;
+    }
+  }
+
+  return counts;
 }
