@@ -2,6 +2,7 @@ import {
   HttpNetworkConfig,
   IQrlProvider,
   NetworkConfig,
+  QrlLocalNetworkConfig,
   QrlProvider,
 } from "../../../types";
 import { LEGACY_IN_MEMORY_NETWORK_NAME } from "../../constants";
@@ -9,6 +10,7 @@ import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 import { HttpProvider } from "./http";
+import { QrlLocalHardhatProvider } from "./qrl-local";
 
 export function createProvider(
   networkName: string,
@@ -18,6 +20,11 @@ export function createProvider(
 
   if (networkName === LEGACY_IN_MEMORY_NETWORK_NAME) {
     throw new HardhatError(ERRORS.NETWORK.QRL_IN_MEMORY_NODE_UNSUPPORTED);
+  }
+
+  if (isQrlLocalNetworkConfig(networkConfig)) {
+    provider = new QrlLocalHardhatProvider(networkConfig);
+    return wrapQrlProvider(provider, networkConfig);
   }
 
   const httpNetConfig = networkConfig as HttpNetworkConfig;
@@ -54,8 +61,9 @@ export function wrapQrlProvider(
   const { createChainIdValidationProvider } = require("./chainId");
 
   const isHttpNetworkConfig = "url" in netConfig;
+  const isLocalNetworkConfig = isQrlLocalNetworkConfig(netConfig);
 
-  if (isHttpNetworkConfig) {
+  if (isHttpNetworkConfig && !isLocalNetworkConfig) {
     const httpNetConfig = netConfig as Partial<HttpNetworkConfig>;
 
     const accounts = httpNetConfig.accounts;
@@ -88,6 +96,12 @@ export function wrapQrlProvider(
   }
 
   return provider;
+}
+
+function isQrlLocalNetworkConfig(
+  netConfig: Partial<NetworkConfig>
+): netConfig is QrlLocalNetworkConfig {
+  return (netConfig as any).type === "qrl-local";
 }
 
 function isLedgerAccountsConfig(accounts: any): boolean {

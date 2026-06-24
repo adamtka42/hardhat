@@ -13,6 +13,13 @@ const defaultConfig: HardhatConfig = {
     qrl: {
       url: "http://127.0.0.1:33462",
     },
+    qrlLocal: {
+      type: "qrl-local",
+      chainId: 1,
+      accounts: [],
+      automine: true,
+      blockGasLimit: 30000000,
+    },
   },
   mocha: {
     timeout: 20000,

@@ -260,11 +260,9 @@ Please make sure your node is running, and check your internet connection and ne
     QRL_IN_MEMORY_NODE_UNSUPPORTED: {
       number: 114,
       message:
-        "The legacy in-memory development network is not supported by the QRL-only fork.",
-      title: "Unsupported QRL in-memory node",
-      description: `This fork currently supports live go-qrl networks only.
-
-Configure a network with an HTTP URL that points to a running go-qrl node.`,
+        "The legacy in-memory development network/server is not supported by the QRL-only fork.",
+      title: "Unsupported legacy QRL node mode",
+      description: `Use qrlLocal for in-process tests, or configure a network with an HTTP URL that points to a running go-qrl node. The legacy buidlerevm/hardhat node server mode is not supported.`,
     },
     INVALID_QRL_ADDRESS: {
       number: 115,
@@ -289,6 +287,13 @@ Configure a network with an HTTP URL that points to a running go-qrl node.`,
       message: "Legacy eth_* JSON-RPC method %method% is not supported.",
       title: "Unsupported legacy JSON-RPC method",
       description: `This project is QRL-only. Use the equivalent qrl_* JSON-RPC method instead.`,
+    },
+    QRLJS_MONOREPO_UNAVAILABLE: {
+      number: 123,
+      message:
+        "Cannot load local qrljs-monorepo from %path%: %message%. Build qrljs-monorepo first or set networks.%network%.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH.",
+      title: "Local qrljs-monorepo is unavailable",
+      description: `The qrlLocal provider needs a locally built qrljs-monorepo because the QRL VM packages are not consumed as published Hardhat dependencies yet.`,
     },
     LEDGER_TRANSPORT_UNAVAILABLE: {
       number: 118,

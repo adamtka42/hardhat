@@ -266,8 +266,89 @@ describe("Config validation", function () {
                 },
               }),
             ERRORS.GENERAL.INVALID_CONFIG,
-            "Configure a live go-qrl HTTP network instead."
+            "Use qrlLocal for in-process tests or configure a live go-qrl HTTP network instead."
           );
+        });
+      });
+
+      describe("QRL local network config", function () {
+        const localAddress = `Q${"01".repeat(64)}`;
+
+        it("Should accept a valid qrl-local network", function () {
+          const errors = getValidationErrors({
+            networks: {
+              qrlLocal: {
+                type: "qrl-local",
+                chainId: 1,
+                from: localAddress,
+                accounts: [
+                  {
+                    address: localAddress,
+                    balance: "1000",
+                    nonce: 0,
+                  },
+                ],
+                automine: true,
+                blockGasLimit: 30000000,
+                qrlJsMonorepoPath: "/tmp/qrljs-monorepo",
+              },
+            },
+          });
+
+          assert.isEmpty(errors);
+        });
+
+        it("Should reject url on qrl-local networks", function () {
+          expectHardhatError(
+            () =>
+              validateConfig({
+                networks: {
+                  qrlLocal: {
+                    type: "qrl-local",
+                    url: "http://localhost",
+                  },
+                },
+              }),
+            ERRORS.GENERAL.INVALID_CONFIG,
+            "HardhatConfig.networks.qrlLocal.url"
+          );
+        });
+
+        it("Should reject invalid local account addresses", function () {
+          expectHardhatError(
+            () =>
+              validateConfig({
+                networks: {
+                  qrlLocal: {
+                    type: "qrl-local",
+                    accounts: [{ address: `Q${"01".repeat(20)}` }],
+                  },
+                },
+              }),
+            ERRORS.GENERAL.INVALID_CONFIG,
+            "64-byte QRL address"
+          );
+        });
+
+        it("Should reject non-local account config forms", function () {
+          for (const accounts of [
+            "remote",
+            { type: "ledger", accounts: [localAddress] },
+          ]) {
+            expectHardhatError(
+              () =>
+                validateConfig({
+                  networks: {
+                    qrlLocal: {
+                      type: "qrl-local",
+                      accounts,
+                    },
+                  },
+                }),
+              ERRORS.GENERAL.INVALID_CONFIG,
+              "QRL local account array"
+            );
+          }
         });
       });
 

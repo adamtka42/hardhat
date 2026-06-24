@@ -84,6 +84,7 @@ const NetworkConfigAccounts = t.union([
 ]);
 
 const QRL_EXTENDED_SEED_REGEX = /^0x[0-9a-fA-F]{102}$/;
+const QRL_LOCAL_BALANCE_REGEX = /^(0x[0-9a-fA-F]+|[0-9]+)$/;
 
 const HttpHeaders = t.record(t.string, t.string, "httpHeaders");
 
@@ -98,7 +99,28 @@ const HttpNetworkConfig = t.type({
   httpHeaders: optional(HttpHeaders),
 });
 
-const Networks = t.record(t.string, HttpNetworkConfig);
+const QrlLocalAccountConfig = t.type({
+  address: t.string,
+  balance: optional(t.union([t.string, t.number])),
+  nonce: optional(t.number),
+});
+
+const QrlLocalNetworkConfig = t.type({
+  type: t.literal("qrl-local"),
+  chainId: optional(t.number),
+  from: optional(t.string),
+  gas: optional(t.union([t.literal("auto"), t.number])),
+  gasPrice: optional(t.union([t.literal("auto"), t.number])),
+  gasMultiplier: optional(t.number),
+  accounts: optional(t.array(QrlLocalAccountConfig)),
+  automine: optional(t.boolean),
+  blockGasLimit: optional(t.number),
+  qrlJsMonorepoPath: optional(t.string),
+});
+
+const NetworkConfig = t.union([HttpNetworkConfig, QrlLocalNetworkConfig]);
+
+const Networks = t.record(t.string, NetworkConfig);
 
 const ProjectPaths = t.type({
   root: optional(t.string),
@@ -154,7 +176,7 @@ export function getValidationErrors(config: any): string[] {
     const inMemoryNetwork = config.networks[LEGACY_IN_MEMORY_NETWORK_NAME];
     if (inMemoryNetwork !== undefined) {
       errors.push(
-        `HardhatConfig.networks.${LEGACY_IN_MEMORY_NETWORK_NAME} is not supported by the QRL-only fork. Configure a live go-qrl HTTP network instead.`
+        `HardhatConfig.networks.${LEGACY_IN_MEMORY_NETWORK_NAME} is not supported by the QRL-only fork. Use qrlLocal for in-process tests or configure a live go-qrl HTTP network instead.`
       );
     }
 
@@ -162,6 +184,110 @@ export function getValidationErrors(config: any): string[] {
       config.networks
     )) {
       if (networkName === LEGACY_IN_MEMORY_NETWORK_NAME) {
+        continue;
+      }
+
+      if (netConfig.type === "qrl-local") {
+        if (netConfig.url !== undefined) {
+          errors.push(
+            getErrorMessage(
+              `HardhatConfig.networks.${networkName}.url`,
+              netConfig.url,
+              "undefined"
+            )
+          );
+        }
+
+        if (netConfig.accounts !== undefined) {
+          if (!Array.isArray(netConfig.accounts)) {
+            errors.push(
+              getErrorMessage(
+                `HardhatConfig.networks.${networkName}.accounts`,
+                netConfig.accounts,
+                "QRL local account array"
+              )
+            );
+          } else {
+            for (const [
+              accountIndex,
+              account,
+            ] of netConfig.accounts.entries()) {
+              if (
+                account === undefined ||
+                account === null ||
+                typeof account !== "object"
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}`,
+                    account,
+                    "QRL local account"
+                  )
+                );
+                continue;
+              }
+
+              if (
+                typeof account.address !== "string" ||
+                !isValidQrlAddress(account.address)
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.address`,
+                    account.address,
+                    "64-byte QRL address"
+                  )
+                );
+              }
+
+              if (
+                account.balance !== undefined &&
+                ((typeof account.balance !== "string" &&
+                  typeof account.balance !== "number") ||
+                  (typeof account.balance === "string" &&
+                    !QRL_LOCAL_BALANCE_REGEX.test(account.balance)) ||
+                  (typeof account.balance === "number" &&
+                    (!Number.isSafeInteger(account.balance) ||
+                      account.balance < 0)))
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.balance`,
+                    account.balance,
+                    "non-negative integer balance"
+                  )
+                );
+              }
+
+              if (
+                account.nonce !== undefined &&
+                (!Number.isSafeInteger(account.nonce) || account.nonce < 0)
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.nonce`,
+                    account.nonce,
+                    "non-negative safe integer"
+                  )
+                );
+              }
+            }
+          }
+        }
+
+        if (
+          typeof netConfig.from === "string" &&
+          !isValidQrlAddress(netConfig.from)
+        ) {
+          errors.push(
+            getErrorMessage(
+              `HardhatConfig.networks.${networkName}.from`,
+              netConfig.from,
+              "64-byte QRL address"
+            )
+          );
+        }
+
         continue;
       }
 

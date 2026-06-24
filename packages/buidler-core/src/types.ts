@@ -26,6 +26,20 @@ export interface QrlLedgerAccountsConfig extends OtherAccountsConfig {
   maxDerivationAccounts?: number;
 }
 
+export interface QrlLocalAccountConfig {
+  address: string;
+  balance?: string | number;
+  nonce?: number;
+}
+
+export interface QrlLocalNetworkConfig extends CommonNetworkConfig {
+  type: "qrl-local";
+  accounts?: QrlLocalAccountConfig[];
+  automine?: boolean;
+  blockGasLimit?: number;
+  qrlJsMonorepoPath?: string;
+}
+
 export type QrlExtendedSeed = string;
 
 export type NetworkConfigAccounts =
@@ -41,7 +55,7 @@ export interface HttpNetworkConfig extends CommonNetworkConfig {
   accounts?: NetworkConfigAccounts;
 }
 
-export type NetworkConfig = HttpNetworkConfig;
+export type NetworkConfig = HttpNetworkConfig | QrlLocalNetworkConfig;
 
 export interface Networks {
   [networkName: string]: NetworkConfig;

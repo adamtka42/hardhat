@@ -20,6 +20,7 @@ export interface JsonRpcTransactionData {
   chainId?: string | number;
 }
 
+// QRL ML-DSA-87 transaction signature descriptor used by local and Ledger signing.
 export const ML_DSA_87_DESCRIPTOR = new Uint8Array([0x01, 0x00, 0x00]);
 export const EMPTY_EXTRA_PARAMS = new Uint8Array();
 const HEX_DATA_REGEX = /^(0x)?[0-9a-fA-F]*$/;

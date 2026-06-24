@@ -21,7 +21,10 @@ describe("config loading", function () {
     it("should load the default config if none is given", function () {
       assert.isDefined(this.env.config.networks.qrl);
       assert.equal(this.env.config.defaultNetwork, "custom");
-      assert.equal(this.env.config.networks.qrl.url, "http://127.0.0.1:33462");
+      assert.equal(
+        (this.env.config.networks.qrl as any).url,
+        "http://127.0.0.1:33462"
+      );
     });
   });
 

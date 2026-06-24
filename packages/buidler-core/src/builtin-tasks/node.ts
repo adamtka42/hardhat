@@ -5,7 +5,7 @@ import { ERRORS } from "../internal/core/errors-list";
 import { TASK_NODE } from "./task-names";
 
 export default function () {
-  task(TASK_NODE, "Fails because the QRL in-memory network is unsupported")
+  task(TASK_NODE, "Fails because standalone QRL node mode is unsupported")
     .addOptionalParam(
       "hostname",
       "The host to which to bind to for new connections",
