@@ -67,7 +67,7 @@ jobs:
 
   test_macos:
     name: Test on MacOS with Node 10
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/setup-node@v1
         with:

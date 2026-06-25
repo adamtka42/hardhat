@@ -5,6 +5,8 @@
   "license": "SEE LICENSE IN EACH PACKAGE'S LICENSE FILE",
   "private": true,
   "devDependencies": {
+    "@types/glob": "7.2.0",
+    "@types/minimatch": "3.0.5",
     "@types/mocha": "^5.2.6",
     "@types/node": "^8.10.44",
     "@types/shelljs": "0.8.6",
