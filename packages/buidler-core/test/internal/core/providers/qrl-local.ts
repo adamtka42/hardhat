@@ -1,4 +1,5 @@
 import { assert } from "chai";
+import fsExtra from "fs-extra";
 import path from "path";
 
 import { ERRORS } from "../../../../src/internal/core/errors-list";
@@ -14,10 +15,18 @@ const RECEIVER = `Q${"02".repeat(64)}`;
 const PACKAGE_ROOT = path.join(__dirname, "..", "..", "..", "..");
 const HARDHAT_ROOT = path.join(PACKAGE_ROOT, "..", "..");
 const ZOND_ROOT = path.dirname(HARDHAT_ROOT);
-const QRLJS_MONOREPO_PATH = path.join(
+const LOCAL_QRLJS_MONOREPO_PATH = path.join(
   path.dirname(ZOND_ROOT),
   "qrljs-monorepo"
 );
+const QRLJS_MONOREPO_PATH =
+  process.env.QRLJS_MONOREPO_PATH ?? LOCAL_QRLJS_MONOREPO_PATH;
+
+function hasQrlJsMonorepoDist(): boolean {
+  return fsExtra.pathExistsSync(
+    path.join(QRLJS_MONOREPO_PATH, "packages", "vm", "dist", "cjs", "index.js")
+  );
+}
 
 function createLocalProvider() {
   return new QrlLocalHardhatProvider({
@@ -34,7 +43,20 @@ function createLocalProvider() {
   });
 }
 
-describe("QRL local Hardhat provider", () => {
+describe("QRL local Hardhat provider", function () {
+  beforeEach(function () {
+    const testTitle =
+      this.currentTest === undefined ? "" : this.currentTest.title;
+
+    if (testTitle.includes("fails with a Hardhat error")) {
+      return;
+    }
+
+    if (!hasQrlJsMonorepoDist()) {
+      this.skip();
+    }
+  });
+
   it("exposes local chain, account, gas, and transaction methods", async () => {
     const provider = createLocalProvider();
 
