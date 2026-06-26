@@ -52,6 +52,7 @@ export async function compileHyperion(
     const result = await execFileAsync(hypcPath, args, {
       cwd: projectRoot,
       maxBuffer: 1024 * 1024 * 50,
+      shell: process.platform === "win32",
     });
     stdout = result.stdout.toString();
     stderr = result.stderr.toString();

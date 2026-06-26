@@ -130,14 +130,15 @@ describe("QRL local Hardhat provider", function () {
   });
 
   it("fails with a Hardhat error when qrljs-monorepo cannot be loaded", () => {
+    const missingQrlJsMonorepoPath = path.resolve("missing-qrljs-monorepo");
     expectHardhatError(
       () =>
         new QrlLocalHardhatProvider({
           type: "qrl-local",
-          qrlJsMonorepoPath: "/tmp/missing-qrljs-monorepo",
+          qrlJsMonorepoPath: missingQrlJsMonorepoPath,
         }),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
-      "/tmp/missing-qrljs-monorepo"
+      missingQrlJsMonorepoPath
     );
   });
 

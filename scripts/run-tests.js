@@ -10,9 +10,7 @@ function getTestArgsOrDefaults() {
   const testNodeArgs = process.argv.slice(2);
 
   if (
-    !testNodeArgs.some(
-      (arg) => arg === "--timeout" || arg === "--no-timeout"
-    )
+    !testNodeArgs.some((arg) => arg === "--timeout" || arg === "--no-timeout")
   ) {
     testNodeArgs.push("--timeout", "0");
   }
@@ -27,6 +25,11 @@ function getTestArgsOrDefaults() {
 shell.exec("npm run build");
 shell.exec("npm run build-test");
 
+const spawnOptions = {
+  shell: process.platform === "win32",
+  stdio: "inherit",
+};
+
 const result = spawnSync(
   "npm",
   [
@@ -37,7 +40,11 @@ const result = spawnSync(
     "--",
     ...getTestArgsOrDefaults(),
   ],
-  { stdio: "inherit" }
+  spawnOptions
 );
+
+if (result.error !== undefined) {
+  console.error(result.error);
+}
 
 process.exit(result.status === null ? 1 : result.status);

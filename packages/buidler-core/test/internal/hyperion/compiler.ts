@@ -29,9 +29,9 @@ describe("Hyperion compiler", function () {
   });
 
   it("uses the configured compiler path", async function () {
-    const configuredHypcPath = path.join(this.tmpDir, "configured-hypc");
-    const envHypcPath = path.join(this.tmpDir, "env-hypc");
-    await writeHypcScript(
+    let configuredHypcPath = path.join(this.tmpDir, "configured-hypc");
+    let envHypcPath = path.join(this.tmpDir, "env-hypc");
+    configuredHypcPath = await writeHypcScript(
       configuredHypcPath,
       JSON.stringify({
         contracts: {
@@ -43,7 +43,7 @@ describe("Hyperion compiler", function () {
         },
       })
     );
-    await writeHypcScript(
+    envHypcPath = await writeHypcScript(
       envHypcPath,
       JSON.stringify({
         contracts: {
@@ -72,8 +72,8 @@ describe("Hyperion compiler", function () {
   });
 
   it("returns a compiler error for invalid hypc JSON output", async function () {
-    const hypcPath = path.join(this.tmpDir, "hypc");
-    await writeHypcScript(hypcPath, "diagnostic { bad");
+    let hypcPath = path.join(this.tmpDir, "hypc");
+    hypcPath = await writeHypcScript(hypcPath, "diagnostic { bad");
     process.env.HYPERION_HYPC_PATH = hypcPath;
 
     const output = await compileHyperion(createEmptyInput(), this.tmpDir);
@@ -87,7 +87,7 @@ describe("Hyperion compiler", function () {
   });
 
   it("returns a compiler error for invalid ABI JSON output", async function () {
-    const hypcPath = path.join(this.tmpDir, "hypc");
+    let hypcPath = path.join(this.tmpDir, "hypc");
     const combinedOutput = JSON.stringify({
       contracts: {
         "contracts/Token.hyp:Token": {
@@ -97,7 +97,7 @@ describe("Hyperion compiler", function () {
         },
       },
     });
-    await writeHypcScript(hypcPath, combinedOutput);
+    hypcPath = await writeHypcScript(hypcPath, combinedOutput);
     process.env.HYPERION_HYPC_PATH = hypcPath;
 
     const output = await compileHyperion(createEmptyInput(), this.tmpDir);
@@ -126,6 +126,22 @@ function createEmptyInput(): HyperionInput {
 }
 
 async function writeHypcScript(hypcPath: string, output: string) {
-  await fsExtra.writeFile(hypcPath, `#!/bin/sh\nprintf '%s' '${output}'\n`);
+  const jsPath = `${hypcPath}.js`;
+  await fsExtra.writeFile(
+    jsPath,
+    `process.stdout.write(${JSON.stringify(output)});\n`
+  );
+
+  if (process.platform === "win32") {
+    const cmdPath = `${hypcPath}.cmd`;
+    await fsExtra.writeFile(
+      cmdPath,
+      `@echo off\r\nnode "%~dp0${path.basename(jsPath)}"\r\n`
+    );
+    return cmdPath;
+  }
+
+  await fsExtra.writeFile(hypcPath, `#!/bin/sh\nnode "${jsPath}"\n`);
   await fsExtra.chmod(hypcPath, 0o755);
+  return hypcPath;
 }

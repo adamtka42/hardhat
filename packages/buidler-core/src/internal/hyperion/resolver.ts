@@ -215,7 +215,12 @@ export class Resolver {
   }
 
   private _isRelativeImport(imported: string): boolean {
-    return imported.startsWith("./") || imported.startsWith("../");
+    return (
+      imported.startsWith("./") ||
+      imported.startsWith("../") ||
+      imported.startsWith(".\\") ||
+      imported.startsWith("..\\")
+    );
   }
 
   private _resolveFromProjectRoot(fileName: string) {
