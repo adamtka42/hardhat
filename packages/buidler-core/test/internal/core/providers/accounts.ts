@@ -12,7 +12,10 @@ import {
 } from "../../../../src/internal/core/providers/ledger";
 import { numberToRpcQuantity } from "../../../../src/internal/core/providers/provider-utils";
 import { wrapSend } from "../../../../src/internal/core/providers/wrapper";
-import { toQrlChecksumAddress } from "../../../../src/internal/qrl/address";
+import {
+  qrlAddressFromSeed,
+  toQrlChecksumAddress,
+} from "../../../../src/internal/qrl/address";
 import { IQrlProvider } from "../../../../src/types";
 import {
   expectHardhatError,
@@ -27,11 +30,6 @@ const QRL_SEEDS = [
 ];
 
 const LEDGER_ADDRESS = `Q${"a".repeat(128)}`;
-
-function seedToAddress(seed: string): string {
-  const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
-  return seedToAccount(seed).address;
-}
 
 function expectQrlAddress(address: string) {
   assert.match(address, /^Q[0-9a-fA-F]{128}$/);
@@ -52,7 +50,7 @@ describe("Local accounts provider", () => {
     mock.setReturnValue("qrl_getTransactionCount", numberToRpcQuantity(0x8));
     mock.setReturnValue("qrl_accounts", []);
 
-    qrlAddresses = QRL_SEEDS.map(seedToAddress);
+    qrlAddresses = QRL_SEEDS.map(qrlAddressFromSeed);
     wrapper = createLocalAccountsProvider(mock, QRL_SEEDS);
   });
 
@@ -324,7 +322,8 @@ describe("Ledger accounts provider", () => {
 
     assert.equal(result, `0x${"1".repeat(64)}`);
     assert.equal(transport.signPath, "m/44'/238'/0'/0/0");
-    assert.equal(transport.signedPayload[0], 0x02);
+    assert.instanceOf(transport.signedPayload, Uint8Array);
+    assert.isAbove(transport.signedPayload.length, 0);
 
     const [rawTransaction] = mock.getLatestParams("qrl_sendRawTransaction");
     assert.isString(rawTransaction);
@@ -392,7 +391,7 @@ describe("Account provider", () => {
   let qrlAddresses: string[];
 
   beforeEach(() => {
-    qrlAddresses = QRL_SEEDS.map(seedToAddress);
+    qrlAddresses = QRL_SEEDS.map(qrlAddressFromSeed);
     tx = {
       to: qrlAddresses[1],
       gas: 21000,

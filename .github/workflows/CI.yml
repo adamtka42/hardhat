@@ -67,7 +67,7 @@ jobs:
         run: npm run build --workspaces --if-present
       - name: Run tests
         env:
-          QRLJS_MONOREPO_PATH: qrljs-monorepo
+          QRLJS_MONOREPO_PATH: ${{ github.workspace }}/qrljs-monorepo
         run: npm run test
 
   test_macos:
@@ -93,7 +93,7 @@ jobs:
         run: npm run build --workspaces --if-present
       - name: Run tests
         env:
-          QRLJS_MONOREPO_PATH: qrljs-monorepo
+          QRLJS_MONOREPO_PATH: ${{ github.workspace }}/qrljs-monorepo
         run: npm run test
 
   test_linux:
@@ -122,5 +122,5 @@ jobs:
         run: npm run build --workspaces --if-present
       - name: Run tests
         env:
-          QRLJS_MONOREPO_PATH: qrljs-monorepo
+          QRLJS_MONOREPO_PATH: ${{ github.workspace }}/qrljs-monorepo
         run: npm run test

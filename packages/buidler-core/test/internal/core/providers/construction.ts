@@ -8,7 +8,10 @@ import {
 import { DEFAULT_GAS_MULTIPLIER } from "../../../../src/internal/core/providers/gas-providers";
 import { HttpProvider } from "../../../../src/internal/core/providers/http";
 import { numberToRpcQuantity } from "../../../../src/internal/core/providers/provider-utils";
-import { toQrlChecksumAddress } from "../../../../src/internal/qrl/address";
+import {
+  qrlAddressFromSeed,
+  toQrlChecksumAddress,
+} from "../../../../src/internal/qrl/address";
 import {
   expectHardhatError,
   expectHardhatErrorAsync,
@@ -22,11 +25,6 @@ const QRL_SEEDS = [
   "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be403",
 ];
 const LEDGER_ADDRESS = `Q${"a".repeat(128)}`;
-
-function seedToAddress(seed: string): string {
-  const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
-  return seedToAccount(seed).address;
-}
 
 describe("Base provider creation", () => {
   it("Should create a valid HTTP provider and wrap it", () => {
@@ -46,7 +44,7 @@ describe("Base providers wrapping", () => {
       gasLimit: numberToRpcQuantity(8000000),
     });
     mockedProvider.setReturnValue("qrl_accounts", [
-      seedToAddress(QRL_SEEDS[0]),
+      qrlAddressFromSeed(QRL_SEEDS[0]),
     ]);
   });
 
@@ -59,7 +57,7 @@ describe("Base providers wrapping", () => {
 
       const accounts = await provider.send("qrl_accounts");
 
-      assert.deepEqual(accounts, QRL_SEEDS.map(seedToAddress));
+      assert.deepEqual(accounts, QRL_SEEDS.map(qrlAddressFromSeed));
       accounts.forEach((account: string) =>
         assert.match(account, /^Q[0-9a-fA-F]{128}$/)
       );
@@ -82,7 +80,7 @@ describe("Base providers wrapping", () => {
 
       const result = await provider.send("qrl_sendTransaction", [
         {
-          to: seedToAddress(QRL_SEEDS[1]),
+          to: qrlAddressFromSeed(QRL_SEEDS[1]),
           value: 1,
         },
       ]);
@@ -119,7 +117,7 @@ describe("Base providers wrapping", () => {
       const accounts = await provider.send("qrl_accounts");
 
       assert.deepEqual(accounts, [
-        seedToAddress(QRL_SEEDS[0]),
+        qrlAddressFromSeed(QRL_SEEDS[0]),
         toQrlChecksumAddress(LEDGER_ADDRESS),
       ]);
     });
@@ -136,13 +134,13 @@ describe("Base providers wrapping", () => {
     it("Should wrap with a fixed sender param", async () => {
       const provider = wrapQrlProvider(mockedProvider, {
         url: "",
-        from: seedToAddress(QRL_SEEDS[1]),
+        from: qrlAddressFromSeed(QRL_SEEDS[1]),
       });
 
       await provider.send("qrl_sendTransaction", [{}]);
 
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
-      assert.equal(tx.from, seedToAddress(QRL_SEEDS[1]));
+      assert.equal(tx.from, qrlAddressFromSeed(QRL_SEEDS[1]));
     });
 
     it("Should wrap without a fixed sender param, using the default one", async () => {
@@ -152,7 +150,7 @@ describe("Base providers wrapping", () => {
 
       await provider.send("qrl_sendTransaction", [{}]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
-      assert.equal(tx.from, seedToAddress(QRL_SEEDS[0]));
+      assert.equal(tx.from, qrlAddressFromSeed(QRL_SEEDS[0]));
     });
   });
 
@@ -175,7 +173,7 @@ describe("Base providers wrapping", () => {
       });
 
       await provider.send("qrl_sendTransaction", [
-        { from: seedToAddress(QRL_SEEDS[0]) },
+        { from: qrlAddressFromSeed(QRL_SEEDS[0]) },
       ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.gas, numberToRpcQuantity(123));
@@ -187,7 +185,7 @@ describe("Base providers wrapping", () => {
       });
 
       await provider.send("qrl_sendTransaction", [
-        { from: seedToAddress(QRL_SEEDS[0]) },
+        { from: qrlAddressFromSeed(QRL_SEEDS[0]) },
       ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(
@@ -203,7 +201,7 @@ describe("Base providers wrapping", () => {
       });
 
       await provider.send("qrl_sendTransaction", [
-        { from: seedToAddress(QRL_SEEDS[0]) },
+        { from: qrlAddressFromSeed(QRL_SEEDS[0]) },
       ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(
@@ -219,7 +217,7 @@ describe("Base providers wrapping", () => {
       });
 
       await provider.send("qrl_sendTransaction", [
-        { from: seedToAddress(QRL_SEEDS[0]) },
+        { from: qrlAddressFromSeed(QRL_SEEDS[0]) },
       ]);
       const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
       assert.equal(tx.gas, numberToRpcQuantity(678));

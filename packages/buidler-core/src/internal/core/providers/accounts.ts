@@ -1,5 +1,12 @@
+import path from "path";
+
 import { IQrlProvider } from "../../../types";
-import { isValidQrlAddress, normalizeQrlAddress } from "../../qrl/address";
+import {
+  isValidQrlAddress,
+  normalizeQrlAddress,
+  qrlAddressFromSeed,
+  qrlAddressToBytes,
+} from "../../qrl/address";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
@@ -30,9 +37,7 @@ export function createLocalAccountsProvider(
   extendedSeeds: string[]
 ) {
   const seeds = [...extendedSeeds];
-  const addresses = seeds.map((seed) =>
-    normalizeQrlAddress(seedToQrlAccount(seed).address)
-  );
+  const addresses = seeds.map(qrlAddressFromSeed);
 
   const getChainId = createChainIdGetter(provider);
 
@@ -198,9 +203,13 @@ async function getSignedTransaction(
   chainId: number,
   seed: string
 ): Promise<string> {
-  const { signTransaction } = require("@theqrl/web3-qrl-accounts");
   const transaction = createQrlDynamicFeeTransaction(tx, chainId);
 
+  if (isQrlJsTransaction(transaction)) {
+    return signQrlJsTransaction(transaction, seed);
+  }
+
+  const { signTransaction } = require("@theqrl/web3-qrl-accounts");
   const signed = await signTransaction(transaction, seed);
   return signed.rawTransaction;
 }
@@ -209,10 +218,17 @@ export function createQrlDynamicFeeTransaction(
   tx: JsonRpcTransactionData,
   chainId: number
 ): any {
-  const { FeeMarketEIP1559Transaction } = require("@theqrl/web3-qrl-accounts");
   const data = tx.data ?? "0x";
 
   validateHexData(data);
+
+  const qrlJsTransaction = createQrlJsDynamicFeeTransaction(tx, chainId, data);
+  if (qrlJsTransaction !== undefined) {
+    return qrlJsTransaction;
+  }
+
+  const { FeeMarketEIP1559Transaction } = require("@theqrl/web3-qrl-accounts");
+  const to = tx.to === undefined ? undefined : qrlAddressToBytes(tx.to);
 
   return FeeMarketEIP1559Transaction.fromTxData({
     type: "0x2",
@@ -221,7 +237,7 @@ export function createQrlDynamicFeeTransaction(
     gasLimit: tx.gasLimit ?? tx.gas,
     maxFeePerGas: tx.maxFeePerGas ?? tx.gasPrice,
     maxPriorityFeePerGas: tx.maxPriorityFeePerGas ?? tx.gasPrice,
-    to: tx.to,
+    to,
     value: tx.value,
     data,
     accessList: [],
@@ -233,6 +249,10 @@ export function encodeQrlSignedTransaction(
   signature: Uint8Array,
   publicKey: Uint8Array
 ): string {
+  if (isQrlJsTransaction(transaction)) {
+    return serializeQrlJsSignedTransaction(transaction, signature, publicKey);
+  }
+
   const signed = transaction._processAuthValues(
     ML_DSA_87_DESCRIPTOR,
     EMPTY_EXTRA_PARAMS,
@@ -241,6 +261,125 @@ export function encodeQrlSignedTransaction(
   );
 
   return `0x${Buffer.from(signed.serialize()).toString("hex")}`;
+}
+
+function createQrlJsDynamicFeeTransaction(
+  tx: JsonRpcTransactionData,
+  chainId: number,
+  data: string
+): any | undefined {
+  const txQrl = loadQrlJsTxModule();
+
+  if (txQrl === undefined) {
+    return undefined;
+  }
+
+  return new txQrl.QRLDynamicFeeTransaction({
+    chainId: toBigInt(tx.chainId ?? chainId),
+    nonce: toBigInt(tx.nonce),
+    gasLimit: toBigInt(tx.gasLimit ?? tx.gas),
+    gasFeeCap: toBigInt(tx.maxFeePerGas ?? tx.gasPrice),
+    gasTipCap: toBigInt(tx.maxPriorityFeePerGas ?? tx.gasPrice),
+    to: tx.to,
+    value: toBigInt(tx.value ?? 0),
+    data: hexDataToBytes(data),
+    descriptor: ML_DSA_87_DESCRIPTOR,
+    extraParams: EMPTY_EXTRA_PARAMS,
+  });
+}
+
+function loadQrlJsTxModule(): any | undefined {
+  const qrlJsMonorepoPath = process.env.QRLJS_MONOREPO_PATH;
+
+  if (qrlJsMonorepoPath === undefined) {
+    return undefined;
+  }
+
+  const qrlJsTxPath = path.join(
+    path.resolve(qrlJsMonorepoPath),
+    "packages",
+    "tx",
+    "dist",
+    "cjs",
+    "index.js"
+  );
+
+  try {
+    return require(qrlJsTxPath).qrl;
+  } catch (error) {
+    throw new HardhatError(ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE, {
+      path: qrlJsTxPath,
+      network: "qrlLocal",
+      message: error.message,
+    });
+  }
+}
+
+function isQrlJsTransaction(transaction: any): boolean {
+  return (
+    transaction !== undefined &&
+    typeof transaction.serialize === "function" &&
+    typeof transaction.getMessageToSign === "function" &&
+    typeof transaction._processAuthValues !== "function"
+  );
+}
+
+function signQrlJsTransaction(transaction: any, seed: string): string {
+  const wallet = newQrlWalletFromSeed(seed);
+  const signature = wallet.sign(transaction.getMessageToSign());
+  return serializeQrlJsSignedTransaction(
+    transaction,
+    signature,
+    wallet.getPK()
+  );
+}
+
+function serializeQrlJsSignedTransaction(
+  transaction: any,
+  signature: Uint8Array,
+  publicKey: Uint8Array
+): string {
+  const signed = new transaction.constructor({
+    chainId: transaction.chainId,
+    nonce: transaction.nonce,
+    gasLimit: transaction.gasLimit,
+    gasFeeCap: transaction.gasFeeCap,
+    gasTipCap: transaction.gasTipCap,
+    to: transaction.to,
+    value: transaction.value,
+    data: transaction.data,
+    accessList: transaction.accessList,
+    descriptor: ML_DSA_87_DESCRIPTOR,
+    extraParams: EMPTY_EXTRA_PARAMS,
+    signature,
+    publicKey,
+  });
+
+  return `0x${Buffer.from(signed.serialize()).toString("hex")}`;
+}
+
+function newQrlWalletFromSeed(seed: string): any {
+  const accountsEntry = require.resolve("@theqrl/web3-qrl-accounts");
+  const { newMLDSA87WalletFromExtendedSeed } = require(path.join(
+    path.dirname(accountsEntry),
+    "qrl_wallet.js"
+  ));
+
+  return newMLDSA87WalletFromExtendedSeed(hexDataToBytes(seed));
+}
+
+function toBigInt(value: string | number | undefined): any {
+  if (value === undefined) {
+    return (global as any).BigInt(0);
+  }
+
+  return (global as any).BigInt(value);
+}
+
+function hexDataToBytes(value: string): Uint8Array {
+  const normalized =
+    value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+  return Uint8Array.from(Buffer.from(normalized, "hex"));
 }
 
 function seedToQrlAccount(seed: string): any {

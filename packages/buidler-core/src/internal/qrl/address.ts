@@ -4,6 +4,24 @@ import { HardhatError } from "../core/errors";
 import { ERRORS } from "../core/errors-list";
 
 const QRL_ADDRESS_REGEX = /^Q[0-9a-fA-F]{128}$/;
+const HEX_REGEX = /^(0x)?[0-9a-fA-F]+$/;
+
+export function qrlAddressFromSeed(seed: string): string {
+  if (!HEX_REGEX.test(seed)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, {
+      address: seed,
+    });
+  }
+
+  try {
+    const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+    return normalizeQrlAddress(seedToAccount(seed).address);
+  } catch (_error) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, {
+      address: seed,
+    });
+  }
+}
 
 export function isValidQrlAddress(address: string): boolean {
   if (!QRL_ADDRESS_REGEX.test(address)) {
@@ -44,4 +62,12 @@ export function normalizeQrlAddress(address: string): string {
   }
 
   return toQrlChecksumAddress(address);
+}
+
+export function qrlAddressToBytes(address: string): Uint8Array {
+  if (!isValidQrlAddress(address)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, { address });
+  }
+
+  return Uint8Array.from(Buffer.from(address.slice(1), "hex"));
 }
