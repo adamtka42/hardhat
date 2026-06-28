@@ -69,8 +69,6 @@ export class QrlLocalHardhatProvider extends EventEmitter
         return [...this._accounts];
       case "qrl_gasPrice":
         return "0x0";
-      case "qrl_estimateGas":
-        return this._estimateGas(params);
       case "qrl_sendRawTransaction":
         throw new HardhatError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
           operation: "qrl_sendRawTransaction on qrlLocal",
@@ -78,17 +76,6 @@ export class QrlLocalHardhatProvider extends EventEmitter
       default:
         return this._provider.request({ method, params });
     }
-  }
-
-  private _estimateGas(params: any[]): string {
-    const tx = params[0];
-    const requestedGas = tx?.gas ?? tx?.gasLimit;
-
-    if (requestedGas !== undefined) {
-      return normalizeRpcQuantity(requestedGas);
-    }
-
-    return numberToRpcQuantity(this._blockGasLimit);
   }
 }
 
@@ -166,16 +153,4 @@ function parseLocalAccountBalance(balance: string | number | undefined): any {
 
 function toRuntimeBigInt(value: any): any {
   return (global as any).BigInt(value);
-}
-
-function normalizeRpcQuantity(value: string | number): string {
-  if (typeof value === "number") {
-    return numberToRpcQuantity(value);
-  }
-
-  if (value.startsWith("0x") || value.startsWith("0X")) {
-    return `0x${toRuntimeBigInt(value).toString(16)}`;
-  }
-
-  return `0x${toRuntimeBigInt(value).toString(16)}`;
 }

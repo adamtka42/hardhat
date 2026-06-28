@@ -3,8 +3,8 @@ import { assert } from "chai";
 import { ERRORS } from "../../../src/internal/core/errors-list";
 import {
   isValidQrlAddress,
-  qrlAddressFromSeed,
   normalizeQrlAddress,
+  qrlAddressFromSeed,
   toQrlChecksumAddress,
 } from "../../../src/internal/qrl/address";
 import { expectHardhatError } from "../../helpers/errors";
@@ -21,7 +21,10 @@ describe("QRL address helpers", () => {
       "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401";
     const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
 
-    assert.equal(qrlAddressFromSeed(seed), normalizeQrlAddress(seedToAccount(seed).address));
+    assert.equal(
+      qrlAddressFromSeed(seed),
+      normalizeQrlAddress(seedToAccount(seed).address)
+    );
   });
 
   it("computes QIP-55 checksum casing with SHAKE256", () => {

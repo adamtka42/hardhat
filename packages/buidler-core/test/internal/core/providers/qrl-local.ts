@@ -64,7 +64,18 @@ describe("QRL local Hardhat provider", function () {
     assert.deepEqual(await provider.send("qrl_accounts"), [SENDER]);
     assert.deepEqual(await provider.send("qrl_requestAccounts"), [SENDER]);
     assert.equal(await provider.send("qrl_gasPrice"), "0x0");
-    assert.equal(await provider.send("qrl_estimateGas", [{}]), "0x7530");
+    assert.equal(
+      await provider.send("qrl_estimateGas", [
+        {
+          from: SENDER,
+          to: RECEIVER,
+          value: "0x1",
+          maxFeePerGas: "0x0",
+          maxPriorityFeePerGas: "0x0",
+        },
+      ]),
+      "0x5208"
+    );
     assert.equal(
       await provider.send("qrl_getBalance", [SENDER, "latest"]),
       "0x3e8"
