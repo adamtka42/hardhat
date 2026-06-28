@@ -71,8 +71,19 @@ describe("QRL local e2e", function () {
     ]);
     assert.include(explicitRunResult.stdout, "Stored value: 42");
 
-    const testResult = await runHardhat(this.tmpDir, env, ["test"]);
+    const testResult = await runHardhat(this.tmpDir, env, [
+      "test",
+      "test/qrl-local-e2e.js",
+    ]);
     assert.include(testResult.stdout, "1 passing");
+
+    const pendingTestResult = await runHardhat(this.tmpDir, env, [
+      "test",
+      "test/qrl-local-pending.js",
+      "--network",
+      "qrlManual",
+    ]);
+    assert.include(pendingTestResult.stdout, "1 passing");
 
     const badRuntimeResult = await expectHardhatFailure(
       this.tmpDir,
@@ -124,6 +135,10 @@ async function prepareProject(projectRoot: string) {
   await fsExtra.writeFile(
     path.join(projectRoot, "test", "qrl-local-e2e.js"),
     getTestSource()
+  );
+  await fsExtra.writeFile(
+    path.join(projectRoot, "test", "qrl-local-pending.js"),
+    getPendingTestSource()
   );
 }
 
@@ -240,6 +255,15 @@ module.exports = {
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
       accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      blockGasLimit: 30000000,
+    },
+    qrlManual: {
+      type: "qrl-local",
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      automine: false,
       blockGasLimit: 30000000,
     },
   },
@@ -372,6 +396,131 @@ describe("QRL local", function () {
         ]),
       /intrinsic gas/i
     );
+  });
+});
+`;
+}
+
+function getPendingTestSource(): string {
+  return `
+const assert = require("assert");
+const hre = require("@theqrl/hardhat");
+
+const RECEIVER = "Q" + "02".repeat(64);
+const LOG_TOPIC = "0x" + "00".repeat(63) + "7b";
+const LOG_DATA = "0x" + "00".repeat(63) + "2a";
+const LOGGING_INIT_CODE = "0x602a5f52607b60405fc100";
+
+describe("QRL local pending", function () {
+  it("exposes pending state, pending blocks, mining, gas estimation, and logs", async function () {
+    const [from] = await hre.network.provider.send("qrl_accounts");
+
+    assert.strictEqual(await hre.network.provider.send("qrl_blockNumber"), "0x0");
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getTransactionCount", [from, "latest"]),
+      "0x0"
+    );
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getTransactionCount", [from, "pending"]),
+      "0x0"
+    );
+
+    const estimatedGas = await hre.network.provider.send("qrl_estimateGas", [
+      {
+        from,
+        to: RECEIVER,
+        value: "0x2a",
+        maxFeePerGas: "0x0",
+        maxPriorityFeePerGas: "0x0",
+      },
+    ]);
+    assert.strictEqual(estimatedGas, "0x5208");
+
+    const transferHash = await hre.network.provider.send("qrl_sendTransaction", [
+      {
+        from,
+        to: RECEIVER,
+        value: "0x2a",
+        gas: estimatedGas,
+        maxFeePerGas: "0x0",
+        maxPriorityFeePerGas: "0x0",
+      },
+    ]);
+
+    assert.strictEqual(await hre.network.provider.send("qrl_blockNumber"), "0x0");
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getTransactionCount", [from, "latest"]),
+      "0x0"
+    );
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getTransactionCount", [from, "pending"]),
+      "0x1"
+    );
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getBalance", [RECEIVER, "latest"]),
+      "0x0"
+    );
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getBalance", [RECEIVER, "pending"]),
+      "0x2a"
+    );
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getTransactionReceipt", [transferHash]),
+      null
+    );
+
+    const pendingBlock = await hre.network.provider.send("qrl_getBlockByNumber", [
+      "pending",
+      true,
+    ]);
+    assert.strictEqual(pendingBlock.number, "0x1");
+    assert.strictEqual(pendingBlock.transactions.length, 1);
+    assert.strictEqual(pendingBlock.transactions[0].hash, transferHash);
+    assert.strictEqual(pendingBlock.transactions[0].from, from);
+    assert.strictEqual(pendingBlock.transactions[0].to, RECEIVER);
+    assert.strictEqual(pendingBlock.receipts[0].status, "0x1");
+
+    await hre.network.provider.send("qrl_mine");
+    const transferReceipt = await hre.network.provider.send("qrl_getTransactionReceipt", [
+      transferHash,
+    ]);
+    assert.strictEqual(transferReceipt.status, "0x1");
+    assert.strictEqual(
+      await hre.network.provider.send("qrl_getBalance", [RECEIVER, "latest"]),
+      "0x2a"
+    );
+
+    const logTxHash = await hre.network.provider.send("qrl_sendTransaction", [
+      {
+        from,
+        data: LOGGING_INIT_CODE,
+        gas: "0x186a0",
+        maxFeePerGas: "0x0",
+        maxPriorityFeePerGas: "0x0",
+      },
+    ]);
+    const logPendingBlock = await hre.network.provider.send("qrl_getBlockByNumber", [
+      "pending",
+      false,
+    ]);
+    assert.strictEqual(logPendingBlock.number, "0x2");
+    assert.strictEqual(logPendingBlock.transactions[0], logTxHash);
+    assert.strictEqual(logPendingBlock.receipts[0].logs.length, 1);
+    assert.strictEqual(logPendingBlock.receipts[0].logs[0].topics[0], LOG_TOPIC);
+    assert.strictEqual(logPendingBlock.receipts[0].logs[0].data, LOG_DATA);
+    assert.deepStrictEqual(
+      await hre.network.provider.send("qrl_getLogs", [{ fromBlock: "0x2", toBlock: "latest" }]),
+      []
+    );
+
+    await hre.network.provider.send("qrl_mine");
+    const logs = await hre.network.provider.send("qrl_getLogs", [
+      { fromBlock: "0x2", toBlock: "latest", topics: [LOG_TOPIC] },
+    ]);
+    assert.strictEqual(logs.length, 1);
+    assert.strictEqual(logs[0].transactionHash, logTxHash);
+    assert.strictEqual(logs[0].topics[0], LOG_TOPIC);
+    assert.strictEqual(logs[0].data, LOG_DATA);
   });
 });
 `;
