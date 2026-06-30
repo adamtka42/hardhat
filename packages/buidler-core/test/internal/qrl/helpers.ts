@@ -692,7 +692,6 @@ describe("QRL runtime helpers", () => {
     );
   });
 
-
   it("decodes QRL event logs using 64-byte topics and data words", async () => {
     const contract = await helpers.getContractAt("Sample", contractAddress);
     const recipient = `Q${"b".repeat(128)}`;
