@@ -188,21 +188,45 @@ function decodeQrlParameters(
   return decoded;
 }
 
-function findFunctionFragment(abi: any, functionName: string): QrlAbiFunction {
+export function getFunctionSignature(fragment: QrlAbiFunction): string {
+  const inputs = fragment.inputs ?? [];
+
+  return `${fragment.name}(${inputs
+    .map((input) => canonicalType(input.type))
+    .join(",")})`;
+}
+
+export function isFullFunctionSignature(identifier: string): boolean {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*\(.*\)$/.test(identifier);
+}
+
+export function findFunctionFragment(
+  abi: any,
+  identifier: string
+): QrlAbiFunction {
   if (!Array.isArray(abi)) {
     throw qrlAbiError("Artifact ABI must be an array");
   }
 
-  const matches = abi.filter(
-    (entry) => entry.type === "function" && entry.name === functionName
-  );
+  const fragments = abi.filter((entry) => entry.type === "function");
+  const normalizedSignature = normalizeFunctionSignature(identifier);
+  const matches =
+    normalizedSignature !== undefined
+      ? fragments.filter(
+          (entry) => getFunctionSignature(entry) === normalizedSignature
+        )
+      : fragments.filter((entry) => entry.name === identifier);
 
   if (matches.length === 0) {
-    throw qrlAbiError(`Function ${functionName} not found in contract ABI`);
+    throw qrlAbiError(`Function ${identifier} not found in contract ABI`);
   }
 
   if (matches.length > 1) {
-    throw qrlAbiError(`Function ${functionName} is overloaded`);
+    throw qrlAbiError(
+      `Function ${identifier} is overloaded. Use a full signature like ${getFunctionSignature(
+        matches[0]
+      )}.`
+    );
   }
 
   return matches[0];
@@ -247,12 +271,7 @@ function findConstructorFragment(abi: any): QrlAbiFunction | undefined {
 }
 
 function getFunctionSelector(fragment: QrlAbiFunction): string {
-  const inputs = fragment.inputs ?? [];
-  const signature = `${fragment.name}(${inputs
-    .map((input) => canonicalType(input.type))
-    .join(",")})`;
-
-  return keccak_256(signature).slice(0, 8);
+  return keccak_256(getFunctionSignature(fragment)).slice(0, 8);
 }
 
 function getEventTopic(fragment: QrlAbiFunction): string {
@@ -398,6 +417,26 @@ function canonicalType(type: string): string {
   }
 
   return type;
+}
+
+function normalizeFunctionSignature(identifier: string): string | undefined {
+  if (!isFullFunctionSignature(identifier)) {
+    return undefined;
+  }
+
+  const match = /^([A-Za-z_$][A-Za-z0-9_$]*)\((.*)\)$/.exec(identifier);
+
+  if (match === null) {
+    return undefined;
+  }
+
+  const [, name, rawTypes] = match;
+  const types =
+    rawTypes.trim() === ""
+      ? []
+      : rawTypes.split(",").map((type) => canonicalType(type.trim()));
+
+  return `${name}(${types.join(",")})`;
 }
 
 function isDynamicType(type: string): boolean {

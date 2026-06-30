@@ -112,6 +112,44 @@ describe("QRL runtime helpers", () => {
           type: "function",
         },
         {
+          inputs: [
+            { name: "node", type: "bytes32" },
+            { name: "addr", type: "address" },
+          ],
+          name: "setAddr",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            { name: "node", type: "bytes32" },
+            { name: "coinType", type: "uint" },
+            { name: "data", type: "bytes" },
+          ],
+          name: "setAddr",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [{ name: "node", type: "bytes32" }],
+          name: "addr",
+          outputs: [{ name: "", type: "address" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            { name: "node", type: "bytes32" },
+            { name: "coinType", type: "uint" },
+          ],
+          name: "addr",
+          outputs: [{ name: "", type: "bytes" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           anonymous: false,
           inputs: [
             { indexed: true, name: "from", type: "address" },
@@ -516,6 +554,144 @@ describe("QRL runtime helpers", () => {
     assert.equal(amounts[0].toString(10), "1");
     assert.equal(amounts[1].toString(10), "2");
   });
+
+  it("calls overloaded view functions through full signatures", async () => {
+    const node = `0x${"11".repeat(32)}`;
+    const recipient = `Q${"b".repeat(128)}`;
+    provider.setReturnValue("qrl_call", `0x${recipient.slice(1)}`);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.callStatic["addr(bytes32)"](
+      node,
+      { from: contractAddress },
+      "latest"
+    );
+
+    assert.equal(result[0], toQrlChecksumAddress(recipient));
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: contract.encodeFunctionData("addr(bytes32)", [node]),
+        from: contractAddress,
+        to: checksummedContractAddress,
+      },
+      "latest",
+    ]);
+  });
+
+  it("calls overloaded read functions through the functions map", async () => {
+    const node = `0x${"11".repeat(32)}`;
+    const recipient = `Q${"b".repeat(128)}`;
+    provider.setReturnValue("qrl_call", `0x${recipient.slice(1)}`);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.functions["addr(bytes32)"](node);
+
+    assert.equal(result[0], toQrlChecksumAddress(recipient));
+    assert.deepEqual(provider.getLatestParams("qrl_call"), [
+      {
+        data: contract.encodeFunctionData("addr(bytes32)", [node]),
+        to: checksummedContractAddress,
+      },
+      "latest",
+    ]);
+  });
+
+  it("sends overloaded functions through the functions map", async () => {
+    const node = `0x${"11".repeat(32)}`;
+    const recipient = `Q${"b".repeat(128)}`;
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.functions["setAddr(bytes32,address)"](
+      node,
+      recipient,
+      { from: contractAddress }
+    );
+
+    assert.equal(result, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: contract.encodeFunctionData("setAddr(bytes32,address)", [
+          node,
+          recipient,
+        ]),
+        from: contractAddress,
+        to: checksummedContractAddress,
+      },
+    ]);
+  });
+
+  it("sends overloaded functions through the explicit send map", async () => {
+    const node = `0x${"11".repeat(32)}`;
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const result = await contract.send["setAddr(bytes32,uint256,bytes)"](
+      node,
+      60,
+      "0x1234",
+      { from: contractAddress }
+    );
+
+    assert.equal(result, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: contract.encodeFunctionData("setAddr(bytes32,uint,bytes)", [
+          node,
+          60,
+          "0x1234",
+        ]),
+        from: contractAddress,
+        to: checksummedContractAddress,
+      },
+    ]);
+  });
+
+  it("encodes and decodes overloaded functions by full signature", async () => {
+    const node = `0x${"11".repeat(32)}`;
+    const recipient = `Q${"b".repeat(128)}`;
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const encoded = contract.encodeFunctionData("setAddr(bytes32,address)", [
+      node,
+      recipient,
+    ]);
+    const decoded = contract.decodeFunctionResult(
+      "addr(bytes32)",
+      `0x${recipient.slice(1)}`
+    );
+
+    assert.equal(encoded.length, 266);
+    assert.equal(decoded[0], toQrlChecksumAddress(recipient));
+  });
+
+  it("rejects overloaded function lookup by bare name", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    assert.equal(contract.functions.setAddr, undefined);
+    assert.equal(contract.callStatic.addr, undefined);
+    expectHardhatError(
+      () => contract.encodeFunctionData("setAddr", []),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Function setAddr is overloaded. Use a full signature like setAddr(bytes32,address)."
+    );
+    expectHardhatError(
+      () => contract.decodeFunctionResult("addr", "0x"),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Function addr is overloaded. Use a full signature like addr(bytes32)."
+    );
+    await expectHardhatErrorAsync(
+      () => contract.callFunction("addr"),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Function addr is overloaded. Use a full signature like addr(bytes32)."
+    );
+    expectHardhatError(
+      () => contract.sendFunction("setAddr"),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Function setAddr is overloaded. Use a full signature like setAddr(bytes32,address)."
+    );
+  });
+
 
   it("decodes QRL event logs using 64-byte topics and data words", async () => {
     const contract = await helpers.getContractAt("Sample", contractAddress);

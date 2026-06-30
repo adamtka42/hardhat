@@ -19,6 +19,7 @@ import {
   decodeQrlReceiptLogs,
   encodeQrlConstructorArgs,
   encodeQrlFunctionData,
+  getFunctionSignature,
 } from "./abi";
 import { normalizeQrlAddress } from "./address";
 
@@ -262,38 +263,50 @@ function createContractFunctionMaps(
   const functions: QrlContractFunctionMap = {};
   const send: QrlContractFunctionMap = {};
 
-  for (const fragment of getFunctionFragments(artifact.abi)) {
+  const fragments = getFunctionFragments(artifact.abi);
+  const functionNameCounts = countFunctionNames(fragments);
+
+  for (const fragment of fragments) {
     if (fragment.name === undefined) {
       continue;
     }
 
-    callStatic[fragment.name] = (...args: any[]) => {
-      const parsed = parseCallArgs(fragment, args);
-      return callFunction(
-        fragment.name!,
-        parsed.abiArgs,
-        parsed.tx,
-        parsed.blockTag
-      );
-    };
-    send[fragment.name] = (...args: any[]) => {
-      const parsed = parseSendArgs(fragment, args);
-      return sendFunction(fragment.name!, parsed.abiArgs, parsed.tx);
-    };
-    functions[fragment.name] = (...args: any[]) => {
-      if (isReadOnlyFunction(fragment)) {
-        const callArgs = parseCallArgs(fragment, args);
-        return callFunction(
-          fragment.name!,
-          callArgs.abiArgs,
-          callArgs.tx,
-          callArgs.blockTag
-        );
-      }
+    const signature = getFunctionSignature(fragment);
+    const names = [signature];
 
-      const sendArgs = parseSendArgs(fragment, args);
-      return sendFunction(fragment.name!, sendArgs.abiArgs, sendArgs.tx);
-    };
+    if (functionNameCounts[fragment.name] === 1) {
+      names.push(fragment.name);
+    }
+
+    for (const name of names) {
+      callStatic[name] = (...args: any[]) => {
+        const parsed = parseCallArgs(fragment, args);
+        return callFunction(
+          signature,
+          parsed.abiArgs,
+          parsed.tx,
+          parsed.blockTag
+        );
+      };
+      send[name] = (...args: any[]) => {
+        const parsed = parseSendArgs(fragment, args);
+        return sendFunction(signature, parsed.abiArgs, parsed.tx);
+      };
+      functions[name] = (...args: any[]) => {
+        if (isReadOnlyFunction(fragment)) {
+          const callArgs = parseCallArgs(fragment, args);
+          return callFunction(
+            signature,
+            callArgs.abiArgs,
+            callArgs.tx,
+            callArgs.blockTag
+          );
+        }
+
+        const sendArgs = parseSendArgs(fragment, args);
+        return sendFunction(signature, sendArgs.abiArgs, sendArgs.tx);
+      };
+    }
   }
 
   return { callStatic, functions, send };
@@ -307,6 +320,20 @@ function getFunctionFragments(abi: any): QrlFunctionFragment[] {
   return abi.filter(
     (entry) => entry.type === "function" && typeof entry.name === "string"
   );
+}
+
+function countFunctionNames(
+  fragments: QrlFunctionFragment[]
+): { [name: string]: number } {
+  const counts: { [name: string]: number } = {};
+
+  for (const fragment of fragments) {
+    if (fragment.name !== undefined) {
+      counts[fragment.name] = (counts[fragment.name] ?? 0) + 1;
+    }
+  }
+
+  return counts;
 }
 
 function parseCallArgs(
