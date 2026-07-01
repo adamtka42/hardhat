@@ -165,6 +165,25 @@ describe("QRL runtime helpers", () => {
           name: "MessageChanged",
           type: "event",
         },
+        {
+          anonymous: false,
+          inputs: [
+            { indexed: true, name: "node", type: "bytes32" },
+            { indexed: false, name: "value", type: "address" },
+          ],
+          name: "AddrChanged",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            { indexed: true, name: "node", type: "bytes32" },
+            { indexed: false, name: "coinType", type: "uint" },
+            { indexed: false, name: "value", type: "bytes" },
+          ],
+          name: "AddrChanged",
+          type: "event",
+        },
       ],
       bytecode: "0x1234",
       contractName: "Sample",
@@ -733,6 +752,74 @@ describe("QRL runtime helpers", () => {
 
     assert.equal(decoded.eventName, "MessageChanged");
     assert.equal(decoded.args.value, "hello");
+  });
+
+  it("decodes overloaded QRL event logs by full signature", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const recipient = `Q${"b".repeat(128)}`;
+    const log = {
+      address: contractAddress,
+      data: `0x${recipient.slice(1)}`,
+      topics: [
+        `0x52d7d861f09ab3d26239d492e8968629f95e9e318cf0b73bfddc441522a15fd2${"0".repeat(
+          64
+        )}`,
+        `0x${"0".repeat(64)}${"1".repeat(64)}`,
+      ],
+    };
+
+    const decoded = contract.decodeEventLog(
+      "AddrChanged(bytes32,address)",
+      log
+    );
+
+    assert.equal(decoded.eventName, "AddrChanged");
+    assert.equal(decoded.args.node, `0x${"0".repeat(64)}`);
+    assert.equal(decoded.args.value, toQrlChecksumAddress(recipient));
+  });
+
+  it("decodes overloaded QRL event logs with canonical signature types", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const dataOffset = `${"0".repeat(126)}80`;
+    const coinType = `${"0".repeat(126)}3c`;
+    const value = "1234";
+    const data = `0x${coinType}${dataOffset}${"0".repeat(
+      127
+    )}2${value}${"0".repeat(124)}`;
+    const log = {
+      address: contractAddress,
+      data,
+      topics: [
+        `0xfb6b36b568d5689ec98617abfd8ff0eccaade0ed49cef564581c257947852f32${"0".repeat(
+          64
+        )}`,
+        `0x${"0".repeat(64)}${"2".repeat(64)}`,
+      ],
+    };
+
+    const decoded = contract.decodeEventLog(
+      "AddrChanged(bytes32,uint,bytes)",
+      log
+    );
+
+    assert.equal(decoded.eventName, "AddrChanged");
+    assert.equal(decoded.args.coinType.toString(10), "60");
+    assert.equal(decoded.args.value, "0x1234");
+  });
+
+  it("rejects overloaded QRL event lookup by bare name", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    expectHardhatError(
+      () =>
+        contract.decodeEventLog("AddrChanged", {
+          address: contractAddress,
+          data: "0x",
+          topics: [],
+        }),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Event AddrChanged is overloaded. Use a full signature like AddrChanged(bytes32,address)."
+    );
   });
 
   it("decodes matching QRL receipt logs", async () => {

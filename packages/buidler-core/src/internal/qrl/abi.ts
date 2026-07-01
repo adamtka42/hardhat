@@ -197,6 +197,10 @@ export function getFunctionSignature(fragment: QrlAbiFunction): string {
 }
 
 export function isFullFunctionSignature(identifier: string): boolean {
+  return isFullSignature(identifier);
+}
+
+function isFullSignature(identifier: string): boolean {
   return /^[A-Za-z_$][A-Za-z0-9_$]*\(.*\)$/.test(identifier);
 }
 
@@ -237,16 +241,25 @@ function findEventFragment(abi: any, eventName: string): QrlAbiFunction {
     throw qrlAbiError("Artifact ABI must be an array");
   }
 
-  const matches = abi.filter(
-    (entry) => entry.type === "event" && entry.name === eventName
-  );
+  const fragments = abi.filter((entry) => entry.type === "event");
+  const normalizedSignature = normalizeEventSignature(eventName);
+  const matches =
+    normalizedSignature !== undefined
+      ? fragments.filter(
+          (entry) => getEventSignature(entry) === normalizedSignature
+        )
+      : fragments.filter((entry) => entry.name === eventName);
 
   if (matches.length === 0) {
     throw qrlAbiError(`Event ${eventName} not found in contract ABI`);
   }
 
   if (matches.length > 1) {
-    throw qrlAbiError(`Event ${eventName} is overloaded`);
+    throw qrlAbiError(
+      `Event ${eventName} is overloaded. Use a full signature like ${getEventSignature(
+        matches[0]
+      )}.`
+    );
   }
 
   if (matches[0].anonymous === true) {
@@ -275,12 +288,15 @@ function getFunctionSelector(fragment: QrlAbiFunction): string {
 }
 
 function getEventTopic(fragment: QrlAbiFunction): string {
+  return rightPadWord(keccak_256(getEventSignature(fragment)));
+}
+
+function getEventSignature(fragment: QrlAbiFunction): string {
   const inputs = fragment.inputs ?? [];
-  const signature = `${fragment.name}(${inputs
+
+  return `${fragment.name}(${inputs
     .map((input) => canonicalType(input.type))
     .join(",")})`;
-
-  return rightPadWord(keccak_256(signature));
 }
 
 function decodeKnownEventLog(
@@ -420,7 +436,15 @@ function canonicalType(type: string): string {
 }
 
 function normalizeFunctionSignature(identifier: string): string | undefined {
-  if (!isFullFunctionSignature(identifier)) {
+  return normalizeSignature(identifier);
+}
+
+function normalizeEventSignature(identifier: string): string | undefined {
+  return normalizeSignature(identifier);
+}
+
+function normalizeSignature(identifier: string): string | undefined {
+  if (!isFullSignature(identifier)) {
     return undefined;
   }
 
