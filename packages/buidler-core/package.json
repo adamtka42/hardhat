@@ -24,7 +24,7 @@
     "hardhat": "internal/cli/cli.js"
   },
   "engines": {
-    "node": ">=8.2.0"
+    "node": ">=20"
   },
   "scripts": {
     "lint:fix": "node ../../node_modules/prettier/bin-prettier.js --write \"src/**/*.{js,ts}\" \"test/**/*.{js,ts}\" && npm run lint-src -- --fix && npm run lint-tests -- --fix",
