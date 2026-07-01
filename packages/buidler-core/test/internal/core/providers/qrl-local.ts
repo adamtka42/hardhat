@@ -153,6 +153,28 @@ describe("QRL local Hardhat provider", function () {
     );
   });
 
+  it("explains how to configure qrlLocal when qrljs-monorepo path is unset", () => {
+    const previousQrlJsMonorepoPath = process.env.QRLJS_MONOREPO_PATH;
+    delete process.env.QRLJS_MONOREPO_PATH;
+
+    try {
+      expectHardhatError(
+        () =>
+          new QrlLocalHardhatProvider({
+            type: "qrl-local",
+          }),
+        ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
+        /QRLJS_MONOREPO_PATH.*--network qrl/s
+      );
+    } finally {
+      if (previousQrlJsMonorepoPath === undefined) {
+        delete process.env.QRLJS_MONOREPO_PATH;
+      } else {
+        process.env.QRLJS_MONOREPO_PATH = previousQrlJsMonorepoPath;
+      }
+    }
+  });
+
   it("can be created through the standard provider factory", async () => {
     const provider = createProvider("qrlLocal", {
       type: "qrl-local",

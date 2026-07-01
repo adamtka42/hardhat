@@ -14,6 +14,9 @@ const accounts =
 const localAccountAddress = `Q${"01".repeat(64)}`;
 
 module.exports = {
+  // qrlLocal is the default because it runs tests in-process. It requires a
+  // locally built qrljs-monorepo; set QRLJS_MONOREPO_PATH or use --network qrl
+  // / HARDHAT_DEFAULT_NETWORK=qrl to connect to a running HTTP node instead.
   defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
   networks: {
     qrl: {
@@ -23,6 +26,7 @@ module.exports = {
     qrlLocal: {
       type: "qrl-local",
       chainId: 1,
+      // Required for qrlLocal until the QRL VM packages are normal Hardhat dependencies.
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
       accounts: [{ address: localAccountAddress, balance: "1000000000000" }],

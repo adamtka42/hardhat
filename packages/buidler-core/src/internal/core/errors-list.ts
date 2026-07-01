@@ -293,7 +293,7 @@ Please make sure your node is running, and check your internet connection and ne
       message:
         "Cannot load local qrljs-monorepo from %path%: %message%. Build qrljs-monorepo first or set networks.%network%.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH.",
       title: "Local qrljs-monorepo is unavailable",
-      description: `The qrlLocal provider needs a locally built qrljs-monorepo because the QRL VM packages are not consumed as published Hardhat dependencies yet.`,
+      description: `The qrlLocal provider needs a locally built qrljs-monorepo because the QRL VM packages are not consumed as published Hardhat dependencies yet. Set QRLJS_MONOREPO_PATH or choose an HTTP network like qrl.`,
     },
     LEDGER_TRANSPORT_UNAVAILABLE: {
       number: 118,

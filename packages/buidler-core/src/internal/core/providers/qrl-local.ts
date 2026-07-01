@@ -86,7 +86,7 @@ function loadQrlJsModules(config: QrlLocalNetworkConfig): QrlJsModules {
   if (configuredPath === undefined) {
     throwQrlJsMonorepoUnavailable(
       "<unset>",
-      "set networks.qrlLocal.qrlJsMonorepoPath or QRLJS_MONOREPO_PATH"
+      "qrlLocal requires a built qrljs-monorepo. Set networks.qrlLocal.qrlJsMonorepoPath or QRLJS_MONOREPO_PATH, or run with --network qrl / HARDHAT_DEFAULT_NETWORK=qrl to use an HTTP node"
     );
   }
 
