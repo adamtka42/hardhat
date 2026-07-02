@@ -7,6 +7,12 @@ This repository is intentionally a new project, not a GitHub fork. The first
 commit imports the exact upstream `v1.3.3` source tree, and QRL support is added
 on top as focused commits.
 
+## Getting Started
+
+Start with [docs/getting-started.md](docs/getting-started.md). It covers
+installation, `qrlLocal`, HTTP go-qrl networks, Hyperion `.hyp` contracts, tests,
+scripts, and the `hre.qrl` runtime helpers.
+
 ## Direction
 
 - Target QRL/Zond, not Ethereum compatibility.
@@ -19,7 +25,7 @@ on top as focused commits.
 ## Current State
 
 This branch contains the QRL-specific runtime, Hyperion compilation flow,
-QRL address handling, ML-DSA-87 signing, and live go-qrl HTTP provider support.
-Legacy Ethereum/EVM/Solidity surfaces have been removed where they are not
-needed, or rejected explicitly where preserving the old input boundary makes
-configuration errors clearer.
+QRL address handling, ML-DSA-87 signing, `qrlLocal` in-process testing, and live
+go-qrl HTTP provider support. Legacy Ethereum/EVM/Solidity surfaces have been
+removed where they are not needed, or rejected explicitly where preserving the
+old input boundary makes configuration errors clearer.

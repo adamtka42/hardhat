@@ -1,40 +1,73 @@
 # QRL Hardhat
 
 QRL Hardhat is a QRL-only smart contract development tool based on the upstream
-v1.3.3 codebase.
+Hardhat/Buidler `v1.3.3` codebase.
 
-This fork targets live go-qrl HTTP networks and Hyperion `.hyp` contracts only.
-The legacy in-memory development network is intentionally unsupported.
+It targets Hyperion `.hyp` contracts, QRL addresses, `qrl_*` JSON-RPC methods, local
+in-process tests through `qrlLocal`, and live go-qrl HTTP networks.
 
 ## Installation
 
-```sh
+~~~sh
 npm install --save-dev @theqrl/hardhat
-```
+~~~
 
-## Usage
+## Getting Started
 
-Create a `hardhat.config.js` file and configure a live go-qrl network:
+See the repository guide:
 
-```js
+~~~text
+docs/getting-started.md
+~~~
+
+The guide covers:
+
+- prerequisites and installation,
+- project layout,
+- `qrlLocal` configuration,
+- HTTP go-qrl network configuration,
+- Hyperion `.hyp` compilation,
+- tests and deployment scripts,
+- `hre.qrl` runtime helpers,
+- overloaded function signatures,
+- common troubleshooting.
+
+## Minimal Configuration
+
+~~~js
+const accounts =
+  process.env.QRL_ACCOUNT_SEED === undefined
+    ? []
+    : [process.env.QRL_ACCOUNT_SEED];
+
+const localAccountAddress = "Q" + "01".repeat(64);
+
 module.exports = {
-  defaultNetwork: "localhost",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
   networks: {
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      accounts: "remote",
+    qrlLocal: {
+      type: "qrl-local",
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      blockGasLimit: 30000000,
+    },
+    qrl: {
+      url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
+      accounts,
     },
   },
 };
-```
+~~~
 
 Run tasks with:
 
-```sh
+~~~sh
 npx hardhat compile
-npx hardhat test
-npx hardhat run scripts/sample-script.js --network localhost
-```
+npx hardhat test --network qrlLocal
+npx hardhat run scripts/deploy.js --network qrl
+~~~
 
 Local signing uses QRL extended seeds and ML-DSA-87 via
 `@theqrl/web3-qrl-accounts`. Legacy mnemonic and raw-key account configs are
