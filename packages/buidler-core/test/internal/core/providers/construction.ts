@@ -154,6 +154,85 @@ describe("Base providers wrapping", () => {
     });
   });
 
+  describe("Transaction quantity normalization", () => {
+    beforeEach(() => {
+      mockedProvider.setReturnValue(
+        "qrl_estimateGas",
+        numberToRpcQuantity(123)
+      );
+      mockedProvider.setReturnValue("qrl_gasPrice", numberToRpcQuantity(123));
+    });
+
+    it("Should normalize numeric qrl_call transaction quantities", async () => {
+      const provider = wrapQrlProvider(mockedProvider, {
+        url: "",
+      });
+
+      await provider.send("qrl_call", [
+        {
+          from: qrlAddressFromSeed(QRL_SEEDS[0]),
+          to: qrlAddressFromSeed(QRL_SEEDS[1]),
+          gas: 30000000,
+          value: 42,
+          nonce: 7,
+          maxFeePerGas: "20",
+          maxPriorityFeePerGas: "5",
+        },
+        "latest",
+      ]);
+
+      const [tx, blockTag] = mockedProvider.getLatestParams("qrl_call");
+      assert.equal(tx.gas, numberToRpcQuantity(30000000));
+      assert.equal(tx.value, numberToRpcQuantity(42));
+      assert.equal(tx.nonce, numberToRpcQuantity(7));
+      assert.equal(tx.maxFeePerGas, numberToRpcQuantity(20));
+      assert.equal(tx.maxPriorityFeePerGas, numberToRpcQuantity(5));
+      assert.equal(blockTag, "latest");
+    });
+
+    it("Should normalize numeric qrl_estimateGas transaction quantities", async () => {
+      const provider = wrapQrlProvider(mockedProvider, {
+        url: "",
+      });
+
+      await provider.send("qrl_estimateGas", [
+        {
+          from: qrlAddressFromSeed(QRL_SEEDS[0]),
+          to: qrlAddressFromSeed(QRL_SEEDS[1]),
+          gasLimit: 12345,
+          gasPrice: 9,
+          chainId: 1337,
+        },
+      ]);
+
+      const [tx] = mockedProvider.getLatestParams("qrl_estimateGas");
+      assert.equal(tx.gasLimit, numberToRpcQuantity(12345));
+      assert.equal(tx.gasPrice, numberToRpcQuantity(9));
+      assert.equal(tx.chainId, numberToRpcQuantity(1337));
+    });
+
+    it("Should normalize explicit numeric qrl_sendTransaction quantities", async () => {
+      const provider = wrapQrlProvider(mockedProvider, {
+        url: "",
+      });
+
+      await provider.send("qrl_sendTransaction", [
+        {
+          from: qrlAddressFromSeed(QRL_SEEDS[0]),
+          to: qrlAddressFromSeed(QRL_SEEDS[1]),
+          gas: 21000,
+          gasPrice: 3,
+          value: 1,
+        },
+      ]);
+
+      const [tx] = mockedProvider.getLatestParams("qrl_sendTransaction");
+      assert.equal(tx.gas, numberToRpcQuantity(21000));
+      assert.equal(tx.gasPrice, numberToRpcQuantity(3));
+      assert.equal(tx.value, numberToRpcQuantity(1));
+    });
+  });
+
   describe("Gas wrapping", () => {
     const OTHER_GAS_MULTIPLIER = 1.337;
 
