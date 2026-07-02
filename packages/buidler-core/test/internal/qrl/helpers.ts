@@ -2,6 +2,11 @@ import { assert } from "chai";
 
 import { saveArtifact } from "../../../src/internal/artifacts";
 import { ERRORS } from "../../../src/internal/core/errors-list";
+import {
+  findFunctionFragment,
+  getFunctionSignature,
+  getQrlEventTopic,
+} from "../../../src/internal/qrl/abi";
 import { toQrlChecksumAddress } from "../../../src/internal/qrl/address";
 import { createQrlRuntimeHelpers } from "../../../src/internal/qrl/helpers";
 import { Artifact, HardhatRuntimeEnvironment } from "../../../src/types";
@@ -682,6 +687,71 @@ describe("QRL runtime helpers", () => {
 
     assert.equal(encoded.length, 266);
     assert.equal(decoded[0], toQrlChecksumAddress(recipient));
+  });
+
+  it("normalizes tuple component types in full function signatures", () => {
+    const tupleAbi = [
+      {
+        inputs: [
+          {
+            components: [
+              { name: "amount", type: "uint" },
+              { name: "recipient", type: "address" },
+            ],
+            name: "payment",
+            type: "tuple",
+          },
+          { name: "salt", type: "bytes32" },
+        ],
+        name: "submit",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+      },
+    ];
+
+    const fragment = findFunctionFragment(
+      tupleAbi,
+      "submit((uint256,address),bytes32)"
+    );
+
+    assert.equal(
+      getFunctionSignature(fragment),
+      "submit((uint256,address),bytes32)"
+    );
+  });
+
+  it("normalizes nested tuple component types in full event signatures", () => {
+    const tupleAbi = [
+      {
+        anonymous: false,
+        inputs: [
+          {
+            components: [
+              { name: "amount", type: "uint" },
+              {
+                components: [
+                  { name: "recipient", type: "address" },
+                  { name: "memo", type: "bytes32" },
+                ],
+                name: "details",
+                type: "tuple",
+              },
+            ],
+            indexed: false,
+            name: "payment",
+            type: "tuple",
+          },
+        ],
+        name: "PaymentQueued",
+        type: "event",
+      },
+    ];
+
+    assert.match(
+      getQrlEventTopic(tupleAbi, "PaymentQueued((uint256,(address,bytes32)))"),
+      /^0x[0-9a-f]{128}$/i
+    );
   });
 
   it("rejects overloaded function lookup by bare name", async () => {

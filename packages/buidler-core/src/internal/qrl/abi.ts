@@ -22,6 +22,7 @@ interface QrlAbiParam {
   type: string;
   name?: string;
   indexed?: boolean;
+  components?: QrlAbiParam[];
 }
 
 export interface QrlDecodedEventLog {
@@ -192,7 +193,7 @@ export function getFunctionSignature(fragment: QrlAbiFunction): string {
   const inputs = fragment.inputs ?? [];
 
   return `${fragment.name}(${inputs
-    .map((input) => canonicalType(input.type))
+    .map((input) => canonicalParamType(input))
     .join(",")})`;
 }
 
@@ -295,7 +296,7 @@ function getEventSignature(fragment: QrlAbiFunction): string {
   const inputs = fragment.inputs ?? [];
 
   return `${fragment.name}(${inputs
-    .map((input) => canonicalType(input.type))
+    .map((input) => canonicalParamType(input))
     .join(",")})`;
 }
 
@@ -418,6 +419,28 @@ function sameQrlAddress(left: string | undefined, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
 
+function canonicalParamType(param: QrlAbiParam): string {
+  const array = parseArrayType(param.type);
+  if (array !== undefined) {
+    return `${canonicalParamType({
+      ...param,
+      type: array.elementType,
+    })}[${array.length ?? ""}]`;
+  }
+
+  if (param.type === "tuple") {
+    if (param.components === undefined) {
+      throw qrlAbiError("Tuple ABI parameter is missing components");
+    }
+
+    return `(${param.components
+      .map((component) => canonicalParamType(component))
+      .join(",")})`;
+  }
+
+  return canonicalType(param.type);
+}
+
 function canonicalType(type: string): string {
   const array = parseArrayType(type);
   if (array !== undefined) {
@@ -458,9 +481,79 @@ function normalizeSignature(identifier: string): string | undefined {
   const types =
     rawTypes.trim() === ""
       ? []
-      : rawTypes.split(",").map((type) => canonicalType(type.trim()));
+      : splitSignatureTypes(rawTypes).map((type) =>
+          canonicalSignatureType(type)
+        );
 
   return `${name}(${types.join(",")})`;
+}
+
+function splitSignatureTypes(rawTypes: string): string[] {
+  const types: string[] = [];
+  let depth = 0;
+  let start = 0;
+
+  for (let index = 0; index < rawTypes.length; index++) {
+    const char = rawTypes[index];
+
+    if (char === "(") {
+      depth++;
+      continue;
+    }
+
+    if (char === ")") {
+      depth--;
+      if (depth < 0) {
+        throw qrlAbiError(`Invalid ABI signature types ${rawTypes}`);
+      }
+      continue;
+    }
+
+    if (char === "," && depth === 0) {
+      types.push(rawTypes.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+
+  if (depth !== 0) {
+    throw qrlAbiError(`Invalid ABI signature types ${rawTypes}`);
+  }
+
+  types.push(rawTypes.slice(start).trim());
+
+  if (types.some((type) => type === "")) {
+    throw qrlAbiError(`Invalid ABI signature types ${rawTypes}`);
+  }
+
+  return types;
+}
+
+function canonicalSignatureType(type: string): string {
+  const normalized = type.replace(/\s+/g, "");
+  const array = parseArrayType(normalized);
+  if (array !== undefined) {
+    return `${canonicalSignatureType(array.elementType)}[${
+      array.length ?? ""
+    }]`;
+  }
+
+  if (normalized.startsWith("(")) {
+    if (!normalized.endsWith(")")) {
+      throw qrlAbiError(`Invalid ABI tuple type ${type}`);
+    }
+
+    const tupleBody = normalized.slice(1, -1);
+    const components =
+      tupleBody === ""
+        ? []
+        : splitSignatureTypes(tupleBody).map((component) =>
+            canonicalSignatureType(component)
+          );
+
+    return `(${components.join(",")})`;
+  }
+
+  return canonicalType(normalized);
 }
 
 function isDynamicType(type: string): boolean {
