@@ -56,6 +56,12 @@ For script usage, see:
 docs/guides/scripts.md
 ~~~
 
+For task automation, see:
+
+~~~text
+docs/guides/create-task.md
+~~~
+
 For runtime helper details, see:
 
 ~~~text
