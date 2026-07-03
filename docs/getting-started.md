@@ -237,7 +237,8 @@ or:
 npx hardhat run scripts/deploy.js --network qrl
 ~~~
 
-See [guides/scripts.md](guides/scripts.md) for the full scripts guide.
+See [guides/deploying.md](guides/deploying.md) for deployment details and
+[guides/scripts.md](guides/scripts.md) for the full scripts guide.
 
 ## Runtime helpers
 

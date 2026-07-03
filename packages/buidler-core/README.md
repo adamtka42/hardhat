@@ -44,6 +44,12 @@ For compile details, see:
 docs/guides/compile-contracts.md
 ~~~
 
+For deployment details, see:
+
+~~~text
+docs/guides/deploying.md
+~~~
+
 For script usage, see:
 
 ~~~text
