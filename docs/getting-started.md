@@ -237,6 +237,8 @@ or:
 npx hardhat run scripts/deploy.js --network qrl
 ~~~
 
+See [guides/scripts.md](guides/scripts.md) for the full scripts guide.
+
 ## Runtime helpers
 
 QRL Hardhat extends the runtime with `qrl` helpers:

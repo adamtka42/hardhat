@@ -44,6 +44,12 @@ For compile details, see:
 docs/guides/compile-contracts.md
 ~~~
 
+For script usage, see:
+
+~~~text
+docs/guides/scripts.md
+~~~
+
 For runtime helper details, see:
 
 ~~~text
