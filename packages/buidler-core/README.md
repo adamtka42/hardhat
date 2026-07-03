@@ -62,6 +62,12 @@ For TypeScript projects, see:
 docs/guides/typescript.md
 ~~~
 
+For VS Code debugging, see:
+
+~~~text
+docs/guides/vscode-tests.md
+~~~
+
 For task automation, see:
 
 ~~~text

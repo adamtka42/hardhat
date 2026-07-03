@@ -16,7 +16,8 @@ see [docs/config/README.md](docs/config/README.md). For compile details, see
 [docs/guides/compile-contracts.md](docs/guides/compile-contracts.md). For deployment, see
 [docs/guides/deploying.md](docs/guides/deploying.md). For scripts, see
 [docs/guides/scripts.md](docs/guides/scripts.md). For TypeScript projects, see
-[docs/guides/typescript.md](docs/guides/typescript.md). For task automation, see
+[docs/guides/typescript.md](docs/guides/typescript.md). For VS Code debugging, see
+[docs/guides/vscode-tests.md](docs/guides/vscode-tests.md). For task automation, see
 [docs/guides/create-task.md](docs/guides/create-task.md). For troubleshooting, see
 [docs/troubleshooting/common-problems.md](docs/troubleshooting/common-problems.md).
 For verbose logging, see

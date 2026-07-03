@@ -321,7 +321,8 @@ Use a full function signature in helpers and ABI utilities, for example
 `setAddr(bytes32,address)` instead of `setAddr`.
 
 For TypeScript project setup, see
-[guides/typescript.md](guides/typescript.md).
+[guides/typescript.md](guides/typescript.md). For VS Code debugging, see
+[guides/vscode-tests.md](guides/vscode-tests.md).
 
 For more troubleshooting cases, see
 [troubleshooting/common-problems.md](troubleshooting/common-problems.md). For
