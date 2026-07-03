@@ -320,3 +320,6 @@ accounts in the node, or set `QRL_ACCOUNT_SEED` so Hardhat can sign locally.
 Use a full function signature in helpers and ABI utilities, for example
 `setAddr(bytes32,address)` instead of `setAddr`.
 
+For more troubleshooting cases, see
+[troubleshooting/common-problems.md](troubleshooting/common-problems.md).
+

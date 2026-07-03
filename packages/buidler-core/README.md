@@ -62,6 +62,12 @@ For task automation, see:
 docs/guides/create-task.md
 ~~~
 
+For troubleshooting, see:
+
+~~~text
+docs/troubleshooting/common-problems.md
+~~~
+
 For runtime helper details, see:
 
 ~~~text

@@ -16,8 +16,9 @@ see [docs/config/README.md](docs/config/README.md). For compile details, see
 [docs/guides/compile-contracts.md](docs/guides/compile-contracts.md). For deployment, see
 [docs/guides/deploying.md](docs/guides/deploying.md). For scripts, see
 [docs/guides/scripts.md](docs/guides/scripts.md). For task automation, see
-[docs/guides/create-task.md](docs/guides/create-task.md). For runtime details, see
-[docs/advanced/hardhat-runtime-environment.md](docs/advanced/hardhat-runtime-environment.md).
+[docs/guides/create-task.md](docs/guides/create-task.md). For troubleshooting, see
+[docs/troubleshooting/common-problems.md](docs/troubleshooting/common-problems.md).
+For runtime details, see [docs/advanced/hardhat-runtime-environment.md](docs/advanced/hardhat-runtime-environment.md).
 
 ## Direction
 
