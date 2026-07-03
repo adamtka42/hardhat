@@ -263,7 +263,9 @@ await resolver.functions["setAddr(bytes32,address)"](node, recipient, { from });
 const [resolved] = await resolver.callStatic["addr(bytes32)"](node);
 ~~~
 
-Unambiguous functions are also available by name.
+Unambiguous functions are also available by name. See
+[advanced/hardhat-runtime-environment.md](advanced/hardhat-runtime-environment.md)
+for the full runtime reference.
 
 ## JSON-RPC methods
 

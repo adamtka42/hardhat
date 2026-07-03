@@ -38,6 +38,12 @@ For the full configuration reference, see:
 docs/config/README.md
 ~~~
 
+For runtime helper details, see:
+
+~~~text
+docs/advanced/hardhat-runtime-environment.md
+~~~
+
 ## Minimal Configuration
 
 ~~~js
