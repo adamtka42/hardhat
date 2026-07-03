@@ -319,7 +319,3 @@ accounts in the node, or set `QRL_ACCOUNT_SEED` so Hardhat can sign locally.
 Use a full function signature in helpers and ABI utilities, for example
 `setAddr(bytes32,address)` instead of `setAddr`.
 
-### Legacy hardhat network errors
-
-The old `hardhat`/`buidlerevm` in-memory Ethereum network is not supported. Use
-`qrlLocal` for in-process tests or configure an HTTP go-qrl network.
