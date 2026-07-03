@@ -32,6 +32,12 @@ The guide covers:
 - overloaded function signatures,
 - common troubleshooting.
 
+For the full configuration reference, see:
+
+~~~text
+docs/config/README.md
+~~~
+
 ## Minimal Configuration
 
 ~~~js

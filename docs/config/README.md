@@ -1,0 +1,314 @@
+# Configuration
+
+QRL Hardhat is configured with `hardhat.config.js` in the root of your project.
+The config file is loaded before every task, test, and script. It defines the
+Hyperion compiler settings, project paths, networks, accounts, gas defaults, and
+Mocha options.
+
+A minimal project config usually looks like this:
+
+~~~js
+const accounts =
+  process.env.QRL_ACCOUNT_SEED === undefined
+    ? []
+    : [process.env.QRL_ACCOUNT_SEED];
+
+const localAccountAddress = "Q" + "01".repeat(64);
+
+module.exports = {
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  hyperion: {
+    compilerPath: process.env.HYPERION_HYPC_PATH,
+    optimizer: {
+      enabled: false,
+      runs: 200,
+    },
+  },
+  networks: {
+    qrlLocal: {
+      type: "qrl-local",
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [
+        {
+          address: localAccountAddress,
+          balance: "1000000000000000000000000",
+        },
+      ],
+      blockGasLimit: 30000000,
+    },
+    qrl: {
+      url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
+      accounts,
+    },
+  },
+};
+~~~
+
+## Top-level options
+
+`defaultNetwork` selects the network used when a command does not pass
+`--network`. The default built into QRL Hardhat is `qrl`, but projects commonly
+set it to `qrlLocal` for tests.
+
+`networks` maps network names to either an HTTP go-qrl network or a local
+in-process `qrlLocal` network.
+
+`hyperion` configures the Hyperion compiler.
+
+`paths` customizes project directories.
+
+`mocha` passes options to Mocha when running `hardhat test`.
+
+Legacy Ethereum-only config such as `solc`, `buidlerevm`, Ethereum private keys,
+and HD wallet mnemonics is not part of the QRL-only configuration surface.
+
+## Hyperion compiler
+
+QRL Hardhat compiles Hyperion `.hyp` files. The compiler config supports:
+
+~~~js
+module.exports = {
+  hyperion: {
+    version: "local",
+    compilerPath: process.env.HYPERION_HYPC_PATH,
+    optimizer: {
+      enabled: false,
+      runs: 200,
+    },
+  },
+};
+~~~
+
+`version` is metadata for the compiler configuration. The current compiler flow
+uses a local compiler binary.
+
+`compilerPath` points at the `hypc` executable. If omitted, QRL Hardhat uses its
+default compiler lookup. Projects that work from a monorepo checkout often set
+`HYPERION_HYPC_PATH`.
+
+`optimizer.enabled` and `optimizer.runs` are passed into the Hyperion compiler
+input.
+
+## qrlLocal network
+
+`qrlLocal` is an in-process QRL VM network for fast local tests. It does not
+connect to a go-qrl node, but it currently needs a built `qrljs-monorepo`
+checkout so QRL VM packages can be loaded.
+
+~~~js
+module.exports = {
+  networks: {
+    qrlLocal: {
+      type: "qrl-local",
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: "Q" + "01".repeat(64),
+      accounts: [
+        {
+          address: "Q" + "01".repeat(64),
+          balance: "1000000000000000000000000",
+          nonce: 0,
+        },
+      ],
+      gas: "auto",
+      gasPrice: "auto",
+      gasMultiplier: 1,
+      blockGasLimit: 30000000,
+      automine: true,
+    },
+  },
+};
+~~~
+
+`type` must be `"qrl-local"`.
+
+`qrlJsMonorepoPath` can also be provided with `QRLJS_MONOREPO_PATH`.
+
+`accounts` is an array of local account objects. Each account needs a QRL
+address. `balance` can be a decimal string, hex string, or number. `nonce` is
+optional.
+
+`from` sets the default sender address for transactions on this network.
+
+`blockGasLimit` sets the local block gas limit. It defaults to `30000000`.
+
+`automine` controls local mining behavior. The default local config enables it.
+
+## HTTP go-qrl networks
+
+HTTP networks connect to a running go-qrl JSON-RPC endpoint and use `qrl_*` RPC
+methods.
+
+~~~js
+const accounts =
+  process.env.QRL_ACCOUNT_SEED === undefined
+    ? []
+    : [process.env.QRL_ACCOUNT_SEED];
+
+module.exports = {
+  networks: {
+    qrl: {
+      url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
+      chainId: 1,
+      from: process.env.QRL_FROM,
+      accounts,
+      gas: "auto",
+      gasPrice: "auto",
+      gasMultiplier: 1,
+      httpHeaders: {},
+      timeout: 20000,
+    },
+  },
+};
+~~~
+
+`url` is the HTTP JSON-RPC endpoint. Private devnets often expose dynamic Docker
+or Kurtosis ports, so prefer `QRL_RPC_URL` over committing a machine-specific
+port.
+
+`chainId` is optional. If set, QRL Hardhat validates that the connected network
+matches it.
+
+`from` sets the default sender. If omitted, QRL Hardhat uses the first available
+account.
+
+`gas` can be `"auto"` or a number. With `"auto"`, QRL Hardhat calls
+`qrl_estimateGas`.
+
+`gasPrice` can be `"auto"` or a number. With `"auto"`, QRL Hardhat calls
+`qrl_gasPrice` when needed.
+
+`gasMultiplier` multiplies automatic gas estimates and is useful when estimation
+is tight.
+
+`httpHeaders` adds headers to JSON-RPC requests.
+
+`timeout` sets the JSON-RPC request timeout in milliseconds.
+
+## Accounts
+
+HTTP networks support three account modes.
+
+### Local QRL extended seeds
+
+Use an array of QRL extended seed hex strings when Hardhat should sign
+transactions locally:
+
+~~~js
+module.exports = {
+  networks: {
+    qrl: {
+      url: process.env.QRL_RPC_URL,
+      accounts: [process.env.QRL_ACCOUNT_SEED],
+    },
+  },
+};
+~~~
+
+The seed must be a `0x`-prefixed 51-byte QRL extended seed hex string. Do not
+commit real account seeds. Use environment variables or local secret management.
+
+You need a local seed for tests or scripts that deploy contracts, mint tokens,
+transfer assets, or otherwise send signed transactions unless the node manages
+accounts remotely.
+
+### Remote node accounts
+
+Use `accounts: "remote"` if the connected go-qrl node manages unlocked accounts:
+
+~~~js
+module.exports = {
+  networks: {
+    qrl: {
+      url: process.env.QRL_RPC_URL,
+      accounts: "remote",
+    },
+  },
+};
+~~~
+
+With this mode, signing is delegated to the node.
+
+### QRL Ledger accounts
+
+Ledger-backed accounts are configured with `type: "ledger"` and a list of QRL
+addresses:
+
+~~~js
+module.exports = {
+  networks: {
+    qrl: {
+      url: process.env.QRL_RPC_URL,
+      accounts: {
+        type: "ledger",
+        accounts: ["Q..."],
+      },
+    },
+  },
+};
+~~~
+
+QRL Hardhat asks the Ledger app to sign transactions for those addresses.
+
+## Project paths
+
+The `paths` config can override the default project directories:
+
+~~~js
+module.exports = {
+  paths: {
+    root: __dirname,
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts",
+  },
+};
+~~~
+
+`sources` is where `.hyp` contracts are read from.
+
+`tests` is where `hardhat test` looks for tests.
+
+`cache` stores compiler and task cache data.
+
+`artifacts` stores compiled contract artifacts.
+
+## Mocha
+
+`mocha` is passed to Mocha for the `test` task:
+
+~~~js
+module.exports = {
+  mocha: {
+    timeout: 300000,
+  },
+};
+~~~
+
+Live/private QRL networks can be slow because transactions wait for blocks, so
+large timeouts are common for integration tests.
+
+## Common environment variables
+
+`QRL_RPC_URL` points at an HTTP go-qrl endpoint.
+
+`QRL_ACCOUNT_SEED` provides a locally signed QRL account for HTTP networks.
+
+`QRLJS_MONOREPO_PATH` points at a built `qrljs-monorepo` checkout for `qrlLocal`.
+
+`HYPERION_HYPC_PATH` points at a local `hypc` compiler binary.
+
+`HARDHAT_DEFAULT_NETWORK` can override `defaultNetwork` if your config uses it.
+
+## Unsupported legacy config
+
+The QRL fork intentionally rejects the old in-memory Ethereum networks named
+`hardhat` or `buidlerevm`. Use `qrlLocal` instead.
+
+Ethereum HD wallet config, raw Ethereum private keys, `eth_*` network assumptions,
+Solidity `solc` config, and EVM hardfork settings are not valid QRL Hardhat
+configuration. Use Hyperion, QRL addresses, QRL extended seeds, and `qrl_*`
+JSON-RPC networks instead.
