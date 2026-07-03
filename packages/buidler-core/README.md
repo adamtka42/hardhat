@@ -56,6 +56,12 @@ For script usage, see:
 docs/guides/scripts.md
 ~~~
 
+For TypeScript projects, see:
+
+~~~text
+docs/guides/typescript.md
+~~~
+
 For task automation, see:
 
 ~~~text
