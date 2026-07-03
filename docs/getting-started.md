@@ -153,7 +153,8 @@ npx hardhat compile
 ~~~
 
 Compiled artifacts are written to `artifacts/` and cache files are written to
-`cache/`.
+`cache/`. See [guides/compile-contracts.md](guides/compile-contracts.md) for
+the full compile reference.
 
 ## Test a contract
 

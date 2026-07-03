@@ -38,6 +38,12 @@ For the full configuration reference, see:
 docs/config/README.md
 ~~~
 
+For compile details, see:
+
+~~~text
+docs/guides/compile-contracts.md
+~~~
+
 For runtime helper details, see:
 
 ~~~text
