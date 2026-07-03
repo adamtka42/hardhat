@@ -38,6 +38,12 @@ For the full configuration reference, see:
 docs/config/README.md
 ~~~
 
+For qrlLocal details, see:
+
+~~~text
+docs/qrl-local/README.md
+~~~
+
 For compile details, see:
 
 ~~~text

@@ -11,7 +11,8 @@ on top as focused commits.
 
 Start with [docs/getting-started.md](docs/getting-started.md). It covers
 installation, `qrlLocal`, HTTP go-qrl networks, Hyperion `.hyp` contracts, tests,
-scripts, and the `hre.qrl` runtime helpers. For the full configuration reference,
+scripts, and the `hre.qrl` runtime helpers. For the qrlLocal guide, see
+[docs/qrl-local/README.md](docs/qrl-local/README.md). For the full configuration reference,
 see [docs/config/README.md](docs/config/README.md). For compile details, see
 [docs/guides/compile-contracts.md](docs/guides/compile-contracts.md). For deployment, see
 [docs/guides/deploying.md](docs/guides/deploying.md). For scripts, see

@@ -136,6 +136,8 @@ optional.
 
 `automine` controls local mining behavior. The default local config enables it.
 
+For a focused qrlLocal guide, see [../qrl-local/README.md](../qrl-local/README.md).
+
 ## HTTP go-qrl networks
 
 HTTP networks connect to a running go-qrl JSON-RPC endpoint and use `qrl_*` RPC

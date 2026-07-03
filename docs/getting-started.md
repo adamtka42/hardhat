@@ -322,7 +322,8 @@ Use a full function signature in helpers and ABI utilities, for example
 
 For TypeScript project setup, see
 [guides/typescript.md](guides/typescript.md). For VS Code debugging, see
-[guides/vscode-tests.md](guides/vscode-tests.md).
+[guides/vscode-tests.md](guides/vscode-tests.md). For qrlLocal details, see
+[qrl-local/README.md](qrl-local/README.md).
 
 For more troubleshooting cases, see
 [troubleshooting/common-problems.md](troubleshooting/common-problems.md). For
