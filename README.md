@@ -18,6 +18,8 @@ see [docs/config/README.md](docs/config/README.md). For compile details, see
 [docs/guides/scripts.md](docs/guides/scripts.md). For task automation, see
 [docs/guides/create-task.md](docs/guides/create-task.md). For troubleshooting, see
 [docs/troubleshooting/common-problems.md](docs/troubleshooting/common-problems.md).
+For verbose logging, see
+[docs/troubleshooting/verbose-logging.md](docs/troubleshooting/verbose-logging.md).
 For runtime details, see [docs/advanced/hardhat-runtime-environment.md](docs/advanced/hardhat-runtime-environment.md).
 
 ## Direction

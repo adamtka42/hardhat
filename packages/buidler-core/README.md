@@ -68,6 +68,12 @@ For troubleshooting, see:
 docs/troubleshooting/common-problems.md
 ~~~
 
+For verbose logging, see:
+
+~~~text
+docs/troubleshooting/verbose-logging.md
+~~~
+
 For runtime helper details, see:
 
 ~~~text

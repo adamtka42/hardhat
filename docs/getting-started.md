@@ -321,5 +321,7 @@ Use a full function signature in helpers and ABI utilities, for example
 `setAddr(bytes32,address)` instead of `setAddr`.
 
 For more troubleshooting cases, see
-[troubleshooting/common-problems.md](troubleshooting/common-problems.md).
+[troubleshooting/common-problems.md](troubleshooting/common-problems.md). For
+debug output and stack traces, see
+[troubleshooting/verbose-logging.md](troubleshooting/verbose-logging.md).
 

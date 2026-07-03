@@ -4,6 +4,9 @@ This page collects the QRL Hardhat issues most likely to appear while compiling,
 testing, deploying, or running scripts against `qrlLocal` and HTTP go-qrl
 networks.
 
+For debug output and stack traces, see
+[verbose-logging.md](verbose-logging.md).
+
 ## qrlLocal cannot load qrljs-monorepo
 
 Typical error:
