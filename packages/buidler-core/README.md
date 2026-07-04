@@ -38,6 +38,12 @@ For the full configuration reference, see:
 docs/config/README.md
 ~~~
 
+For project setup, see:
+
+~~~text
+docs/guides/project-setup.md
+~~~
+
 For qrlLocal details, see:
 
 ~~~text

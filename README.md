@@ -13,7 +13,8 @@ Start with [docs/tutorial/README.md](docs/tutorial/README.md) for a step-by-step
 installation, `qrlLocal`, HTTP go-qrl networks, Hyperion `.hyp` contracts, tests,
 scripts, and the `hre.qrl` runtime helpers. For the qrlLocal guide, see
 [docs/qrl-local/README.md](docs/qrl-local/README.md). For the full configuration reference,
-see [docs/config/README.md](docs/config/README.md). For compile details, see
+see [docs/config/README.md](docs/config/README.md). For project setup, see
+[docs/guides/project-setup.md](docs/guides/project-setup.md). For compile details, see
 [docs/guides/compile-contracts.md](docs/guides/compile-contracts.md). For deployment, see
 [docs/guides/deploying.md](docs/guides/deploying.md). For scripts, see
 [docs/guides/scripts.md](docs/guides/scripts.md). For TypeScript projects, see
