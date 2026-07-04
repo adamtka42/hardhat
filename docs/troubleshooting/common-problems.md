@@ -5,7 +5,8 @@ testing, deploying, or running scripts against `qrlLocal` and HTTP go-qrl
 networks.
 
 For debug output and stack traces, see
-[verbose-logging.md](verbose-logging.md).
+[verbose-logging.md](verbose-logging.md). For a code-by-code reference, see
+[error-codes.md](error-codes.md).
 
 ## qrlLocal cannot load qrljs-monorepo
 

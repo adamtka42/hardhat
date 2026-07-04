@@ -122,6 +122,12 @@ For troubleshooting, see:
 docs/troubleshooting/common-problems.md
 ~~~
 
+For error codes, see:
+
+~~~text
+docs/troubleshooting/error-codes.md
+~~~
+
 For verbose logging, see:
 
 ~~~text

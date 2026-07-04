@@ -24,7 +24,8 @@ see [docs/config/README.md](docs/config/README.md). For project setup, see
 [docs/guides/create-plugin.md](docs/guides/create-plugin.md) and
 [docs/advanced/building-plugins.md](docs/advanced/building-plugins.md). For the interactive console, see
 [docs/guides/buidler-console.md](docs/guides/buidler-console.md). For troubleshooting, see
-[docs/troubleshooting/common-problems.md](docs/troubleshooting/common-problems.md).
+[docs/troubleshooting/common-problems.md](docs/troubleshooting/common-problems.md). For error codes, see
+[docs/troubleshooting/error-codes.md](docs/troubleshooting/error-codes.md).
 For verbose logging, see
 [docs/troubleshooting/verbose-logging.md](docs/troubleshooting/verbose-logging.md).
 For runtime details, see [docs/advanced/hardhat-runtime-environment.md](docs/advanced/hardhat-runtime-environment.md).

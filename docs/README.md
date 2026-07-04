@@ -44,6 +44,7 @@ in-process tests through `qrlLocal`, and live go-qrl HTTP networks.
 
 - [Common problems](troubleshooting/common-problems.md): common QRL Hardhat
   setup, network, account, ABI, and gas issues.
+- [Error codes](troubleshooting/error-codes.md): QRL-focused `BDLRxxx` reference and fixes.
 - [Verbose logging](troubleshooting/verbose-logging.md): collecting detailed
   logs from tasks, providers, and RPC calls.
 
