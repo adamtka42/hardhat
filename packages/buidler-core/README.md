@@ -14,6 +14,12 @@ npm install --save-dev @theqrl/hardhat
 
 ## Getting Started
 
+See the documentation index:
+
+~~~text
+docs/README.md
+~~~
+
 See the repository guide:
 
 ~~~text
