@@ -164,17 +164,15 @@ async function main() {
     } else {
       if (!isHardhatError) {
         console.error(
-          `If you think this is a bug in Hardhat, please report it here: https://github.com/cyyber/hardhat/issues/new`
+          `If you think this is a bug in Hardhat, please report it to the QRL Hardhat maintainers`
         );
       }
 
       if (HardhatError.isHardhatError(error)) {
-        const link = `https://github.com/cyyber/hardhat#${getErrorCode(
-          error.errorDescriptor
-        )}`;
+        const errorCode = getErrorCode(error.errorDescriptor);
 
         console.error(
-          `For more info go to ${link} or run ${HARDHAT_NAME} with --show-stack-traces`
+          `For more info, check the QRL Hardhat error code documentation for ${errorCode} or run ${HARDHAT_NAME} with --show-stack-traces`
         );
       } else {
         console.error(

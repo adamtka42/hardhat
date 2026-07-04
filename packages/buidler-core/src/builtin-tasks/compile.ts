@@ -158,7 +158,7 @@ export default function () {
     if (hasConsoleLogErrors) {
       console.error(
         chalk.red(
-          `The console.log call you made isn’t supported. See https://github.com/cyyber/hardhat#console-log for the list of supported methods.`
+          `The console.log call you made isn’t supported. See the QRL Hardhat documentation for the list of supported methods.`
         )
       );
       console.log();

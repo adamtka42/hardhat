@@ -67,7 +67,7 @@ export default function () {
       }
 
       const packageJson = await getPackageJson();
-      flattened += `// Sources flattened with Hardhat v${packageJson.version} https://github.com/cyyber/hardhat`;
+      flattened += `// Sources flattened with Hardhat v${packageJson.version}`;
 
       const sortedFiles = getSortedFiles(graph);
 

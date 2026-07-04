@@ -64,7 +64,7 @@ Please upgrade your version of Node.js and try again.`,
 
 Unless you are creating a task or plugin, this is probably a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_ALREADY_CREATED: {
       number: 4,
@@ -72,7 +72,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Hardhat was already initialized",
       description: `Hardhat initialization was executed twice. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_NOT_CREATED: {
       number: 5,
@@ -80,7 +80,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Hardhat wasn't initialized",
       description: `Hardhat initialization failed. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_BRE_NOT_DEFINED: {
       number: 6,
@@ -89,7 +89,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Hardhat Runtime Environment not created",
       description: `Hardhat initialization failed. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_BRE_ALREADY_DEFINED: {
       number: 7,
@@ -98,7 +98,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Tried to create the Hardhat Runtime Environment twice",
       description: `The Hardhat initialization process was executed twice. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     INVALID_CONFIG: {
       number: 8,
@@ -106,11 +106,11 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
 
 %errors%
 
-To learn more about Hardhat's configuration, please go to https://github.com/cyyber/hardhat#configuration`,
+To learn more about Hardhat's configuration, please go to the QRL Hardhat configuration documentation`,
       title: "Invalid Hardhat config",
       description: `You have one or more errors in your config file.
 
-Check the error message for details, or go to [documentation](https://github.com/cyyber/hardhat#configuration) to learn more.`,
+Check the error message for details, or go to the configuration documentation to learn more.`,
     },
     LIB_IMPORTED_FROM_THE_CONFIG: {
       number: 9,
@@ -132,7 +132,7 @@ You or one of your plugins is trying to modify the userConfig.%path% value from 
 
 This is probably a bug in one of your plugins.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
   },
   NETWORK: {
@@ -142,7 +142,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Selected network doesn't exist",
       description: `You are trying to run Hardhat with a non-existent network.
 
-Read the [documentation](https://github.com/cyyber/hardhat#network-configuration) to learn how to define custom networks.`,
+Read the network configuration documentation to learn how to define custom networks.`,
     },
     INVALID_GLOBAL_CHAIN_ID: {
       number: 101,
@@ -161,7 +161,7 @@ Please make sure you are setting your config correctly.`,
       title: "Incorrectly send chainId in a transaction",
       description: `Hardhat sent the \`chainId\` field in a transaction.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     QRLSIGN_MISSING_DATA_PARAM: {
       number: 103,
@@ -206,7 +206,7 @@ Please make sure that your QRL node has unlocked accounts.`,
       title: "Invalid HD path",
       description: `An invalid HD/BIP32 derivation path was provided in your config.
 
-Read the [documentation](https://github.com/cyyber/hardhat#accounts-configuration) to learn how to define HD accounts correctly.`,
+Read the accounts configuration documentation to learn how to define HD accounts correctly.`,
     },
     INVALID_RPC_QUANTITY_VALUE: {
       number: 108,
@@ -574,7 +574,7 @@ This is disabled for security reasons.`,
       title: "Resolved library file as a local one",
       description: `One of your libraries' files was treated as a local file. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     LIBRARY_NOT_INSTALLED: {
       number: 403,
@@ -730,7 +730,7 @@ Please use \`usePlugin(npm-plugin-package)\` instead.`,
       title: "Invalid error message template",
       description: `An error message template contains an invalid variable name. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     TEMPLATE_VALUE_CONTAINS_VARIABLE_TAG: {
       number: 901,
@@ -739,7 +739,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Invalid error message replacement",
       description: `Tried to replace an error message variable with a value that contains another variable name. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     TEMPLATE_VARIABLE_TAG_MISSING: {
       number: 902,
@@ -747,7 +747,7 @@ Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us impr
       title: "Missing replacement value from error message template",
       description: `An error message template is missing a replacement value. This is a bug.
 
-Please [report it](https://github.com/cyyber/hardhat/issues/new) to help us improve Hardhat.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
   },
 };
