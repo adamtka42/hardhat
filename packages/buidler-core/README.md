@@ -62,6 +62,12 @@ For script usage, see:
 docs/guides/scripts.md
 ~~~
 
+For the interactive console, see:
+
+~~~text
+docs/guides/buidler-console.md
+~~~
+
 For TypeScript projects, see:
 
 ~~~text
