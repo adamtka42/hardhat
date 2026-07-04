@@ -98,6 +98,24 @@ For task automation, see:
 docs/guides/create-task.md
 ~~~
 
+For plugin creation, see:
+
+~~~text
+docs/guides/create-plugin.md
+~~~
+
+For plugin development, see:
+
+~~~text
+docs/advanced/building-plugins.md
+~~~
+
+For plugin status and compatibility notes, see:
+
+~~~text
+docs/plugins/README.md
+~~~
+
 For troubleshooting, see:
 
 ~~~text

@@ -20,7 +20,9 @@ see [docs/config/README.md](docs/config/README.md). For project setup, see
 [docs/guides/scripts.md](docs/guides/scripts.md). For TypeScript projects, see
 [docs/guides/typescript.md](docs/guides/typescript.md). For VS Code debugging, see
 [docs/guides/vscode-tests.md](docs/guides/vscode-tests.md). For task automation, see
-[docs/guides/create-task.md](docs/guides/create-task.md). For the interactive console, see
+[docs/guides/create-task.md](docs/guides/create-task.md). For plugin development, see
+[docs/guides/create-plugin.md](docs/guides/create-plugin.md) and
+[docs/advanced/building-plugins.md](docs/advanced/building-plugins.md). For the interactive console, see
 [docs/guides/buidler-console.md](docs/guides/buidler-console.md). For troubleshooting, see
 [docs/troubleshooting/common-problems.md](docs/troubleshooting/common-problems.md).
 For verbose logging, see
