@@ -159,6 +159,39 @@ describe("QRL runtime helpers", () => {
           type: "function",
         },
         {
+          inputs: [],
+          name: "getPair",
+          outputs: [
+            { name: "amount", type: "uint256" },
+            { name: "account", type: "address" },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                { name: "threshold", type: "uint256" },
+                { name: "active", type: "bool" },
+              ],
+              name: "config",
+              type: "tuple",
+            },
+          ],
+          name: "setConfig",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "hash",
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           anonymous: false,
           inputs: [
             { indexed: true, name: "from", type: "address" },
@@ -452,6 +485,153 @@ describe("QRL runtime helpers", () => {
     const receipt = await response.wait(1000, 1);
 
     assert.equal(receipt.status, "0x1");
+  });
+
+  it("unwraps single-output view results through direct aliases", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+    const stored = await contract.retrieve();
+
+    assert.equal(stored.toString(10), "42");
+    const callParams = provider.getLatestParams("qrl_call");
+    assert.equal(callParams[0].to, checksummedContractAddress);
+  });
+
+  it("returns decoded arrays from multi-output direct aliases", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue(
+      "qrl_call",
+      `0x${"0".repeat(126)}2a${contractAddress.slice(1)}`
+    );
+    const result = await contract.getPair();
+
+    assert.isArray(result);
+    assert.equal(result[0].toString(10), "42");
+    assert.equal(result[1], checksummedContractAddress);
+  });
+
+  it("passes overrides from direct view aliases to qrl_call", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+    await contract.retrieve({ from: contractAddress });
+
+    const callParams = provider.getLatestParams("qrl_call");
+    assert.equal(callParams[0].from, contractAddress);
+    assert.equal(callParams[0].to, checksummedContractAddress);
+  });
+
+  it("sends transactions through direct aliases and waits for receipts", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      status: "0x1",
+      transactionHash: txHash,
+    });
+
+    const response = await contract.store(42, { from: contractAddress });
+
+    assert.equal(response.hash, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: `0x6057361d${"0".repeat(126)}2a`,
+        from: contractAddress,
+        to: checksummedContractAddress,
+      },
+    ]);
+
+    const receipt = await response.wait(1000, 1);
+    assert.equal(receipt.status, "0x1");
+  });
+
+  it("accepts an empty overrides object in direct aliases", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    const response = await contract.store(42, {});
+
+    assert.equal(response.hash, txHash);
+  });
+
+  it("treats tuple ABI arguments as arguments, not overrides", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    // Tuple VALUE encoding is not implemented yet in the QRL ABI codec, so
+    // both cases below fail during encoding. The assertions still pin the
+    // arity-based routing: if the tuple object had been misparsed as
+    // overrides, the errors would be an argument-count mismatch or an
+    // unknown-override error instead. Upgrade to success-path tests once
+    // tuple value encoding lands.
+    await expectHardhatErrorAsync(
+      () => contract.setConfig({ threshold: 5, active: true }),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Unsupported QRL ABI type tuple"
+    );
+
+    await expectHardhatErrorAsync(
+      () =>
+        contract.setConfig(
+          { threshold: 5, active: true },
+          { from: contractAddress }
+        ),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "Unsupported QRL ABI type tuple"
+    );
+  });
+
+  it("rejects unknown transaction override keys in direct aliases", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    await expectHardhatErrorAsync(
+      () => contract.store(42, { form: contractAddress }),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      'Unknown transaction override "form"'
+    );
+  });
+
+  it("rejects direct alias calls with a wrong argument count", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    await expectHardhatErrorAsync(
+      () => contract.store(),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "expects 1 ABI arguments"
+    );
+
+    await expectHardhatErrorAsync(
+      () => contract.store(42, { from: contractAddress }, "extra"),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "got 3 arguments"
+    );
+  });
+
+  it("does not create direct aliases for overloaded functions", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    assert.equal(contract.setAddr, undefined);
+    assert.equal(contract.addr, undefined);
+    assert.isFunction(contract.functions["setAddr(bytes32,address)"]);
+    assert.isFunction(contract.callStatic["addr(bytes32)"]);
+  });
+
+  it("does not overwrite reserved wrapper fields with ABI functions", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    // The ABI defines an unambiguous view function named `hash`, which
+    // collides with the reserved deployment-metadata alias and therefore
+    // must not become a direct alias.
+    assert.notTypeOf(contract.hash, "function");
+    assert.equal(contract.address, checksummedContractAddress);
+
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+    const viaMap = await contract.functions.hash();
+    assert.equal(viaMap[0].toString(10), "42");
+
+    const viaStatic = await contract.callStatic.hash();
+    assert.equal(viaStatic[0].toString(10), "42");
   });
 
   it("attaches contracts and forwards call/send requests", async () => {

@@ -1,6 +1,7 @@
 import {
   Artifact,
   HardhatRuntimeEnvironment,
+  QrlBaseContract,
   QrlContract,
   QrlContractFactory,
   QrlContractFunctionMap,
@@ -33,9 +34,52 @@ interface QrlFunctionFragment {
   type?: string;
   name?: string;
   inputs?: any[];
+  outputs?: any[];
   stateMutability?: string;
   constant?: boolean;
 }
+
+/**
+ * Wrapper fields that must never be shadowed by a direct ABI method alias.
+ * Includes deployment metadata fields attached by the contract factory so
+ * that ABI functions with realistic names like `hash()` or `receipt()`
+ * cannot overwrite them. Colliding functions stay reachable through the
+ * `functions`/`callStatic`/`send` maps and full-signature entries.
+ */
+const RESERVED_QRL_CONTRACT_PROPERTIES: ReadonlySet<string> = new Set([
+  "address",
+  "artifact",
+  "contractName",
+  "deployTransactionHash",
+  "deployReceipt",
+  "hash",
+  "receipt",
+  "deployed",
+  "waitForDeployment",
+  "functions",
+  "callStatic",
+  "send",
+  "call",
+  "sendTransaction",
+  "callFunction",
+  "sendFunction",
+  "encodeFunctionData",
+  "decodeFunctionResult",
+  "decodeEventLog",
+  "decodeReceiptLogs",
+]);
+
+const DIRECT_ALIAS_OVERRIDE_KEYS: ReadonlySet<string> = new Set([
+  "from",
+  "gas",
+  "gasLimit",
+  "gasPrice",
+  "maxFeePerGas",
+  "maxPriorityFeePerGas",
+  "value",
+  "nonce",
+  "chainId",
+]);
 
 export function createQrlRuntimeHelpers(
   bre: HardhatRuntimeEnvironment
@@ -58,7 +102,13 @@ export function createQrlRuntimeHelpers(
         waitOptions: QrlWaitOptions = {}
       ) => deployContract(contractName, tx, constructorDataOrArgs, waitOptions),
       attach: (address: string) =>
-        getContractFromArtifact(artifact, address, call, sendTransaction),
+        getContractFromArtifact(
+          artifact,
+          address,
+          call,
+          sendTransaction,
+          waitForTransaction
+        ),
     };
   }
 
@@ -68,7 +118,13 @@ export function createQrlRuntimeHelpers(
   ): Promise<QrlContract> {
     const artifact = await readQrlArtifact(contractName);
 
-    return getContractFromArtifact(artifact, address, call, sendTransaction);
+    return getContractFromArtifact(
+      artifact,
+      address,
+      call,
+      sendTransaction,
+      waitForTransaction
+    );
   }
 
   async function sendTransaction(tx: QrlTransactionRequest): Promise<string> {
@@ -227,7 +283,8 @@ function getContractFromArtifact(
   artifact: Artifact,
   address: string,
   call: QrlRuntimeHelpers["call"],
-  sendTransaction: QrlRuntimeHelpers["sendTransaction"]
+  sendTransaction: QrlRuntimeHelpers["sendTransaction"],
+  waitForTransaction: QrlRuntimeHelpers["waitForTransaction"]
 ): QrlContract {
   const contractAddress = normalizeQrlAddress(address);
 
@@ -255,7 +312,7 @@ function getContractFromArtifact(
     sendFunction
   );
 
-  return {
+  const contract: QrlContract = {
     address: contractAddress,
     artifact,
     contractName: artifact.contractName,
@@ -288,12 +345,135 @@ function getContractFromArtifact(
       return sendTransaction({ ...tx, to: contractAddress, data });
     },
   };
+
+  addDirectFunctionAliases(
+    contract,
+    artifact,
+    callFunction,
+    sendFunction,
+    waitForTransaction
+  );
+
+  return contract;
+}
+
+/**
+ * Attaches ergonomic direct method aliases (`contract.foo(...)`) for
+ * unambiguous ABI functions:
+ * - `view`/`pure` functions perform a call; a single output is unwrapped to
+ *   a scalar, zero or multiple outputs return the decoded result array;
+ * - state-changing functions send a transaction and return a
+ *   `QrlTransactionResponse` with a receipt-polling `wait()`.
+ *
+ * Overloaded names and names colliding with reserved wrapper fields are
+ * skipped; those functions stay reachable through the `functions`,
+ * `callStatic`, and `send` maps.
+ */
+function addDirectFunctionAliases(
+  contract: QrlContract,
+  artifact: Artifact,
+  callFunction: QrlBaseContract["callFunction"],
+  sendFunction: QrlBaseContract["sendFunction"],
+  waitForTransaction: QrlRuntimeHelpers["waitForTransaction"]
+): void {
+  const fragments = getFunctionFragments(artifact.abi);
+  const functionNameCounts = countFunctionNames(fragments);
+
+  for (const fragment of fragments) {
+    const name = fragment.name;
+
+    if (name === undefined) {
+      continue;
+    }
+
+    if (functionNameCounts[name] !== 1) {
+      continue;
+    }
+
+    if (RESERVED_QRL_CONTRACT_PROPERTIES.has(name) || name in contract) {
+      continue;
+    }
+
+    const signature = getFunctionSignature(fragment);
+
+    if (isReadOnlyFunction(fragment)) {
+      contract[name] = async (...args: any[]) => {
+        const parsed = parseDirectAliasArgs(fragment, args);
+        const decoded = await callFunction(
+          signature,
+          parsed.abiArgs,
+          parsed.tx
+        );
+
+        return (fragment.outputs?.length ?? 0) === 1 ? decoded[0] : decoded;
+      };
+    } else {
+      contract[name] = async (...args: any[]) => {
+        const parsed = parseDirectAliasArgs(fragment, args);
+        const hash = await sendFunction(signature, parsed.abiArgs, parsed.tx);
+
+        return createTransactionResponse(hash, waitForTransaction);
+      };
+    }
+  }
+}
+
+function parseDirectAliasArgs(
+  fragment: QrlFunctionFragment,
+  args: any[]
+): {
+  abiArgs: any[];
+  tx: Omit<QrlTransactionRequest, "to" | "data">;
+} {
+  const inputCount = getInputCount(fragment);
+
+  if (args.length === inputCount) {
+    return { abiArgs: args, tx: {} };
+  }
+
+  if (args.length === inputCount + 1) {
+    const overrides = args[inputCount];
+    assertDirectAliasOverrides(fragment, overrides);
+
+    return { abiArgs: args.slice(0, inputCount), tx: overrides };
+  }
+
+  throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ABI, {
+    message: `Function ${fragment.name} expects ${inputCount} ABI arguments and an optional transaction overrides object, got ${args.length} arguments`,
+  });
+}
+
+function assertDirectAliasOverrides(
+  fragment: QrlFunctionFragment,
+  overrides: any
+) {
+  if (
+    overrides === null ||
+    typeof overrides !== "object" ||
+    Array.isArray(overrides)
+  ) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ABI, {
+      message: `Function ${fragment.name} expects a plain transaction overrides object as its final argument`,
+    });
+  }
+
+  for (const key of Object.keys(overrides)) {
+    if (!DIRECT_ALIAS_OVERRIDE_KEYS.has(key)) {
+      throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ABI, {
+        message: `Unknown transaction override "${key}" for function ${
+          fragment.name
+        }; allowed overrides are: ${[...DIRECT_ALIAS_OVERRIDE_KEYS].join(
+          ", "
+        )}`,
+      });
+    }
+  }
 }
 
 function createContractFunctionMaps(
   artifact: Artifact,
-  callFunction: QrlContract["callFunction"],
-  sendFunction: QrlContract["sendFunction"]
+  callFunction: QrlBaseContract["callFunction"],
+  sendFunction: QrlBaseContract["sendFunction"]
 ): {
   callStatic: QrlContractFunctionMap;
   functions: QrlContractFunctionMap;

@@ -385,7 +385,7 @@ export interface QrlContractFactory {
   attach(address: string): QrlContract;
 }
 
-export interface QrlContract {
+export interface QrlBaseContract {
   readonly address: string;
   readonly contractName: string;
   readonly artifact: Artifact;
@@ -417,6 +417,15 @@ export interface QrlContract {
     tx?: Omit<QrlTransactionRequest, "to" | "data">
   ): Promise<string>;
 }
+
+/**
+ * Contract wrapper with dynamically attached direct method aliases for
+ * unambiguous ABI functions. Use `QrlBaseContract` to type a variable when
+ * strict field typing is preferred over the dynamic method surface.
+ */
+export type QrlContract = QrlBaseContract & {
+  [functionNameAlias: string]: any;
+};
 
 export interface QrlContractFunctionMap {
   [functionName: string]: (...args: any[]) => Promise<any>;
