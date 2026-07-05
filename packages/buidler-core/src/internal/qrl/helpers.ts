@@ -101,9 +101,10 @@ export function createQrlRuntimeHelpers(
         constructorDataOrArgs: string | any[] = "0x",
         waitOptions: QrlWaitOptions = {}
       ) => {
+        const resolvedTx = await resolveDefaultSender(tx);
         const deployment = await deployContract(
           contractName,
-          tx,
+          resolvedTx,
           constructorDataOrArgs,
           waitOptions
         );
@@ -112,7 +113,8 @@ export function createQrlRuntimeHelpers(
           deployment.address as string,
           call,
           sendTransaction,
-          waitForTransaction
+          waitForTransaction,
+          resolveDefaultSender
         );
 
         attachDeploymentMetadata(contract, deployment);
@@ -125,7 +127,8 @@ export function createQrlRuntimeHelpers(
           address,
           call,
           sendTransaction,
-          waitForTransaction
+          waitForTransaction,
+          resolveDefaultSender
         ),
     };
   }
@@ -141,12 +144,49 @@ export function createQrlRuntimeHelpers(
       address,
       call,
       sendTransaction,
-      waitForTransaction
+      waitForTransaction,
+      resolveDefaultSender
     );
   }
 
   async function sendTransaction(tx: QrlTransactionRequest): Promise<string> {
     return bre.network.provider.send("qrl_sendTransaction", [tx]);
+  }
+
+  /**
+   * Resolves the sender for transactions sent through the ergonomic contract
+   * helpers (direct method aliases and `factory.deploy()`). Resolution order:
+   * explicit `tx.from`, the network's `from` config field, and finally the
+   * first account returned by `qrl_accounts`. The explicit helpers
+   * (`sendTransaction`, `functions.*`, `send.*`, `deployContract`) keep their
+   * original validation and are not affected.
+   */
+  async function resolveDefaultSender<
+    T extends Omit<QrlTransactionRequest, "to" | "data">
+  >(tx: T): Promise<T> {
+    if (tx.from !== undefined) {
+      return tx;
+    }
+
+    const configFrom = (bre.network as any)?.config?.from;
+    if (typeof configFrom === "string" && configFrom !== "") {
+      return { ...tx, from: configFrom };
+    }
+
+    let accounts: any;
+    try {
+      accounts = await bre.network.provider.send("qrl_accounts");
+    } catch {
+      accounts = undefined;
+    }
+
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      return { ...tx, from: accounts[0] };
+    }
+
+    throw new HardhatError(ERRORS.NETWORK.MISSING_QRL_SENDER, {
+      network: (bre.network as any)?.name ?? "unknown",
+    });
   }
 
   async function call(
@@ -297,12 +337,17 @@ function assertReceiptMatchesTransaction(receipt: any, txHash: string) {
   }
 }
 
+type QrlSenderResolver = <T extends Omit<QrlTransactionRequest, "to" | "data">>(
+  tx: T
+) => Promise<T>;
+
 function getContractFromArtifact(
   artifact: Artifact,
   address: string,
   call: QrlRuntimeHelpers["call"],
   sendTransaction: QrlRuntimeHelpers["sendTransaction"],
-  waitForTransaction: QrlRuntimeHelpers["waitForTransaction"]
+  waitForTransaction: QrlRuntimeHelpers["waitForTransaction"],
+  resolveSender: QrlSenderResolver
 ): QrlContract {
   const contractAddress = normalizeQrlAddress(address);
 
@@ -369,7 +414,8 @@ function getContractFromArtifact(
     artifact,
     callFunction,
     sendFunction,
-    waitForTransaction
+    waitForTransaction,
+    resolveSender
   );
 
   return contract;
@@ -417,7 +463,8 @@ function addDirectFunctionAliases(
   artifact: Artifact,
   callFunction: QrlBaseContract["callFunction"],
   sendFunction: QrlBaseContract["sendFunction"],
-  waitForTransaction: QrlRuntimeHelpers["waitForTransaction"]
+  waitForTransaction: QrlRuntimeHelpers["waitForTransaction"],
+  resolveSender: QrlSenderResolver
 ): void {
   const fragments = getFunctionFragments(artifact.abi);
   const functionNameCounts = countFunctionNames(fragments);
@@ -453,7 +500,8 @@ function addDirectFunctionAliases(
     } else {
       contract[name] = async (...args: any[]) => {
         const parsed = parseDirectAliasArgs(fragment, args);
-        const hash = await sendFunction(signature, parsed.abiArgs, parsed.tx);
+        const resolvedTx = await resolveSender(parsed.tx);
+        const hash = await sendFunction(signature, parsed.abiArgs, resolvedTx);
 
         return createTransactionResponse(hash, waitForTransaction);
       };

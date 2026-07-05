@@ -321,6 +321,15 @@ Please make sure your node is running, and check your internet connection and ne
       title: "Transaction receipt hash mismatch",
       description: `The QRL node returned a transaction receipt for a different transaction hash than the one Hardhat requested.`,
     },
+    MISSING_QRL_SENDER: {
+      number: 124,
+      message:
+        "No sender account available for the transaction on network %network%. Pass an explicit `from`, set `networks.%network%.from` in your config, or use a network that exposes accounts through qrl_accounts.",
+      title: "No QRL sender account available",
+      description: `Hardhat couldn't resolve a default sender for a transaction sent through an ergonomic contract helper.
+
+The default sender is resolved in this order: the transaction's own \`from\` field, the network's \`from\` config field, and finally the first account returned by \`qrl_accounts\`.`,
+    },
   },
   TASK_DEFINITIONS: {
     PARAM_AFTER_VARIADIC: {

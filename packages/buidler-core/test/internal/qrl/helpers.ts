@@ -389,6 +389,100 @@ describe("QRL runtime helpers", () => {
     assert.isUndefined(contract.waitForDeployment);
   });
 
+  it("prefers an explicit from over default sender sources", async function () {
+    const configuredFrom = `Q${"b".repeat(128)}`;
+    const localHelpers = createQrlRuntimeHelpers(({
+      config: { paths: { artifacts: this.tmpDir } },
+      network: { provider, config: { from: configuredFrom }, name: "qrl" },
+    } as any) as HardhatRuntimeEnvironment);
+    const contract = await localHelpers.getContractAt(
+      "Sample",
+      contractAddress
+    );
+
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    await contract.store(42, { from: contractAddress });
+
+    const params = provider.getLatestParams("qrl_sendTransaction");
+    assert.equal(params[0].from, contractAddress);
+    assert.equal(provider.getNumberOfCalls("qrl_accounts"), 0);
+  });
+
+  it("uses the network config from for direct alias transactions", async function () {
+    const configuredFrom = `Q${"b".repeat(128)}`;
+    const localHelpers = createQrlRuntimeHelpers(({
+      config: { paths: { artifacts: this.tmpDir } },
+      network: { provider, config: { from: configuredFrom }, name: "qrl" },
+    } as any) as HardhatRuntimeEnvironment);
+    const contract = await localHelpers.getContractAt(
+      "Sample",
+      contractAddress
+    );
+
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    const response = await contract.store(42);
+
+    assert.equal(response.hash, txHash);
+    const params = provider.getLatestParams("qrl_sendTransaction");
+    assert.equal(params[0].from, configuredFrom);
+    assert.equal(provider.getNumberOfCalls("qrl_accounts"), 0);
+  });
+
+  it("falls back to the first qrl_accounts entry for the default sender", async () => {
+    const accountsFrom = `Q${"c".repeat(128)}`;
+    provider.setReturnValue("qrl_accounts", [accountsFrom, contractAddress]);
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+    const response = await contract.store(42);
+
+    assert.equal(response.hash, txHash);
+    const params = provider.getLatestParams("qrl_sendTransaction");
+    assert.equal(params[0].from, accountsFrom);
+  });
+
+  it("throws a clear error when no default sender can be resolved", async () => {
+    provider.setReturnValue("qrl_accounts", []);
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    await expectHardhatErrorAsync(
+      () => contract.store(42),
+      ERRORS.NETWORK.MISSING_QRL_SENDER
+    );
+  });
+
+  it("does not resolve a default sender for view aliases", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+    await contract.retrieve();
+
+    assert.equal(provider.getNumberOfCalls("qrl_accounts"), 0);
+    const callParams = provider.getLatestParams("qrl_call");
+    assert.isUndefined(callParams[0].from);
+  });
+
+  it("resolves the default sender for factory deploy", async function () {
+    const configuredFrom = `Q${"b".repeat(128)}`;
+    const localHelpers = createQrlRuntimeHelpers(({
+      config: { paths: { artifacts: this.tmpDir } },
+      network: { provider, config: { from: configuredFrom }, name: "qrl" },
+    } as any) as HardhatRuntimeEnvironment);
+
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x1",
+    });
+
+    const factory = await localHelpers.getContractFactory("Sample");
+    const contract = await factory.deploy();
+
+    assert.equal(contract.address, checksummedContractAddress);
+    const params = provider.getLatestParams("qrl_sendTransaction");
+    assert.equal(params[0].from, configuredFrom);
+  });
+
   it("rejects invalid constructor data", async () => {
     await expectHardhatErrorAsync(
       () => helpers.deployContract("Sample", {}, "0xz"),
@@ -627,6 +721,7 @@ describe("QRL runtime helpers", () => {
   it("accepts an empty overrides object in direct aliases", async () => {
     const contract = await helpers.getContractAt("Sample", contractAddress);
 
+    provider.setReturnValue("qrl_accounts", [contractAddress]);
     provider.setReturnValue("qrl_sendTransaction", txHash);
     const response = await contract.store(42, {});
 
@@ -635,6 +730,7 @@ describe("QRL runtime helpers", () => {
 
   it("treats tuple ABI arguments as arguments, not overrides", async () => {
     const contract = await helpers.getContractAt("Sample", contractAddress);
+    provider.setReturnValue("qrl_accounts", [contractAddress]);
 
     // Tuple VALUE encoding is not implemented yet in the QRL ABI codec, so
     // both cases below fail during encoding. The assertions still pin the
