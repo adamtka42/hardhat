@@ -337,6 +337,24 @@ export interface QrlWaitOptions {
   pollIntervalMs?: number;
 }
 
+export interface QrlTransactionReceipt {
+  transactionHash: string;
+  blockHash?: string;
+  blockNumber?: string | number;
+  contractAddress?: string | null;
+  status?: string | number | boolean;
+  logs?: any[];
+  [key: string]: any;
+}
+
+export interface QrlTransactionResponse {
+  hash: string;
+  wait(
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ): Promise<QrlTransactionReceipt>;
+}
+
 export interface QrlRuntimeHelpers {
   readArtifact(contractName: string): Promise<Artifact>;
   getContractFactory(contractName: string): Promise<QrlContractFactory>;
@@ -347,7 +365,7 @@ export interface QrlRuntimeHelpers {
     txHash: string,
     timeoutMs?: number,
     pollIntervalMs?: number
-  ): Promise<any>;
+  ): Promise<QrlTransactionReceipt>;
   deployContract(
     contractName: string,
     tx?: QrlTransactionRequest,

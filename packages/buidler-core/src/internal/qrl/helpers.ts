@@ -6,7 +6,9 @@ import {
   QrlContractFunctionMap,
   QrlDeploymentResult,
   QrlRuntimeHelpers,
+  QrlTransactionReceipt,
   QrlTransactionRequest,
+  QrlTransactionResponse,
   QrlWaitOptions,
 } from "../../types";
 import { readArtifact } from "../artifacts";
@@ -84,7 +86,7 @@ export function createQrlRuntimeHelpers(
     txHash: string,
     timeoutMs: number = DEFAULT_TIMEOUT_MS,
     pollIntervalMs: number = DEFAULT_POLL_INTERVAL_MS
-  ): Promise<any> {
+  ): Promise<QrlTransactionReceipt> {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt <= timeoutMs) {
@@ -159,6 +161,44 @@ export function createQrlRuntimeHelpers(
     sendTransaction,
     waitForTransaction,
   };
+}
+
+/**
+ * Wraps a transaction hash in a response object with a `wait()` helper that
+ * polls for the mined receipt. Building block for the ergonomic contract API;
+ * not part of the documented `hre.qrl` surface.
+ */
+export function createTransactionResponse(
+  hash: string,
+  waitForTransaction: (
+    txHash: string,
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ) => Promise<QrlTransactionReceipt>
+): QrlTransactionResponse {
+  return {
+    hash,
+    wait: (timeoutMs?: number, pollIntervalMs?: number) =>
+      waitForTransaction(hash, timeoutMs, pollIntervalMs),
+  };
+}
+
+/**
+ * Sends a transaction and returns a `QrlTransactionResponse` instead of a raw
+ * hash string. Internal sender variant used by direct contract method
+ * aliases; the public `sendTransaction` helper is unchanged.
+ */
+export async function sendTransactionWithResponse(
+  sendTransaction: (tx: QrlTransactionRequest) => Promise<string>,
+  waitForTransaction: (
+    txHash: string,
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ) => Promise<QrlTransactionReceipt>,
+  tx: QrlTransactionRequest
+): Promise<QrlTransactionResponse> {
+  const hash = await sendTransaction(tx);
+  return createTransactionResponse(hash, waitForTransaction);
 }
 
 function isFailedReceipt(receipt: any): boolean {

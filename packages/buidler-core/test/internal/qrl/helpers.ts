@@ -8,7 +8,11 @@ import {
   getQrlEventTopic,
 } from "../../../src/internal/qrl/abi";
 import { toQrlChecksumAddress } from "../../../src/internal/qrl/address";
-import { createQrlRuntimeHelpers } from "../../../src/internal/qrl/helpers";
+import {
+  createQrlRuntimeHelpers,
+  createTransactionResponse,
+  sendTransactionWithResponse,
+} from "../../../src/internal/qrl/helpers";
 import { Artifact, HardhatRuntimeEnvironment } from "../../../src/types";
 import {
   expectHardhatError,
@@ -354,6 +358,100 @@ describe("QRL runtime helpers", () => {
       ERRORS.NETWORK.TRANSACTION_RECEIPT_MISMATCH,
       txHash
     );
+  });
+
+  it("creates a transaction response that resolves the mined receipt", async () => {
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      status: "0x1",
+      transactionHash: txHash,
+    });
+
+    const response = createTransactionResponse(
+      txHash,
+      helpers.waitForTransaction
+    );
+
+    assert.equal(response.hash, txHash);
+
+    const receipt = await response.wait();
+
+    assert.equal(receipt.status, "0x1");
+    assert.equal(receipt.transactionHash, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_getTransactionReceipt"), [
+      txHash,
+    ]);
+  });
+
+  it("polls for the transaction response receipt until it is available", async () => {
+    let pollCount = 0;
+    provider.setReturnValue("qrl_getTransactionReceipt", () => {
+      pollCount += 1;
+      return pollCount < 3 ? null : { status: "0x1" };
+    });
+
+    const response = createTransactionResponse(
+      txHash,
+      helpers.waitForTransaction
+    );
+    const receipt = await response.wait(1000, 1);
+
+    assert.equal(receipt.status, "0x1");
+    assert.equal(provider.getNumberOfCalls("qrl_getTransactionReceipt"), 3);
+  });
+
+  it("times out waiting for a transaction response receipt", async () => {
+    provider.setReturnValue("qrl_getTransactionReceipt", null);
+
+    const response = createTransactionResponse(
+      txHash,
+      helpers.waitForTransaction
+    );
+
+    await expectHardhatErrorAsync(
+      () => response.wait(1, 1),
+      ERRORS.NETWORK.NETWORK_TIMEOUT
+    );
+  });
+
+  it("rejects a transaction response receipt with a mismatched hash", async () => {
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      status: "0x1",
+      transactionHash: `0x${"2".repeat(64)}`,
+    });
+
+    const response = createTransactionResponse(
+      txHash,
+      helpers.waitForTransaction
+    );
+
+    await expectHardhatErrorAsync(
+      () => response.wait(1, 1),
+      ERRORS.NETWORK.TRANSACTION_RECEIPT_MISMATCH,
+      txHash
+    );
+  });
+
+  it("sends a transaction and returns a transaction response", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      status: "0x1",
+      transactionHash: txHash,
+    });
+
+    const response = await sendTransactionWithResponse(
+      helpers.sendTransaction,
+      helpers.waitForTransaction,
+      { from: contractAddress, to: contractAddress, value: 1 }
+    );
+
+    assert.equal(response.hash, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      { from: contractAddress, to: contractAddress, value: 1 },
+    ]);
+
+    const receipt = await response.wait(1000, 1);
+
+    assert.equal(receipt.status, "0x1");
   });
 
   it("attaches contracts and forwards call/send requests", async () => {
