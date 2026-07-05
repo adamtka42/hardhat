@@ -312,6 +312,83 @@ describe("QRL runtime helpers", () => {
     ]);
   });
 
+  it("returns a usable contract wrapper from factory deploy", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x1",
+      transactionHash: txHash,
+    });
+
+    const factory = await helpers.getContractFactory("Sample");
+    const contract = await factory.deploy({ from: contractAddress }, [
+      42,
+      contractAddress,
+    ]);
+
+    assert.equal(contract.address, checksummedContractAddress);
+    assert.equal(contract.contractName, "Sample");
+    assert.isFunction(contract.functions.store);
+    assert.isFunction(contract.callStatic.retrieve);
+
+    provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+    const stored = await contract.retrieve();
+    assert.equal(stored.toString(10), "42");
+  });
+
+  it("attaches deployment metadata and transitional aliases to deployed contracts", async () => {
+    const deployReceipt = {
+      contractAddress,
+      status: "0x1",
+      transactionHash: txHash,
+    };
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", deployReceipt);
+
+    const factory = await helpers.getContractFactory("Sample");
+    const contract = await factory.deploy({ from: contractAddress }, [
+      42,
+      contractAddress,
+    ]);
+
+    assert.equal(contract.deployTransactionHash, txHash);
+    assert.deepEqual(contract.deployReceipt, deployReceipt);
+    assert.equal(contract.hash, txHash);
+    assert.deepEqual(contract.receipt, deployReceipt);
+
+    const { address, hash } = contract;
+    assert.equal(address, checksummedContractAddress);
+    assert.equal(hash, txHash);
+  });
+
+  it("resolves deployed() and waitForDeployment() with the same contract", async () => {
+    provider.setReturnValue("qrl_sendTransaction", txHash);
+    provider.setReturnValue("qrl_getTransactionReceipt", {
+      contractAddress,
+      status: "0x1",
+    });
+
+    const factory = await helpers.getContractFactory("Sample");
+    const contract = await factory.deploy({ from: contractAddress }, [
+      42,
+      contractAddress,
+    ]);
+
+    assert.strictEqual(await contract.deployed!(), contract);
+    assert.strictEqual(await contract.waitForDeployment!(), contract);
+  });
+
+  it("does not attach deployment metadata to attached contracts", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    assert.isUndefined(contract.deployTransactionHash);
+    assert.isUndefined(contract.deployReceipt);
+    assert.isUndefined(contract.hash);
+    assert.isUndefined(contract.receipt);
+    assert.isUndefined(contract.deployed);
+    assert.isUndefined(contract.waitForDeployment);
+  });
+
   it("rejects invalid constructor data", async () => {
     await expectHardhatErrorAsync(
       () => helpers.deployContract("Sample", {}, "0xz"),

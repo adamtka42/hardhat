@@ -96,11 +96,29 @@ export function createQrlRuntimeHelpers(
     return {
       contractName,
       artifact,
-      deploy: (
+      deploy: async (
         tx: QrlTransactionRequest = {},
         constructorDataOrArgs: string | any[] = "0x",
         waitOptions: QrlWaitOptions = {}
-      ) => deployContract(contractName, tx, constructorDataOrArgs, waitOptions),
+      ) => {
+        const deployment = await deployContract(
+          contractName,
+          tx,
+          constructorDataOrArgs,
+          waitOptions
+        );
+        const contract = getContractFromArtifact(
+          artifact,
+          deployment.address as string,
+          call,
+          sendTransaction,
+          waitForTransaction
+        );
+
+        attachDeploymentMetadata(contract, deployment);
+
+        return contract;
+      },
       attach: (address: string) =>
         getContractFromArtifact(
           artifact,
@@ -355,6 +373,31 @@ function getContractFromArtifact(
   );
 
   return contract;
+}
+
+/**
+ * Attaches deployment metadata to a contract wrapper returned by
+ * `factory.deploy()`. The `hash` and `receipt` fields are transitional
+ * aliases for `deployTransactionHash`/`deployReceipt` so existing code
+ * destructuring the old `QrlDeploymentResult` shape keeps working; they are
+ * deprecated and scheduled for removal in the next major version.
+ *
+ * `deployed()` and `waitForDeployment()` resolve immediately because
+ * `deployContract()` already waits for the mined receipt and validates the
+ * deployment status and contract address.
+ */
+function attachDeploymentMetadata(
+  contract: QrlContract,
+  deployment: QrlDeploymentResult
+): void {
+  const writable = contract as any;
+
+  writable.deployTransactionHash = deployment.hash;
+  writable.deployReceipt = deployment.receipt;
+  writable.hash = deployment.hash;
+  writable.receipt = deployment.receipt;
+  writable.deployed = async () => contract;
+  writable.waitForDeployment = async () => contract;
 }
 
 /**

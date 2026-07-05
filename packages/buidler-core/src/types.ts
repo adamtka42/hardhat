@@ -377,11 +377,17 @@ export interface QrlRuntimeHelpers {
 export interface QrlContractFactory {
   readonly contractName: string;
   readonly artifact: Artifact;
+  /**
+   * Deploys the contract and returns a ready-to-use contract wrapper with
+   * deployment metadata attached (`deployTransactionHash`, `deployReceipt`,
+   * plus transitional `hash`/`receipt` aliases). Use `qrl.deployContract()`
+   * for the raw `QrlDeploymentResult` metadata.
+   */
   deploy(
     tx?: QrlTransactionRequest,
     constructorDataOrArgs?: string | any[],
     waitOptions?: QrlWaitOptions
-  ): Promise<QrlDeploymentResult>;
+  ): Promise<QrlContract>;
   attach(address: string): QrlContract;
 }
 
@@ -389,9 +395,34 @@ export interface QrlBaseContract {
   readonly address: string;
   readonly contractName: string;
   readonly artifact: Artifact;
+
+  /**
+   * Deployment metadata, present only on contracts returned by
+   * `factory.deploy()`.
+   */
+  readonly deployTransactionHash?: string;
+  readonly deployReceipt?: QrlTransactionReceipt;
+
+  /**
+   * @deprecated Transitional alias for `deployTransactionHash`, kept so
+   * existing code destructuring `factory.deploy()` results keeps working.
+   * Removal target: next major version.
+   */
+  readonly hash?: string;
+
+  /**
+   * @deprecated Transitional alias for `deployReceipt`, kept so existing
+   * code destructuring `factory.deploy()` results keeps working. Removal
+   * target: next major version.
+   */
+  readonly receipt?: QrlTransactionReceipt;
+
   readonly functions: QrlContractFunctionMap;
   readonly callStatic: QrlContractFunctionMap;
   readonly send: QrlContractFunctionMap;
+
+  deployed?(): Promise<QrlContract>;
+  waitForDeployment?(): Promise<QrlContract>;
   encodeFunctionData(functionName: string, args?: any[]): string;
   decodeFunctionResult(functionName: string, data: string): any[];
   decodeEventLog(eventName: string, log: any): any;
