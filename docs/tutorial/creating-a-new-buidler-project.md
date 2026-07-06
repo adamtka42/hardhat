@@ -99,9 +99,13 @@ The most common helpers are:
 
 ```js
 const Factory = await qrl.getContractFactory("Token");
-const deployment = await Factory.deploy({ from });
-const token = await qrl.getContractAt("Token", deployment.address);
+const token = await Factory.deploy();
+console.log(token.address);
 ```
+
+`deploy()` waits for the deployment receipt and returns a ready-to-use
+contract wrapper. To connect to an already deployed contract, use
+`qrl.getContractAt("Token", address)`.
 
 You will use these helpers throughout the rest of the tutorial.
 

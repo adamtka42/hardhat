@@ -84,33 +84,37 @@ Attach to a deployed contract with `qrl.getContractAt`:
 ~~~js
 > const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS)
 undefined
-> const [name] = await token.callStatic.name()
-undefined
-> name
+> await token.name()
 'My QRL Token'
 ~~~
 
-Use `callStatic` for simulated calls that do not persist state:
+Read-only method aliases perform a call and unwrap a single output to a
+scalar:
 
 ~~~js
-> const [balance] = await token.callStatic.balanceOf(from)
+> const balance = await token.balanceOf(from)
 undefined
 > balance.toString(10)
 '1000000'
 ~~~
 
-Use `functions` for state-changing calls:
+State-changing aliases send a transaction and return a transaction response
+with a receipt-polling `wait()`:
 
 ~~~js
-> const txHash = await token.functions.transfer(process.env.RECIPIENT, 1, { from })
+> const tx = await token.transfer(process.env.RECIPIENT, 1)
 undefined
-> await qrl.waitForTransaction(txHash, 300000)
+> await tx.wait(300000)
 {
   transactionHash: '0x...',
   status: '0x1',
   ...
 }
 ~~~
+
+The explicit low-level maps are still available: `token.callStatic.name()`
+always returns a decoded array, and `token.functions.transfer(...)` returns a
+transaction hash string.
 
 For overloaded ABI functions, use the full signature:
 
@@ -124,15 +128,19 @@ For overloaded ABI functions, use the full signature:
 You can deploy contracts directly from the console while experimenting:
 
 ~~~js
-> const [from] = await network.provider.send("qrl_accounts")
-undefined
 > const Token = await qrl.getContractFactory("Token")
 undefined
-> const deployment = await Token.deploy({ from }, [], { timeoutMs: 300000 })
+> const token = await Token.deploy()
 undefined
-> deployment.address
+> token.address
 'Q...'
+> token.deployTransactionHash
+'0x...'
 ~~~
+
+`deploy()` waits for the deployment receipt and returns a ready-to-use
+contract wrapper. The sender defaults to the network's `from` config or the
+first `qrl_accounts` account.
 
 For repeatable deployments, prefer a script in `scripts/` and run it with
 `npx hardhat run`. See [Writing scripts](scripts.md).

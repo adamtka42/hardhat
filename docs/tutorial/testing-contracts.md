@@ -23,11 +23,10 @@ describe("Token contract", function () {
     const [owner] = await network.provider.send("qrl_accounts");
     const Token = await qrl.getContractFactory("Token");
 
-    const deployment = await Token.deploy({ from: owner });
-    const token = await qrl.getContractAt("Token", deployment.address);
+    const token = await Token.deploy();
 
-    const [ownerBalance] = await token.callStatic.balanceOf(owner);
-    const [totalSupply] = await token.callStatic.totalSupply();
+    const ownerBalance = await token.balanceOf(owner);
+    const totalSupply = await token.totalSupply();
 
     assert.strictEqual(totalSupply.toString(10), ownerBalance.toString(10));
   });
@@ -70,33 +69,33 @@ const Token = await qrl.getContractFactory("Token");
 A QRL contract factory is used to deploy new instances of a compiled contract.
 
 ```js
-const deployment = await Token.deploy({ from: owner });
+const token = await Token.deploy();
 ```
 
-Calling `deploy()` sends a deployment transaction and waits for the receipt.
-The returned object includes the transaction hash and deployed QRL contract
-address.
+Calling `deploy()` sends a deployment transaction, waits for the receipt, and
+returns a contract wrapper connected to the deployed address. The sender
+defaults to the network's `from` config or the first `qrl_accounts` account,
+and the deployment metadata is available as `token.deployTransactionHash` and
+`token.deployReceipt`. To connect to an already deployed contract, use
+`qrl.getContractAt("Token", address)`.
 
 ```js
-const token = await qrl.getContractAt("Token", deployment.address);
+const ownerBalance = await token.balanceOf(owner);
 ```
 
-This creates a contract object connected to the deployed address.
+Read-only (`view`/`pure`) contract methods can be called directly on the
+wrapper. They perform a simulated call that does not change contract state,
+and a single return value is unwrapped to a scalar.
 
 ```js
-const [ownerBalance] = await token.callStatic.balanceOf(owner);
+const tx = await token.transfer(receiver, 50, { from: owner });
+const receipt = await tx.wait();
 ```
 
-`callStatic` simulates a read-only contract call. It does not send a
-transaction and does not change contract state.
-
-```js
-await token.functions.transfer(receiver, 50, { from: owner });
-```
-
-`functions` sends a transaction for state-changing contract methods. After a
-transaction, use `qrl.waitForTransaction(txHash)` when you need to wait
-explicitly for the receipt.
+State-changing contract methods send a transaction and return a transaction
+response with a `hash` and a receipt-polling `wait()`. Method aliases accept
+the ABI arguments followed by an optional transaction overrides object such as
+`{ from: owner }`.
 
 ### Using a different account
 
@@ -113,19 +112,18 @@ describe("Transactions", function () {
     const [owner, addr1, addr2] = await network.provider.send("qrl_accounts");
     const Token = await qrl.getContractFactory("Token");
 
-    const deployment = await Token.deploy({ from: owner });
-    const token = await qrl.getContractAt("Token", deployment.address);
+    const token = await Token.deploy({ from: owner });
 
-    let txHash = await token.functions.transfer(addr1, 50, { from: owner });
-    await qrl.waitForTransaction(txHash);
+    let tx = await token.transfer(addr1, 50, { from: owner });
+    await tx.wait();
 
-    let [addr1Balance] = await token.callStatic.balanceOf(addr1);
+    let addr1Balance = await token.balanceOf(addr1);
     assert.strictEqual(addr1Balance.toString(10), "50");
 
-    txHash = await token.functions.transfer(addr2, 50, { from: addr1 });
-    await qrl.waitForTransaction(txHash);
+    tx = await token.transfer(addr2, 50, { from: addr1 });
+    await tx.wait();
 
-    const [addr2Balance] = await token.callStatic.balanceOf(addr2);
+    const addr2Balance = await token.balanceOf(addr2);
     assert.strictEqual(addr2Balance.toString(10), "50");
   });
 });
@@ -152,47 +150,46 @@ describe("Token contract", function () {
     [owner, addr1, addr2] = await network.provider.send("qrl_accounts");
 
     const Token = await qrl.getContractFactory("Token");
-    const deployment = await Token.deploy({ from: owner });
-    token = await qrl.getContractAt("Token", deployment.address);
+    token = await Token.deploy({ from: owner });
   });
 
   describe("Deployment", function () {
     it("Should set the right owner", async function () {
-      const [storedOwner] = await token.callStatic.owner();
+      const storedOwner = await token.owner();
       assert.strictEqual(storedOwner, owner);
     });
 
     it("Should assign the total supply of tokens to the owner", async function () {
-      const [ownerBalance] = await token.callStatic.balanceOf(owner);
-      const [totalSupply] = await token.callStatic.totalSupply();
+      const ownerBalance = await token.balanceOf(owner);
+      const totalSupply = await token.totalSupply();
       assert.strictEqual(totalSupply.toString(10), ownerBalance.toString(10));
     });
   });
 
   describe("Transactions", function () {
     it("Should transfer tokens between accounts", async function () {
-      let txHash = await token.functions.transfer(addr1, 50, { from: owner });
-      await qrl.waitForTransaction(txHash);
+      let tx = await token.transfer(addr1, 50, { from: owner });
+      await tx.wait();
 
-      const [addr1Balance] = await token.callStatic.balanceOf(addr1);
+      const addr1Balance = await token.balanceOf(addr1);
       assert.strictEqual(addr1Balance.toString(10), "50");
 
-      txHash = await token.functions.transfer(addr2, 50, { from: addr1 });
-      await qrl.waitForTransaction(txHash);
+      tx = await token.transfer(addr2, 50, { from: addr1 });
+      await tx.wait();
 
-      const [addr2Balance] = await token.callStatic.balanceOf(addr2);
+      const addr2Balance = await token.balanceOf(addr2);
       assert.strictEqual(addr2Balance.toString(10), "50");
     });
 
     it("Should fail if sender does not have enough tokens", async function () {
-      const [initialOwnerBalance] = await token.callStatic.balanceOf(owner);
+      const initialOwnerBalance = await token.balanceOf(owner);
 
       await assert.rejects(
-        token.functions.transfer(owner, 1, { from: addr1 }),
+        token.transfer(owner, 1, { from: addr1 }),
         /Not enough tokens/
       );
 
-      const [finalOwnerBalance] = await token.callStatic.balanceOf(owner);
+      const finalOwnerBalance = await token.balanceOf(owner);
       assert.strictEqual(
         finalOwnerBalance.toString(10),
         initialOwnerBalance.toString(10)
@@ -200,17 +197,17 @@ describe("Token contract", function () {
     });
 
     it("Should update balances after transfers", async function () {
-      const [initialOwnerBalance] = await token.callStatic.balanceOf(owner);
+      const initialOwnerBalance = await token.balanceOf(owner);
 
-      let txHash = await token.functions.transfer(addr1, 100, { from: owner });
-      await qrl.waitForTransaction(txHash);
+      let tx = await token.transfer(addr1, 100, { from: owner });
+      await tx.wait();
 
-      txHash = await token.functions.transfer(addr2, 50, { from: owner });
-      await qrl.waitForTransaction(txHash);
+      tx = await token.transfer(addr2, 50, { from: owner });
+      await tx.wait();
 
-      const [finalOwnerBalance] = await token.callStatic.balanceOf(owner);
-      const [addr1Balance] = await token.callStatic.balanceOf(addr1);
-      const [addr2Balance] = await token.callStatic.balanceOf(addr2);
+      const finalOwnerBalance = await token.balanceOf(owner);
+      const addr1Balance = await token.balanceOf(addr1);
+      const addr2Balance = await token.balanceOf(addr2);
 
       assert.strictEqual(
         finalOwnerBalance.toString(10),

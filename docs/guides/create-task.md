@@ -176,18 +176,21 @@ Tasks can use `hre.qrl` just like scripts and tests:
 ~~~js
 task("deploy-sample", "Deploys the Sample contract")
   .addOptionalParam("value", "Initial value", 0, types.int)
-  .setAction(async ({ value }, { network, qrl }) => {
-    const [from] = await network.provider.send("qrl_accounts");
+  .setAction(async ({ value }, { qrl }) => {
     const Sample = await qrl.getContractFactory("Sample");
 
-    const deployment = await Sample.deploy({ from }, [value], {
+    const sample = await Sample.deploy({}, [value], {
       timeoutMs: 300000,
     });
 
-    console.log("Transaction:", deployment.hash);
-    console.log("Contract:", deployment.address);
+    console.log("Transaction:", sample.deployTransactionHash);
+    console.log("Contract:", sample.address);
   });
 ~~~
+
+`deploy` takes transaction overrides first and constructor arguments second,
+resolves its sender from the network's `from` config or the first
+`qrl_accounts` account, and returns a ready-to-use contract wrapper.
 
 Run it with:
 

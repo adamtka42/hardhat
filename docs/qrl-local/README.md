@@ -107,9 +107,12 @@ Contract helpers use `hre.qrl`:
 
 ~~~js
 const Sample = await qrl.getContractFactory("Sample");
-const deployment = await Sample.deploy({ from }, [], { timeoutMs: 300000 });
-const sample = await qrl.getContractAt("Sample", deployment.address);
+const sample = await Sample.deploy();
+console.log(sample.address);
 ~~~
+
+`deploy()` returns a ready-to-use contract wrapper. On `qrlLocal`, the sender
+defaults to the network's `from` config field.
 
 ## Supported local RPC behavior
 

@@ -18,12 +18,12 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer);
 
   const Token = await qrl.getContractFactory("Token");
-  const deployment = await Token.deploy({ from: deployer }, [], {
+  const token = await Token.deploy({ from: deployer }, [], {
     timeoutMs: 300000,
   });
 
-  console.log("Deployment transaction:", deployment.hash);
-  console.log("Token address:", deployment.address);
+  console.log("Deployment transaction:", token.deployTransactionHash);
+  console.log("Token address:", token.address);
 }
 
 main()

@@ -36,14 +36,15 @@ For more details, see
 
 ## Inspecting transactions
 
-State-changing contract methods return a transaction hash. You can wait for the
-receipt and print it from your test or script:
+State-changing contract methods return a transaction response with a `hash`
+and a receipt-polling `wait()`. You can wait for the receipt and print it from
+your test or script:
 
 ```js
-const txHash = await token.functions.transfer(addr1, 50, { from: owner });
-const receipt = await qrl.waitForTransaction(txHash);
+const tx = await token.transfer(addr1, 50, { from: owner });
+const receipt = await tx.wait();
 
-console.log("Transaction:", txHash);
+console.log("Transaction:", tx.hash);
 console.log("Status:", receipt.status);
 console.log("Gas used:", receipt.gasUsed.toString());
 ```

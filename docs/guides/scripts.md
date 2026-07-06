@@ -65,15 +65,11 @@ Create `scripts/deploy.js`:
 
 ~~~js
 async function main() {
-  const [from] = await network.provider.send("qrl_accounts");
   const Sample = await qrl.getContractFactory("Sample");
+  const sample = await Sample.deploy();
 
-  const deployment = await Sample.deploy({ from }, [], {
-    timeoutMs: 300000,
-  });
-
-  console.log("Transaction:", deployment.hash);
-  console.log("Contract:", deployment.address);
+  console.log("Transaction:", sample.deployTransactionHash);
+  console.log("Contract:", sample.address);
 }
 
 main()
@@ -83,6 +79,10 @@ main()
     process.exit(1);
   });
 ~~~
+
+`deploy()` waits for the deployment receipt and returns a ready-to-use
+contract wrapper. The sender defaults to the network's `from` config or the
+first `qrl_accounts` account.
 
 Run it on `qrlLocal`:
 
@@ -98,12 +98,13 @@ QRL_ACCOUNT_SEED=<qrl-extended-seed> \
 npx hardhat run scripts/deploy.js --network qrl
 ~~~
 
-The second `deploy` argument is either constructor arguments or pre-encoded
-constructor data. For a constructor with arguments:
+`deploy` takes transaction overrides first and constructor arguments second.
+The second argument is either constructor arguments or pre-encoded constructor
+data. For a constructor with arguments:
 
 ~~~js
-const deployment = await Token.deploy(
-  { from, gas: 15000000 },
+const token = await Token.deploy(
+  { gas: 15000000 },
   ["Example Token", "EXT", 18],
   { timeoutMs: 300000 }
 );
@@ -118,8 +119,8 @@ async function main() {
   const [from] = await network.provider.send("qrl_accounts");
   const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS);
 
-  const [name] = await token.callStatic.name();
-  const [balance] = await token.callStatic.balanceOf(from);
+  const name = await token.name();
+  const balance = await token.balanceOf(from);
 
   console.log("Name:", name);
   console.log("Balance:", balance.toString(10));
@@ -133,31 +134,36 @@ main()
   });
 ~~~
 
-`callStatic` simulates execution and decodes return values. It must not persist
-state changes.
+Read-only method aliases perform a call and unwrap a single output to a
+scalar. The explicit `callStatic` map remains the low-level simulation layer;
+it always returns a decoded array and must not persist state changes.
 
 ## Sending a transaction
 
-Use `contract.functions` for normal contract interactions. State-changing
-functions send a transaction and return the transaction hash:
+Call state-changing methods directly on the contract wrapper. They send a
+transaction and return a transaction response with a receipt-polling `wait()`:
 
 ~~~js
 async function main() {
-  const [from] = await network.provider.send("qrl_accounts");
   const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS);
 
-  const txHash = await token.functions.transfer(process.env.RECIPIENT, 100, {
-    from,
+  const tx = await token.transfer(process.env.RECIPIENT, 100, {
     gas: 15000000,
   });
 
-  const receipt = await qrl.waitForTransaction(txHash, 300000);
+  const receipt = await tx.wait(300000);
   console.log("Transfer mined in transaction:", receipt.transactionHash);
 }
 ~~~
 
-Use `contract.send` if you always want to send a transaction, even for ABI
-functions that look read-only. Use `contract.callStatic` if you always want a
+Aliases accept the ABI arguments followed by an optional transaction overrides
+object, and resolve a default sender from the network's `from` config or the
+first `qrl_accounts` account.
+
+The explicit maps remain the low-level layer and do not resolve a default
+sender. Use `contract.functions` for hash-returning state-changing calls,
+`contract.send` if you always want to send a transaction, even for ABI
+functions that look read-only, and `contract.callStatic` if you always want a
 simulation.
 
 ## Raw transaction and call helpers
@@ -216,13 +222,10 @@ const hre = require("@theqrl/hardhat");
 async function main() {
   await hre.run("compile");
 
-  const [from] = await hre.network.provider.send("qrl_accounts");
   const Sample = await hre.qrl.getContractFactory("Sample");
-  const deployment = await Sample.deploy({ from }, [], {
-    timeoutMs: 300000,
-  });
+  const sample = await Sample.deploy();
 
-  console.log(deployment.address);
+  console.log(sample.address);
 }
 
 main()
@@ -280,8 +283,9 @@ HTTP/private QRL networks can be slower than `qrlLocal`. Pass a larger timeout
 when waiting for deployment or transaction receipts:
 
 ~~~js
-const deployment = await Sample.deploy({ from }, [], { timeoutMs: 300000 });
-const receipt = await qrl.waitForTransaction(txHash, 300000);
+const sample = await Sample.deploy({}, [], { timeoutMs: 300000 });
+const receipt = await tx.wait(300000);
+const rawReceipt = await qrl.waitForTransaction(txHash, 300000);
 ~~~
 
 Mocha tests use `mocha.timeout` from config, but scripts should pass explicit

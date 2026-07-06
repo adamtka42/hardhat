@@ -14,15 +14,11 @@ Create `scripts/deploy.js`:
 
 ~~~js
 async function main() {
-  const [from] = await network.provider.send("qrl_accounts");
   const Sample = await qrl.getContractFactory("Sample");
+  const sample = await Sample.deploy();
 
-  const deployment = await Sample.deploy({ from }, [], {
-    timeoutMs: 300000,
-  });
-
-  console.log("Deployment transaction:", deployment.hash);
-  console.log("Contract address:", deployment.address);
+  console.log("Deployment transaction:", sample.deployTransactionHash);
+  console.log("Contract address:", sample.address);
 }
 
 main()
@@ -34,14 +30,18 @@ main()
 ~~~
 
 `Sample.deploy` sends a `qrl_sendTransaction`, waits for
-`qrl_getTransactionReceipt`, checks the receipt status, and returns the deployed
-QRL contract address.
+`qrl_getTransactionReceipt`, checks the receipt status, and returns a
+ready-to-use contract wrapper. The deployed address and deployment metadata
+are available as `sample.address`, `sample.deployTransactionHash`, and
+`sample.deployReceipt`. The sender defaults to the network's `from` config or
+the first `qrl_accounts` account.
 
-For constructors with arguments, pass them as the second argument:
+For constructors with arguments, pass transaction overrides first and the
+constructor arguments second:
 
 ~~~js
-const deployment = await Token.deploy(
-  { from, gas: 15000000 },
+const token = await Token.deploy(
+  { gas: 15000000 },
   ["Example Token", "EXT", 18],
   { timeoutMs: 300000 }
 );
@@ -171,7 +171,12 @@ There are three common cases:
 - HTTP with node signing: set `accounts: "remote"` and use an unlocked node
   account.
 
-Most scripts start with:
+`factory.deploy()` resolves the sender in this order: the explicit `from` in
+the transaction overrides, the network's `from` config field, and finally the
+first account returned by `qrl_accounts`. When none is available, deployment
+fails with `BDLR124`.
+
+To inspect the accounts a network exposes:
 
 ~~~js
 const [from] = await network.provider.send("qrl_accounts");
@@ -184,7 +189,7 @@ If you pass a custom `from`, make sure it is managed by Hardhat or the connected
 node:
 
 ~~~js
-const deployment = await Sample.deploy({ from: process.env.DEPLOYER });
+const sample = await Sample.deploy({ from: process.env.DEPLOYER });
 ~~~
 
 An unmanaged `from` account causes `BDLR104`.
@@ -199,8 +204,8 @@ If the private network has a strict block gas limit, pass a gas value below that
 limit:
 
 ~~~js
-const deployment = await Sample.deploy(
-  { from, gas: 15000000 },
+const sample = await Sample.deploy(
+  { gas: 15000000 },
   [],
   { timeoutMs: 300000 }
 );
@@ -217,7 +222,7 @@ RPC requests.
 larger timeout:
 
 ~~~js
-const deployment = await Sample.deploy({ from }, [], {
+const sample = await Sample.deploy({}, [], {
   timeoutMs: 300000,
   pollIntervalMs: 1000,
 });
@@ -235,19 +240,26 @@ of returning a contract address.
 
 ## Verifying a deployment
 
-After deployment, attach to the contract and call a read-only function:
+`deploy` already returns a usable contract wrapper, so call a read-only
+function on it directly:
 
 ~~~js
-const sample = await qrl.getContractAt("Sample", deployment.address);
-const [value] = await sample.callStatic.retrieve();
+const value = await sample.retrieve();
 console.log(value.toString(10));
 ~~~
 
-You can also inspect raw receipts:
+To verify a contract deployed earlier, attach to its address instead:
+
+~~~js
+const sample = await qrl.getContractAt("Sample", address);
+~~~
+
+The mined deployment receipt is available as `sample.deployReceipt`. You can
+also fetch it again over RPC:
 
 ~~~js
 const receipt = await network.provider.send("qrl_getTransactionReceipt", [
-  deployment.hash,
+  sample.deployTransactionHash,
 ]);
 console.log(receipt.contractAddress);
 ~~~

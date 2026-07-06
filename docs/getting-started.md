@@ -167,17 +167,16 @@ describe("Sample", function () {
   it("deploys and calls a Hyperion contract", async function () {
     this.timeout(300000);
 
-    const [from] = await network.provider.send("qrl_accounts");
     const Sample = await qrl.getContractFactory("Sample");
-    const deployment = await Sample.deploy({ from });
-    const sample = await qrl.getContractAt("Sample", deployment.address);
+    const sample = await Sample.deploy();
 
-    const txHash = await sample.functions.store(42, { from });
-    await qrl.waitForTransaction(txHash);
-    const [stored] = await sample.callStatic.retrieve();
+    const tx = await sample.store(42);
+    const receipt = await tx.wait();
+    const stored = await sample.retrieve();
 
-    assert.ok(deployment.hash);
-    assert.ok(deployment.address);
+    assert.ok(sample.deployTransactionHash);
+    assert.ok(sample.address);
+    assert.strictEqual(receipt.status, "0x1");
     assert.strictEqual(stored.toString(10), "42");
   });
 });
@@ -204,16 +203,15 @@ Create `scripts/deploy.js`:
 
 ~~~js
 async function main() {
-  const [from] = await network.provider.send("qrl_accounts");
   const Sample = await qrl.getContractFactory("Sample");
-  const deployment = await Sample.deploy({ from });
-  const sample = await qrl.getContractAt("Sample", deployment.address);
+  const sample = await Sample.deploy();
 
-  const txHash = await sample.functions.store(42, { from });
-  await qrl.waitForTransaction(txHash);
-  const [stored] = await sample.callStatic.retrieve();
+  const tx = await sample.store(42);
+  await tx.wait();
+  const stored = await sample.retrieve();
 
-  console.log("Sample deployed to:", deployment.address);
+  console.log("Sample deployed to:", sample.address);
+  console.log("Deployment transaction:", sample.deployTransactionHash);
   console.log("Stored value:", stored.toString(10));
 }
 
@@ -244,18 +242,26 @@ See [guides/deploying.md](guides/deploying.md) for deployment details and
 
 QRL Hardhat extends the runtime with `qrl` helpers:
 
-- `qrl.getContractFactory(name)`: load a compiled Hyperion artifact.
-- `qrl.getContractAt(name, address)`: attach to a deployed contract.
+- `qrl.getContractFactory(name)`: load a compiled Hyperion artifact. The
+  factory's `deploy()` returns a ready-to-use contract wrapper.
+- `qrl.getContractAt(name, address)`: attach to an already deployed contract.
 - `qrl.deployContract(name, tx, argsOrData?, waitOptions?)`: deploy with a
-  lower-level transaction object.
+  lower-level transaction object; returns `{ hash, receipt, address }`.
 - `qrl.sendTransaction(tx)`: send a QRL transaction.
 - `qrl.call(tx, blockTag?)`: run `qrl_call`.
 - `qrl.waitForTransaction(hash, timeoutMs?)`: wait for a receipt.
 
-Contract objects expose familiar helper maps:
+Contract wrappers expose direct method aliases for unambiguous ABI functions:
+
+- `contract.name(...args, txOverrides?)` calls read-only functions (a single
+  output is unwrapped to a scalar) or sends state-changing transactions and
+  returns `{ hash, wait() }`.
+
+The explicit low-level maps remain available:
 
 - `contract.functions.name(...args, txOptions)` sends a state-changing call.
-- `contract.callStatic.name(...args, txOptions)` simulates a call.
+- `contract.callStatic.name(...args, txOptions)` simulates a call and always
+  returns a decoded array.
 - `contract.send.name(...args, txOptions)` sends and returns a transaction hash.
 - `contract.encodeFunctionData(identifier, args)` encodes calldata.
 - `contract.decodeFunctionResult(identifier, data)` decodes return data.

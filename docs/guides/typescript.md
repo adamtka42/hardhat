@@ -134,14 +134,11 @@ TypeScript scripts can be run with `hardhat run`:
 import hre from "@theqrl/hardhat";
 
 async function main() {
-  const [from] = await hre.network.provider.send("qrl_accounts");
   const Sample = await hre.qrl.getContractFactory("Sample");
+  const sample = await Sample.deploy();
 
-  const deployment = await Sample.deploy({ from }, [], {
-    timeoutMs: 300000,
-  });
-
-  console.log("Contract:", deployment.address);
+  console.log("Contract:", sample.address);
+  console.log("Transaction:", sample.deployTransactionHash);
 }
 
 main()

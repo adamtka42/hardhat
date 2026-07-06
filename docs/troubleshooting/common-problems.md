@@ -234,13 +234,14 @@ curl -s -X POST "$QRL_RPC_URL" \
   --data '{"jsonrpc":"2.0","method":"qrl_getBlockByNumber","params":["latest",false],"id":1}'
 ~~~
 
-If needed, pass a gas value below the private network block gas limit:
+If needed, pass a gas value below the private network block gas limit in the
+trailing transaction overrides:
 
 ~~~js
-await contract.functions.method(arg1, arg2, {
-  from,
+const tx = await contract.method(arg1, arg2, {
   gas: 15000000,
 });
+await tx.wait();
 ~~~
 
 QRL Hardhat normalizes numeric transaction quantity fields before sending RPC
@@ -261,7 +262,7 @@ Private networks can take longer to produce blocks. Increase deployment or
 receipt wait timeouts:
 
 ~~~js
-const deployment = await Factory.deploy({ from }, [], {
+const contract = await Factory.deploy({}, [], {
   timeoutMs: 300000,
   pollIntervalMs: 1000,
 });

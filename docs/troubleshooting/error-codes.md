@@ -252,6 +252,36 @@ npx hardhat test --network qrlLocal
 You can also set `networks.<name>.qrlJsMonorepoPath` in
 `hardhat.config.js`.
 
+### BDLR124: No QRL sender account available
+
+A transaction sent through an ergonomic contract helper (a direct method
+alias or `factory.deploy()`) had no sender and none could be resolved.
+
+The default sender is resolved in this order:
+
+1. the explicit `from` in the transaction overrides,
+2. the network's `from` config field,
+3. the first account returned by `qrl_accounts`.
+
+Fix (any one of):
+
+~~~js
+// pass an explicit sender
+const tx = await contract.store(42, { from });
+
+// or set a default sender for the network in hardhat.config.js
+networks: {
+  qrl: {
+    url: "http://127.0.0.1:33462",
+    from: "Q…",
+    accounts,
+  },
+},
+~~~
+
+Or use a network that exposes accounts through `qrl_accounts` (a configured
+`accounts` list or a node with unlocked accounts).
+
 ## Ledger errors
 
 ### BDLR118: QRL Ledger transport unavailable

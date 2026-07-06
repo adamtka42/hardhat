@@ -6,8 +6,9 @@ You now have a QRL Hardhat project that can:
 
 - Compile Hyperion `.hyp` contracts
 - Test contracts on qrlLocal
-- Send state-changing transactions through `contract.functions`
-- Simulate read-only calls through `contract.callStatic`
+- Send state-changing transactions through direct contract method aliases and
+  wait for receipts with `tx.wait()`
+- Call read-only contract functions directly on contract wrappers
 - Deploy contracts with scripts
 - Connect to HTTP go-qrl networks
 
