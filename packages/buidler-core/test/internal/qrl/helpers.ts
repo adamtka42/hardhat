@@ -1459,4 +1459,120 @@ describe("QRL runtime helpers", () => {
       ERRORS.NETWORK.INVALID_QRL_ADDRESS
     );
   });
+
+  // The ergonomic layer (direct aliases, factory deploy wrappers, default
+  // sender) must never change the shapes of the explicit API. These tests pin
+  // the old contract so regressions in the new layer surface immediately.
+  describe("explicit contract API compatibility", () => {
+    it("deployContract still returns the raw { hash, receipt, address } shape", async () => {
+      const deployReceipt = {
+        contractAddress,
+        status: "0x1",
+        transactionHash: txHash,
+      };
+      provider.setReturnValue("qrl_sendTransaction", txHash);
+      provider.setReturnValue("qrl_getTransactionReceipt", deployReceipt);
+
+      const result = await helpers.deployContract("Sample", {
+        from: contractAddress,
+      });
+
+      assert.deepEqual(Object.keys(result).sort(), [
+        "address",
+        "hash",
+        "receipt",
+      ]);
+      assert.equal(result.hash, txHash);
+      assert.deepEqual(result.receipt, deployReceipt);
+      assert.equal(result.address, checksummedContractAddress);
+      assert.isUndefined((result as any).functions);
+      assert.isUndefined((result as any).wait);
+    });
+
+    it("functions map still returns a raw hash string for state-changing calls", async () => {
+      const contract = await helpers.getContractAt("Sample", contractAddress);
+
+      provider.setReturnValue("qrl_sendTransaction", txHash);
+      const result = await contract.functions.store(42, {
+        from: contractAddress,
+      });
+
+      assert.strictEqual(result, txHash);
+      assert.isString(result);
+      assert.isUndefined((result as any).wait);
+    });
+
+    it("send map still returns a raw hash string", async () => {
+      const contract = await helpers.getContractAt("Sample", contractAddress);
+
+      provider.setReturnValue("qrl_sendTransaction", txHash);
+      const result = await contract.send.store(42, { from: contractAddress });
+
+      assert.strictEqual(result, txHash);
+      assert.isString(result);
+    });
+
+    it("callStatic still returns a decoded array for single-output functions", async () => {
+      const contract = await helpers.getContractAt("Sample", contractAddress);
+
+      provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+      const result = await contract.callStatic.retrieve();
+
+      assert.isArray(result);
+      assert.lengthOf(result, 1);
+      assert.equal(result[0].toString(10), "42");
+    });
+
+    it("functions map still returns a decoded array for read-only calls", async () => {
+      const contract = await helpers.getContractAt("Sample", contractAddress);
+
+      provider.setReturnValue("qrl_call", `0x${"0".repeat(126)}2a`);
+      const result = await contract.functions.retrieve();
+
+      assert.isArray(result);
+      assert.equal(result[0].toString(10), "42");
+    });
+
+    it("explicit maps do not resolve a default sender", async () => {
+      const contract = await helpers.getContractAt("Sample", contractAddress);
+
+      provider.setReturnValue("qrl_sendTransaction", txHash);
+      await contract.functions.store(42);
+      await contract.send.store(42);
+
+      assert.equal(provider.getNumberOfCalls("qrl_accounts"), 0);
+      const params = provider.getLatestParams("qrl_sendTransaction");
+      assert.isUndefined(params[0].from);
+    });
+
+    it("getContractAt still exposes the full explicit wrapper surface", async () => {
+      const contract = await helpers.getContractAt("Sample", contractAddress);
+
+      assert.equal(contract.address, checksummedContractAddress);
+      assert.equal(contract.contractName, "Sample");
+      assert.isObject(contract.artifact);
+      assert.isObject(contract.functions);
+      assert.isObject(contract.callStatic);
+      assert.isObject(contract.send);
+      assert.isFunction(contract.callFunction);
+      assert.isFunction(contract.sendFunction);
+      assert.isFunction(contract.call);
+      assert.isFunction(contract.sendTransaction);
+      assert.isFunction(contract.encodeFunctionData);
+      assert.isFunction(contract.decodeFunctionResult);
+      assert.isFunction(contract.decodeEventLog);
+      assert.isFunction(contract.decodeReceiptLogs);
+
+      assert.equal(
+        contract.encodeFunctionData("store", [42]),
+        `0x6057361d${"0".repeat(126)}2a`
+      );
+      assert.deepEqual(
+        contract
+          .decodeFunctionResult("retrieve", `0x${"0".repeat(126)}2a`)
+          .map((value: any) => value.toString(10)),
+        ["42"]
+      );
+    });
+  });
 });
