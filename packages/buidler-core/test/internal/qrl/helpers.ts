@@ -192,6 +192,27 @@ describe("QRL runtime helpers", () => {
           type: "function",
         },
         {
+          inputs: [],
+          name: "then",
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "catch",
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "finally",
+          outputs: [{ name: "", type: "uint256" }],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           anonymous: false,
           inputs: [
             { indexed: true, name: "from", type: "address" },
@@ -830,6 +851,17 @@ describe("QRL runtime helpers", () => {
 
     const viaStatic = await contract.callStatic.hash();
     assert.equal(viaStatic[0].toString(10), "42");
+  });
+
+  it("does not create promise-like direct aliases", async () => {
+    const contract = await helpers.getContractAt("Sample", contractAddress);
+
+    assert.isUndefined(contract.then);
+    assert.isUndefined(contract.catch);
+    assert.isUndefined(contract.finally);
+    assert.isFunction(contract.functions.then);
+    assert.isFunction(contract.callStatic.catch);
+    assert.isFunction(contract.send.finally);
   });
 
   it("attaches contracts and forwards call/send requests", async () => {
