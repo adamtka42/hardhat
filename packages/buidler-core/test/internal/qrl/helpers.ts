@@ -462,6 +462,31 @@ describe("QRL runtime helpers", () => {
     assert.isUndefined(callParams[0].from);
   });
 
+  it("rejects ethers-style deploy argument order with a clear error", async () => {
+    const factory = await helpers.getContractFactory("Sample");
+
+    await expectHardhatErrorAsync(
+      () => (factory.deploy as any)("Hello", { from: contractAddress }),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "transaction overrides as its first argument"
+    );
+
+    await expectHardhatErrorAsync(
+      () =>
+        (factory.deploy as any)([42, contractAddress], {
+          from: contractAddress,
+        }),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "transaction overrides as its first argument"
+    );
+
+    await expectHardhatErrorAsync(
+      () => (factory.deploy as any)({ from: contractAddress }, { gas: 1 }),
+      ERRORS.NETWORK.INVALID_QRL_ABI,
+      "constructor arguments as an array"
+    );
+  });
+
   it("resolves the default sender for factory deploy", async function () {
     const configuredFrom = `Q${"b".repeat(128)}`;
     const localHelpers = createQrlRuntimeHelpers(({

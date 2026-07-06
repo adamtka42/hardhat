@@ -101,6 +101,7 @@ export function createQrlRuntimeHelpers(
         constructorDataOrArgs: string | any[] = "0x",
         waitOptions: QrlWaitOptions = {}
       ) => {
+        assertFactoryDeployArguments(tx, constructorDataOrArgs);
         const resolvedTx = await resolveDefaultSender(tx);
         const deployment = await deployContract(
           contractName,
@@ -419,6 +420,34 @@ function getContractFromArtifact(
   );
 
   return contract;
+}
+
+/**
+ * Guards the QRL factory deploy argument order. The QRL signature is
+ * `deploy(txOverrides?, constructorArgsOrData?, waitOptions?)` — a deliberate
+ * decision to avoid the ambiguity of ethers-style
+ * `deploy(...args, overrides)` with object/tuple constructor arguments.
+ * Without this guard, an ethers-style call like `deploy("Hello", { from })`
+ * would silently spread the string into a garbage transaction object.
+ */
+function assertFactoryDeployArguments(
+  tx: unknown,
+  constructorDataOrArgs: unknown
+): void {
+  if (tx === null || typeof tx !== "object" || Array.isArray(tx)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ABI, {
+      message: `Factory deploy() expects transaction overrides as its first argument and constructor arguments as its second, e.g. deploy({ from }, [constructorArg1, constructorArg2])`,
+    });
+  }
+
+  if (
+    typeof constructorDataOrArgs !== "string" &&
+    !Array.isArray(constructorDataOrArgs)
+  ) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ABI, {
+      message: `Factory deploy() expects constructor arguments as an array (or raw hex data string) in its second argument, e.g. deploy({ from }, [constructorArg1])`,
+    });
+  }
 }
 
 /**

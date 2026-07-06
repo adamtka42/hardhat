@@ -382,6 +382,11 @@ export interface QrlContractFactory {
    * deployment metadata attached (`deployTransactionHash`, `deployReceipt`,
    * plus transitional `hash`/`receipt` aliases). Use `qrl.deployContract()`
    * for the raw `QrlDeploymentResult` metadata.
+   *
+   * Note the QRL argument order, which differs from ethers: transaction
+   * overrides come first and constructor arguments second, e.g.
+   * `deploy({ from }, ["Hello"])`. This avoids the ambiguity of
+   * `deploy(...args, overrides)` with object/tuple constructor arguments.
    */
   deploy(
     tx?: QrlTransactionRequest,
