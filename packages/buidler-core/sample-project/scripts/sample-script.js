@@ -1,14 +1,13 @@
 async function main() {
-  const [from] = await network.provider.send("qrl_accounts");
   const Sample = await qrl.getContractFactory("Sample");
-  const deployment = await Sample.deploy({ from });
-  const sample = await qrl.getContractAt("Sample", deployment.address);
+  const sample = await Sample.deploy();
 
-  const txHash = await sample.functions.store(42, { from });
-  await qrl.waitForTransaction(txHash);
-  const [stored] = await sample.callStatic.retrieve();
+  const tx = await sample.store(42);
+  await tx.wait();
+  const stored = await sample.retrieve();
 
-  console.log("Sample deployed to:", deployment.address);
+  console.log("Sample deployed to:", sample.address);
+  console.log("Deployment transaction:", sample.deployTransactionHash);
   console.log("Stored value:", stored.toString(10));
 }
 

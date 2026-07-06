@@ -4,17 +4,16 @@ describe("Sample", function() {
   it("deploys and calls a Hyperion contract", async function() {
     this.timeout(300000);
 
-    const [from] = await network.provider.send("qrl_accounts");
     const Sample = await qrl.getContractFactory("Sample");
-    const deployment = await Sample.deploy({ from });
-    const sample = await qrl.getContractAt("Sample", deployment.address);
+    const sample = await Sample.deploy();
 
-    const txHash = await sample.functions.store(42, { from });
-    await qrl.waitForTransaction(txHash);
-    const [stored] = await sample.callStatic.retrieve();
+    const tx = await sample.store(42);
+    const receipt = await tx.wait();
+    const stored = await sample.retrieve();
 
-    assert.ok(deployment.hash);
-    assert.ok(deployment.address);
+    assert.ok(sample.deployTransactionHash);
+    assert.ok(sample.address);
+    assert.strictEqual(receipt.status, "0x1");
     assert.strictEqual(stored.toString(10), "42");
   });
 });
