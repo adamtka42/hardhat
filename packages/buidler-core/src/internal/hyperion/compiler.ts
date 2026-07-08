@@ -1,4 +1,6 @@
 import { execFile } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import { promisify } from "util";
 
 import { HyperionOptimizerConfig } from "../../types";
@@ -35,6 +37,24 @@ export async function compileHyperion(
     "--base-path",
     projectRoot,
   ];
+
+  // Allow library imports from installed packages, e.g.
+  // `import "@theqrl/hardhat/console.hyp";`.
+  const nodeModulesPath = path.join(projectRoot, "node_modules");
+  if (fs.existsSync(nodeModulesPath)) {
+    args.push("--include-path", nodeModulesPath);
+
+    // hypc canonicalizes import paths before checking them against the
+    // allowed directories, so packages installed as symlinks (npm link,
+    // file: installs) resolve outside the project and get rejected.
+    // Explicitly allow the real paths of symlinked packages.
+    const symlinkedPackagePaths = collectSymlinkedPackageRealPaths(
+      nodeModulesPath
+    );
+    if (symlinkedPackagePaths.length > 0) {
+      args.push("--allow-paths", symlinkedPackagePaths.join(","));
+    }
+  }
 
   if (input.settings.optimizer.enabled) {
     args.push(
@@ -184,4 +204,45 @@ function stripHexPrefix(value: string): string {
   return value.startsWith("0x") || value.startsWith("0X")
     ? value.slice(2)
     : value;
+}
+
+function collectSymlinkedPackageRealPaths(nodeModulesPath: string): string[] {
+  const realPaths: string[] = [];
+
+  const addIfSymlink = (entryPath: string) => {
+    try {
+      if (fs.lstatSync(entryPath).isSymbolicLink()) {
+        realPaths.push(fs.realpathSync(entryPath));
+      }
+    } catch {
+      // Broken symlinks and unreadable entries are ignored.
+    }
+  };
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(nodeModulesPath);
+  } catch {
+    return realPaths;
+  }
+
+  for (const entry of entries) {
+    const entryPath = path.join(nodeModulesPath, entry);
+
+    if (entry.startsWith("@")) {
+      let scopedEntries: string[];
+      try {
+        scopedEntries = fs.readdirSync(entryPath);
+      } catch {
+        continue;
+      }
+      for (const scopedEntry of scopedEntries) {
+        addIfSymlink(path.join(entryPath, scopedEntry));
+      }
+    } else {
+      addIfSymlink(entryPath);
+    }
+  }
+
+  return realPaths;
 }

@@ -1,0 +1,175 @@
+// SPDX-License-Identifier: MIT
+// Development-only contract console logging for QRL Hardhat.
+//
+// Usage: import "@theqrl/hardhat/console.hyp"; then call console.log(...)
+// inside contract functions (view or state-changing; not pure). On qrlLocal
+// the logs are decoded and printed by Hardhat. On real networks the calls
+// silently succeed (the console address has no code), so contracts behave
+// identically everywhere; only the local output differs.
+pragma hyperion >=0.0;
+
+library console {
+    address constant CONSOLE_ADDRESS =
+        Q0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000071726c2e636f6e736f6c652e6c6f67;
+
+    function log() internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log()")
+        );
+        ignored;
+    }
+
+    function log(string memory p0) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(string)", p0)
+        );
+        ignored;
+    }
+
+    function log(uint256 p0) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(uint256)", p0)
+        );
+        ignored;
+    }
+
+    function log(bool p0) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bool)", p0)
+        );
+        ignored;
+    }
+
+    function log(address p0) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(address)", p0)
+        );
+        ignored;
+    }
+
+    function log(bytes memory p0) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bytes)", p0)
+        );
+        ignored;
+    }
+
+    function log(bytes32 p0) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bytes32)", p0)
+        );
+        ignored;
+    }
+
+    function log(string memory p0, string memory p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(string,string)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(string memory p0, uint256 p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(string,uint256)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(string memory p0, bool p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(string,bool)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(string memory p0, address p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(string,address)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(uint256 p0, string memory p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(uint256,string)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(uint256 p0, uint256 p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(uint256,uint256)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(uint256 p0, bool p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(uint256,bool)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(uint256 p0, address p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(uint256,address)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(bool p0, string memory p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bool,string)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(bool p0, uint256 p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bool,uint256)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(bool p0, bool p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bool,bool)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(bool p0, address p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(bool,address)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(address p0, string memory p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(address,string)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(address p0, uint256 p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(address,uint256)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(address p0, bool p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(address,bool)", p0, p1)
+        );
+        ignored;
+    }
+
+    function log(address p0, address p1) internal view {
+        (bool ignored, ) = CONSOLE_ADDRESS.staticcall(
+            abi.encodeWithSignature("log(address,address)", p0, p1)
+        );
+        ignored;
+    }
+}

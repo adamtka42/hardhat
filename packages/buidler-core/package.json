@@ -38,6 +38,7 @@
   },
   "files": [
     "builtin-tasks/",
+    "console.hyp",
     "internal/",
     "sample-project/",
     "src/",
