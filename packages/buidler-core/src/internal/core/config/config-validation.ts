@@ -94,6 +94,7 @@ const HttpNetworkConfig = t.type({
   gas: optional(t.union([t.literal("auto"), t.number])),
   gasPrice: optional(t.union([t.literal("auto"), t.number])),
   gasMultiplier: optional(t.number),
+  consoleLog: optional(t.boolean),
   url: optional(t.string),
   accounts: optional(NetworkConfigAccounts),
   httpHeaders: optional(HttpHeaders),
@@ -114,6 +115,7 @@ const QrlLocalNetworkConfig = t.type({
   gasMultiplier: optional(t.number),
   accounts: optional(t.array(QrlLocalAccountConfig)),
   automine: optional(t.boolean),
+  consoleLog: optional(t.boolean),
   blockGasLimit: optional(t.number),
   qrlJsMonorepoPath: optional(t.string),
 });

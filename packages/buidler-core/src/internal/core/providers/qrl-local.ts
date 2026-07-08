@@ -6,6 +6,7 @@ import {
   QrlLocalAccountConfig,
   QrlLocalNetworkConfig,
 } from "../../../types";
+import { printQrlConsoleLog } from "../../qrl/console-log";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
@@ -30,6 +31,14 @@ export class QrlLocalHardhatProvider extends EventEmitter
     super();
 
     const { vmQrl, utilQrl } = loadQrlJsModules(config);
+    const consoleLogSupported =
+      (vmQrl as any).QRL_CONSOLE_LOG_SUPPORTED === true;
+    if (config.consoleLog === true && !consoleLogSupported) {
+      // tslint:disable-next-line: no-console
+      console.warn(
+        "The loaded qrljs-monorepo build does not support contract console logging. Rebuild qrljs-monorepo to enable it."
+      );
+    }
     this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
     this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
     this._accounts = (config.accounts ?? []).map((account) =>
@@ -51,6 +60,10 @@ export class QrlLocalHardhatProvider extends EventEmitter
         gasLimit: toRuntimeBigInt(this._blockGasLimit),
         noBaseFee: true,
       },
+      onConsoleLog:
+        config.consoleLog === false || !consoleLogSupported
+          ? undefined
+          : (data: Uint8Array) => printQrlConsoleLog(data),
     });
   }
 

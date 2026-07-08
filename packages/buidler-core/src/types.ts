@@ -13,6 +13,12 @@ interface CommonNetworkConfig {
   gas?: "auto" | number;
   gasPrice?: "auto" | number;
   gasMultiplier?: number;
+  /**
+   * Contract console logging (development only). Meaningful on `qrl-local`
+   * networks, where it defaults to enabled; accepted but inert on HTTP
+   * networks so shared config files validate everywhere.
+   */
+  consoleLog?: boolean;
 }
 
 export interface OtherAccountsConfig {
