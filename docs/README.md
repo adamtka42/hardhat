@@ -25,6 +25,8 @@ in-process tests through `qrlLocal`, and live go-qrl HTTP networks.
   deployment flows.
 - [Using the Hardhat console](guides/buidler-console.md): interactive REPL
   usage with QRL helpers and direct `qrl_*` RPC calls.
+- [Contract console logging](guides/console-log.md): `console.log` from
+  Hyperion contracts on `qrlLocal`.
 - [Creating tasks](guides/create-task.md): custom CLI tasks for QRL projects.
 - [Creating plugins](guides/create-plugin.md): a small QRL-compatible plugin walkthrough.
 - [QRL Hardhat plugins](plugins/README.md): plugin status, loading, and QRL compatibility expectations.

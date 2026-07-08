@@ -71,6 +71,44 @@ describe("Hyperion compiler", function () {
     );
   });
 
+  it("uses a filtered node_modules include path", async function () {
+    const argsPath = path.join(this.tmpDir, "hypc-args.json");
+    let hypcPath = path.join(this.tmpDir, "hypc-args");
+    hypcPath = await writeHypcArgsScript(
+      hypcPath,
+      argsPath,
+      JSON.stringify({ contracts: {} })
+    );
+
+    await fsExtra.ensureDir(
+      path.join(this.tmpDir, "node_modules", "@theqrl", "hardhat")
+    );
+    await fsExtra.ensureDir(
+      path.join(this.tmpDir, "node_modules", "@theqrl", "qrl-contracts")
+    );
+    await fsExtra.ensureDir(path.join(this.tmpDir, "@theqrl", "qrl-contracts"));
+
+    const output = await compileHyperion(
+      createEmptyInput(),
+      this.tmpDir,
+      hypcPath
+    );
+
+    assert.isUndefined(output.errors);
+
+    const captured: CapturedHypcArgs = JSON.parse(
+      await fsExtra.readFile(argsPath, "utf8")
+    );
+    const includePathIndex = captured.args.indexOf("--include-path");
+    assert.isAtLeast(includePathIndex, 0);
+    assert.notEqual(
+      captured.args[includePathIndex + 1],
+      path.join(this.tmpDir, "node_modules")
+    );
+    assert.isTrue(captured.hasHardhatPackage);
+    assert.isFalse(captured.hasDuplicateQrlContractsPackage);
+  });
+
   it("returns a compiler error for invalid hypc JSON output", async function () {
     let hypcPath = path.join(this.tmpDir, "hypc");
     hypcPath = await writeHypcScript(hypcPath, "diagnostic { bad");
@@ -111,6 +149,12 @@ describe("Hyperion compiler", function () {
   });
 });
 
+interface CapturedHypcArgs {
+  args: string[];
+  hasHardhatPackage: boolean;
+  hasDuplicateQrlContractsPackage: boolean;
+}
+
 function createEmptyInput(): HyperionInput {
   return {
     language: "Hyperion",
@@ -123,6 +167,49 @@ function createEmptyInput(): HyperionInput {
       },
     },
   };
+}
+
+async function writeHypcArgsScript(
+  hypcPath: string,
+  argsPath: string,
+  output: string
+) {
+  const jsPath = `${hypcPath}.js`;
+  await fsExtra.writeFile(
+    jsPath,
+    `const fs = require("fs");
+const path = require("path");
+const args = process.argv.slice(2);
+const includePathIndex = args.indexOf("--include-path");
+const includePath = includePathIndex === -1 ? undefined : args[includePathIndex + 1];
+fs.writeFileSync(${JSON.stringify(argsPath)}, JSON.stringify({
+  args,
+  hasHardhatPackage: includePath !== undefined && fs.existsSync(path.join(includePath, "@theqrl", "hardhat")),
+  hasDuplicateQrlContractsPackage: includePath !== undefined && fs.existsSync(path.join(includePath, "@theqrl", "qrl-contracts")),
+}));
+process.stdout.write(${JSON.stringify(output)});
+`
+  );
+
+  if (process.platform === "win32") {
+    const cmdPath = `${hypcPath}.cmd`;
+    await fsExtra.writeFile(
+      cmdPath,
+      `@echo off
+node "%~dp0${path.basename(jsPath)}" %*
+`
+    );
+    return cmdPath;
+  }
+
+  await fsExtra.writeFile(
+    hypcPath,
+    `#!/bin/sh
+node "${jsPath}" "$@"
+`
+  );
+  await fsExtra.chmod(hypcPath, 0o755);
+  return hypcPath;
 }
 
 async function writeHypcScript(hypcPath: string, output: string) {

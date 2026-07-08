@@ -62,6 +62,14 @@ describe("Env vars arguments parsing", () => {
     assert.equal(args.help, true);
   });
 
+  it("Should accept config path", () => {
+    const args = getEnvHardhatArguments(HARDHAT_PARAM_DEFINITIONS, {
+      HARDHAT_CONFIG: __filename,
+    });
+
+    assert.equal(args.config, __filename);
+  });
+
   it("should throw if an invalid value is passed", () => {
     expectHardhatError(
       () =>

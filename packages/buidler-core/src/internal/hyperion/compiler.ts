@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
 import * as fs from "fs";
+import fsExtra from "fs-extra";
+import * as os from "os";
 import * as path from "path";
 import { promisify } from "util";
 
@@ -39,20 +41,19 @@ export async function compileHyperion(
   ];
 
   // Allow library imports from installed packages, e.g.
-  // `import "@theqrl/hardhat/console.hyp";`.
-  const nodeModulesPath = path.join(projectRoot, "node_modules");
-  if (fs.existsSync(nodeModulesPath)) {
-    args.push("--include-path", nodeModulesPath);
+  // `import "@theqrl/hardhat/console.hyp";`. hypc reports ambiguous imports
+  // if the same package exists under both base-path and include-path, so expose
+  // a filtered temporary include root instead of the whole node_modules tree.
+  const nodeModulesInclude = prepareNodeModulesIncludePath(projectRoot);
+  if (nodeModulesInclude !== undefined) {
+    args.push("--include-path", nodeModulesInclude.path);
 
     // hypc canonicalizes import paths before checking them against the
     // allowed directories, so packages installed as symlinks (npm link,
     // file: installs) resolve outside the project and get rejected.
     // Explicitly allow the real paths of symlinked packages.
-    const symlinkedPackagePaths = collectSymlinkedPackageRealPaths(
-      nodeModulesPath
-    );
-    if (symlinkedPackagePaths.length > 0) {
-      args.push("--allow-paths", symlinkedPackagePaths.join(","));
+    if (nodeModulesInclude.allowPaths.length > 0) {
+      args.push("--allow-paths", nodeModulesInclude.allowPaths.join(","));
     }
   }
 
@@ -90,6 +91,8 @@ export async function compileHyperion(
         },
       ],
     };
+  } finally {
+    nodeModulesInclude?.cleanup();
   }
 
   return adaptCombinedJsonOutput(stdout, stderr);
@@ -206,13 +209,43 @@ function stripHexPrefix(value: string): string {
     : value;
 }
 
-function collectSymlinkedPackageRealPaths(nodeModulesPath: string): string[] {
-  const realPaths: string[] = [];
+interface NodeModulesIncludePath {
+  path: string;
+  allowPaths: string[];
+  cleanup: () => void;
+}
 
-  const addIfSymlink = (entryPath: string) => {
+function prepareNodeModulesIncludePath(
+  projectRoot: string
+): NodeModulesIncludePath | undefined {
+  const nodeModulesPath = path.join(projectRoot, "node_modules");
+  if (!fs.existsSync(nodeModulesPath)) {
+    return undefined;
+  }
+
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), "hardhat-hypc-includes-")
+  );
+  const allowPaths: string[] = [];
+  let linkedPackages = 0;
+
+  const cleanup = () => {
+    fsExtra.removeSync(tempRoot);
+  };
+
+  const linkPackage = (packageName: string, packagePath: string) => {
+    if (fs.existsSync(path.join(projectRoot, packageName))) {
+      return;
+    }
+
+    const linkPath = path.join(tempRoot, packageName);
+    fsExtra.ensureDirSync(path.dirname(linkPath));
+    fs.symlinkSync(packagePath, linkPath, "dir");
+    linkedPackages++;
+
     try {
-      if (fs.lstatSync(entryPath).isSymbolicLink()) {
-        realPaths.push(fs.realpathSync(entryPath));
+      if (fs.lstatSync(packagePath).isSymbolicLink()) {
+        allowPaths.push(fs.realpathSync(packagePath));
       }
     } catch {
       // Broken symlinks and unreadable entries are ignored.
@@ -223,7 +256,8 @@ function collectSymlinkedPackageRealPaths(nodeModulesPath: string): string[] {
   try {
     entries = fs.readdirSync(nodeModulesPath);
   } catch {
-    return realPaths;
+    cleanup();
+    return undefined;
   }
 
   for (const entry of entries) {
@@ -237,12 +271,24 @@ function collectSymlinkedPackageRealPaths(nodeModulesPath: string): string[] {
         continue;
       }
       for (const scopedEntry of scopedEntries) {
-        addIfSymlink(path.join(entryPath, scopedEntry));
+        linkPackage(
+          path.join(entry, scopedEntry),
+          path.join(entryPath, scopedEntry)
+        );
       }
     } else {
-      addIfSymlink(entryPath);
+      linkPackage(entry, entryPath);
     }
   }
 
-  return realPaths;
+  if (linkedPackages === 0) {
+    cleanup();
+    return undefined;
+  }
+
+  return {
+    path: tempRoot,
+    allowPaths,
+    cleanup,
+  };
 }

@@ -34,6 +34,24 @@ HARDHAT_VERBOSE=true npx hardhat test --network qrlLocal
 For more details, see
 [Verbose logging](../troubleshooting/verbose-logging.md).
 
+## Contract console logging
+
+For temporary logs inside Hyperion contracts, import the QRL Hardhat console
+library and run on `qrlLocal`:
+
+```solidity
+import "@theqrl/hardhat/console.hyp";
+
+function transfer(address to, uint256 amount) public {
+    console.log("amount", amount);
+}
+```
+
+The output appears in the terminal during local tests and scripts. HTTP and
+private networks execute the same contract code silently. See
+[Contract console logging](../guides/console-log.md) for the supported
+signatures and limitations.
+
 ## Inspecting transactions
 
 State-changing contract methods return a transaction response with a `hash`

@@ -4,6 +4,7 @@ import fsExtra from "fs-extra";
 import path from "path";
 import { promisify } from "util";
 
+import { QRL_CONSOLE_LOG_ADDRESS } from "../../src/internal/qrl/console-log";
 import { useTmpDir } from "../helpers/fs";
 
 const execFileAsync = promisify(execFile);
@@ -106,6 +107,82 @@ describe("QRL local e2e", function () {
     );
     assert.include(badCompilerResult.output, "Compilation failed");
     assert.include(badCompilerResult.output, "missing-hypc");
+  });
+
+  it("prints contract console logs on qrlLocal", async function () {
+    this.timeout(420000);
+
+    const hypcPath = resolveHypcPath();
+    const qrlJsMonorepoPath = resolveQrlJsMonorepoPath();
+    if (hypcPath === undefined || qrlJsMonorepoPath === undefined) {
+      this.skip();
+      return;
+    }
+
+    await execFileAsync("npm", ["run", "build"], {
+      cwd: PACKAGE_ROOT,
+      maxBuffer: 1024 * 1024 * 20,
+    });
+
+    await prepareProject(this.tmpDir);
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "contracts", "ConsoleProbe.hyp"),
+      getConsoleProbeSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "scripts", "console-e2e.js"),
+      getConsoleScriptSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "hardhat.console-off.config.js"),
+      getConsoleOffConfigSource()
+    );
+
+    const env = {
+      ...process.env,
+      HYPERION_HYPC_PATH: hypcPath!,
+      QRLJS_MONOREPO_PATH: qrlJsMonorepoPath!,
+    };
+
+    // Cross-repo constant drift guard: the hardhat-side console address must
+    // stay byte-identical to the qrljs-monorepo one. This is the only place
+    // both runtimes are guaranteed loaded.
+    const utilQrl = require(path.join(
+      qrlJsMonorepoPath!,
+      "packages",
+      "util",
+      "dist",
+      "cjs",
+      "index.js"
+    )).qrl;
+    assert.equal(
+      utilQrl.QRL_CONSOLE_LOG_ADDRESS.toString().toLowerCase(),
+      QRL_CONSOLE_LOG_ADDRESS.toLowerCase()
+    );
+
+    const result = await runHardhat(this.tmpDir, env, [
+      "run",
+      "scripts/console-e2e.js",
+    ]);
+    const output = result.stdout.toString();
+    const senderLine = `set called by Q${"01".repeat(64)}`;
+    assert.equal(countOccurrences(output, senderLine), 1);
+    assert.equal(countOccurrences(output, "\nold 0\n"), 1);
+    assert.equal(countOccurrences(output, "\nnew 42\n"), 1);
+    assert.equal(countOccurrences(output, "\npeek 42\n"), 1);
+    assert.include(output, "value after: 42");
+
+    // consoleLog: false disables the output without any behavior change.
+    const offResult = await runHardhat(this.tmpDir, env, [
+      "--config",
+      "hardhat.console-off.config.js",
+      "run",
+      "scripts/console-e2e.js",
+    ]);
+    const offOutput = offResult.stdout.toString();
+    assert.equal(countOccurrences(offOutput, "\nnew 42\n"), 0);
+    assert.notInclude(offOutput, senderLine);
+    assert.include(offOutput, "value after: 42");
   });
 });
 
@@ -524,4 +601,60 @@ describe("QRL local pending", function () {
   });
 });
 `;
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+function getConsoleProbeSource(): string {
+  return `// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+import "@theqrl/hardhat/console.hyp";
+
+contract ConsoleProbe {
+    uint256 public value;
+
+    function set(uint256 v) public {
+        console.log("set called by", msg.sender);
+        console.log("old", value);
+        console.log("new", v);
+        value = v;
+    }
+
+    function peek() public view returns (uint256) {
+        console.log("peek", value);
+        return value;
+    }
+}
+`;
+}
+
+function getConsoleScriptSource(): string {
+  return `async function main() {
+  const Probe = await qrl.getContractFactory("ConsoleProbe");
+  const probe = await Probe.deploy();
+
+  const tx = await probe.set(42);
+  await tx.wait();
+  const v = await probe.peek();
+
+  console.log("value after:", v.toString(10));
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+`;
+}
+
+function getConsoleOffConfigSource(): string {
+  return getConfigSource().replace(
+    'type: "qrl-local",',
+    'type: "qrl-local",\n      consoleLog: false,'
+  );
 }

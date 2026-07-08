@@ -83,6 +83,12 @@ For HTTP networks, the provider points at the configured go-qrl endpoint. For
 `qrlLocal`, it points at the in-process QRL VM provider loaded from a built
 `qrljs-monorepo` checkout.
 
+Contract console logging is wired through the `qrlLocal` provider. When a
+Hyperion contract imports `@theqrl/hardhat/console.hyp`, local executions can
+print decoded `console.log` lines to stdout. The HRE does not expose a separate
+log collection API; logs are streamed by the provider. See
+[Contract console logging](../guides/console-log.md).
+
 ## QRL helpers
 
 `hre.qrl` is the main high-level runtime API for contracts and QRL

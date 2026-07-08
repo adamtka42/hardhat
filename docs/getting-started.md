@@ -197,6 +197,23 @@ export QRL_ACCOUNT_SEED=<qrl-extended-seed>
 npx hardhat test --network qrl
 ~~~
 
+## Debug contract code with console.log
+
+When running on `qrlLocal`, contracts can import
+`@theqrl/hardhat/console.hyp` and print temporary debug values from inside
+Hyperion code:
+
+~~~solidity
+import "@theqrl/hardhat/console.hyp";
+
+function store(uint256 newValue) public {
+    console.log("new", newValue);
+}
+~~~
+
+See [Contract console logging](guides/console-log.md) for the supported
+signatures and network behavior.
+
 ## Deploy with a script
 
 Create `scripts/deploy.js`:

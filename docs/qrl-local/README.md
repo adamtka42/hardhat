@@ -114,6 +114,29 @@ console.log(sample.address);
 `deploy()` returns a ready-to-use contract wrapper. On `qrlLocal`, the sender
 defaults to the network's `from` config field.
 
+## Contract console logging
+
+`qrlLocal` can print debug logs emitted from Hyperion contracts through
+`@theqrl/hardhat/console.hyp`:
+
+~~~solidity
+import "@theqrl/hardhat/console.hyp";
+
+contract Sample {
+    function store(uint256 value) public {
+        console.log("value", value);
+    }
+}
+~~~
+
+Logs are enabled by default on `qrlLocal`. Disable them with
+`networks.qrlLocal.consoleLog: false`. HTTP go-qrl networks accept the same
+config field for shared config compatibility, but they do not print contract
+console logs.
+
+See [Contract console logging](../guides/console-log.md) for supported
+signatures, formatting, and limitations.
+
 ## Supported local RPC behavior
 
 `qrlLocal` supports the QRL JSON-RPC methods implemented by the underlying local

@@ -192,6 +192,22 @@ Fix one of these:
 
 Recipient addresses do not need to be managed. Sender addresses do.
 
+## Contract console.log prints nothing
+
+Contract-side `console.log` output is printed only by `qrlLocal`. If the same
+contract runs on an HTTP go-qrl network, the console call succeeds silently and
+no logs are printed.
+
+Check these items:
+
+- run the script or test with `--network qrlLocal`,
+- make sure the contract imports `@theqrl/hardhat/console.hyp`,
+- check that `networks.qrlLocal.consoleLog` is not set to `false`,
+- rebuild `qrljs-monorepo` if Hardhat warns that the loaded local VM does not
+  support contract console logging.
+
+See [Contract console logging](../guides/console-log.md).
+
 ## qrl_getBalance requires a block tag
 
 Some go-qrl endpoints require the block tag argument for `qrl_getBalance`.
