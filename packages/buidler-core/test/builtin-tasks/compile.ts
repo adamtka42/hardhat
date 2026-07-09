@@ -2,7 +2,10 @@ import { assert } from "chai";
 import fsExtra from "fs-extra";
 import path from "path";
 
-import { TASK_COMPILE } from "../../src/builtin-tasks/task-names";
+import {
+  TASK_COMPILE,
+  TASK_COMPILE_CHECK_CACHE,
+} from "../../src/builtin-tasks/task-names";
 import { readArtifact } from "../../src/internal/artifacts";
 import { useEnvironment } from "../helpers/environment";
 import { useFixtureProject } from "../helpers/project";
@@ -49,10 +52,7 @@ function findExecutableOnPath(executable: string): string | undefined {
   }
 }
 
-describe("Compile task", function () {
-  useFixtureProject("contracts-project");
-  useEnvironment();
-
+function useHypcEnvironment() {
   const previousHypcPath = process.env.HYPERION_HYPC_PATH;
 
   before(function () {
@@ -72,6 +72,12 @@ describe("Compile task", function () {
       process.env.HYPERION_HYPC_PATH = previousHypcPath;
     }
   });
+}
+
+describe("Compile task", function () {
+  useFixtureProject("contracts-project");
+  useEnvironment();
+  useHypcEnvironment();
 
   beforeEach(async function () {
     await fsExtra.remove("artifacts");
@@ -92,5 +98,97 @@ describe("Compile task", function () {
     assert.deepEqual(artifact.abi, []);
     assert.match(artifact.bytecode, /^0x[0-9a-f]*$/i);
     assert.match(artifact.deployedBytecode, /^0x[0-9a-f]*$/i);
+  });
+});
+
+describe("Compile task cache", function () {
+  useFixtureProject("cache-imports-project");
+  useEnvironment();
+  useHypcEnvironment();
+
+  beforeEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  afterEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  const libFilePath = () =>
+    path.join(process.cwd(), "node_modules", "dep-lib", "Lib.hyp");
+  const libPackageJsonPath = () =>
+    path.join(process.cwd(), "node_modules", "dep-lib", "package.json");
+  const projectSourcePath = () =>
+    path.join(process.cwd(), "contracts", "Consumer.hyp");
+
+  async function withRestoredFile(
+    filePath: string,
+    action: (originalContent: string) => Promise<void>
+  ) {
+    const originalContent = await fsExtra.readFile(filePath, "utf8");
+    try {
+      await action(originalContent);
+    } finally {
+      await fsExtra.writeFile(filePath, originalContent);
+    }
+  }
+
+  it("reports a cache hit when nothing changed", async function () {
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    assert.isTrue(
+      await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+    );
+  });
+
+  it("invalidates the cache when an imported node_modules file changes", async function () {
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    await withRestoredFile(libFilePath(), async (originalContent) => {
+      await fsExtra.writeFile(
+        libFilePath(),
+        `${originalContent}\n// modified\n`
+      );
+
+      assert.isFalse(
+        await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+      );
+    });
+  });
+
+  it("invalidates the cache when a project source changes", async function () {
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    await withRestoredFile(projectSourcePath(), async (originalContent) => {
+      await fsExtra.writeFile(
+        projectSourcePath(),
+        `${originalContent}\n// modified\n`
+      );
+
+      assert.isFalse(
+        await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+      );
+    });
+  });
+
+  it("recompiles instead of failing when dependency resolution breaks", async function () {
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    // Removing the package.json makes the resolver throw for the dep-lib
+    // import; the cache check must degrade to a cache miss, not crash.
+    const packageJsonContent = await fsExtra.readFile(
+      libPackageJsonPath(),
+      "utf8"
+    );
+    await fsExtra.remove(libPackageJsonPath());
+    try {
+      assert.isFalse(
+        await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+      );
+    } finally {
+      await fsExtra.writeFile(libPackageJsonPath(), packageJsonContent);
+    }
   });
 });

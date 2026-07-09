@@ -1,0 +1,5 @@
+pragma hyperion >=0.0;
+
+import "dep-lib/Lib.hyp";
+
+contract Consumer {}

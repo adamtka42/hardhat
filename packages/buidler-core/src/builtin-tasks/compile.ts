@@ -180,12 +180,29 @@ export default function () {
       return false;
     }
 
-    const sourcePaths: string[] = await run(TASK_COMPILE_GET_SOURCE_PATHS);
-    const sourceTimestamps = await Promise.all(
-      sourcePaths.map(
-        async (sourcePath) => (await fsExtra.stat(sourcePath)).ctimeMs
-      )
-    );
+    // The dependency graph includes every transitively imported file, so
+    // changes to imported libraries (e.g. under node_modules) also
+    // invalidate the cache, not just changes to project-local sources.
+    let sourceTimestamps: number[];
+    try {
+      const dependencyGraph: DependencyGraph = await run(
+        TASK_COMPILE_GET_DEPENDENCY_GRAPH
+      );
+
+      sourceTimestamps = dependencyGraph
+        .getResolvedFiles()
+        .map((file) => file.lastModificationDate.getTime());
+    } catch (error) {
+      // Never let the cache check break a build that would compile fine:
+      // hypc resolves imports on its own, so if the resolver fails here we
+      // just recompile instead of risking a stale cache hit.
+      console.warn(
+        chalk.yellow(
+          "Could not resolve Hyperion dependencies for cache checking, recompiling."
+        )
+      );
+      return false;
+    }
 
     return areArtifactsCached(sourceTimestamps, config.hyperion, config.paths);
   });
