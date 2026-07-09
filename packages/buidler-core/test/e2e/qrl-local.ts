@@ -184,6 +184,53 @@ describe("QRL local e2e", function () {
     assert.notInclude(offOutput, senderLine);
     assert.include(offOutput, "value after: 42");
   });
+
+  it("deploys contracts with external libraries on qrlLocal", async function () {
+    this.timeout(420000);
+
+    const hypcPath = resolveHypcPath();
+    const qrlJsMonorepoPath = resolveQrlJsMonorepoPath();
+    if (hypcPath === undefined || qrlJsMonorepoPath === undefined) {
+      this.skip();
+      return;
+    }
+
+    await execFileAsync("npm", ["run", "build"], {
+      cwd: PACKAGE_ROOT,
+      maxBuffer: 1024 * 1024 * 20,
+    });
+
+    await prepareProject(this.tmpDir);
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "contracts", "MathLib.hyp"),
+      getMathLibSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "contracts", "UsesMathLib.hyp"),
+      getUsesMathLibSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "scripts", "library-e2e.js"),
+      getLibraryScriptSource()
+    );
+
+    const env = {
+      ...process.env,
+      HYPERION_HYPC_PATH: hypcPath!,
+      QRLJS_MONOREPO_PATH: qrlJsMonorepoPath!,
+    };
+
+    const result = await runHardhat(this.tmpDir, env, [
+      "run",
+      "scripts/library-e2e.js",
+    ]);
+    const output = result.stdout.toString();
+    assert.include(output, "library address ok: true");
+    assert.include(output, "calc result: 42");
+    assert.include(output, "deployContract calc result: 84");
+    assert.include(output, "unlinked deploy failed: true");
+    assert.include(output, "unresolved library references");
+  });
 });
 
 async function prepareProject(projectRoot: string) {
@@ -628,6 +675,73 @@ contract ConsoleProbe {
         return value;
     }
 }
+`;
+}
+
+function getMathLibSource(): string {
+  return `// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+library MathLib {
+    function double(uint256 x) external pure returns (uint256) {
+        return x * 2;
+    }
+}
+`;
+}
+
+function getUsesMathLibSource(): string {
+  return `// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+import "./MathLib.hyp";
+
+contract UsesMathLib {
+    function calc(uint256 x) public pure returns (uint256) {
+        return MathLib.double(x);
+    }
+}
+`;
+}
+
+function getLibraryScriptSource(): string {
+  return `async function main() {
+  const MathLib = await qrl.getContractFactory("MathLib");
+  const mathLib = await MathLib.deploy();
+  console.log("library address ok:", /^Q[0-9a-fA-F]{128}$/.test(mathLib.address));
+
+  const UsesMathLib = await qrl.getContractFactory("UsesMathLib", {
+    libraries: { MathLib: mathLib.address },
+  });
+  const usesMathLib = await UsesMathLib.deploy();
+  const result = await usesMathLib.calc(21);
+  console.log("calc result:", result.toString());
+
+  const deployment = await qrl.deployContract("UsesMathLib", {}, [], {
+    libraries: { MathLib: mathLib.address },
+  });
+  const attached = UsesMathLib.attach(deployment.address);
+  const attachedResult = await attached.calc(42);
+  console.log("deployContract calc result:", attachedResult.toString());
+
+  let unlinkedFailed = false;
+  let unlinkedMessage = "";
+  try {
+    await qrl.deployContract("UsesMathLib");
+  } catch (error) {
+    unlinkedFailed = true;
+    unlinkedMessage = error.message;
+  }
+  console.log("unlinked deploy failed:", unlinkedFailed);
+  console.log(unlinkedMessage.split("\\n")[0]);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 `;
 }
 

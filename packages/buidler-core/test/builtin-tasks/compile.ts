@@ -101,6 +101,52 @@ describe("Compile task", function () {
   });
 });
 
+describe("Compile task with external libraries", function () {
+  useFixtureProject("library-project");
+  useEnvironment();
+  useHypcEnvironment();
+
+  beforeEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  afterEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  it("emits link references and placeholders for external libraries", async function () {
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    const artifact = await readArtifact(
+      this.env.config.paths.artifacts,
+      "UsesMathLib"
+    );
+
+    const sourceNames = Object.keys(artifact.linkReferences);
+    assert.lengthOf(sourceNames, 1);
+    const libraryNames = Object.keys(artifact.linkReferences[sourceNames[0]]);
+    assert.deepEqual(libraryNames, ["MathLib"]);
+
+    const [position] = artifact.linkReferences[sourceNames[0]].MathLib;
+    // The placeholder occupies the full 64-byte address slot regardless of
+    // the reported length.
+    const placeholder = artifact.bytecode.slice(
+      2 + position.start * 2,
+      2 + position.start * 2 + 128
+    );
+    assert.match(placeholder, /^__\$[0-9a-f]{122}\$__$/);
+
+    const libraryArtifact = await readArtifact(
+      this.env.config.paths.artifacts,
+      "MathLib"
+    );
+    assert.deepEqual(libraryArtifact.linkReferences, {});
+    assert.notInclude(libraryArtifact.bytecode, "__$");
+  });
+});
+
 describe("Compile task cache", function () {
   useFixtureProject("cache-imports-project");
   useEnvironment();

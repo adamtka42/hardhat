@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+import "./MathLib.hyp";
+
+contract UsesMathLib {
+    function calc(uint256 x) public pure returns (uint256) {
+        return MathLib.double(x);
+    }
+}

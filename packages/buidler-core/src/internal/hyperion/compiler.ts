@@ -200,7 +200,9 @@ function adaptStandardJsonOutput(stdout: string, stderr: string): any {
   return output;
 }
 
-function adaptBytecodeOutput(bytecodeOutput: any): {
+function adaptBytecodeOutput(
+  bytecodeOutput: any
+): {
   object: string;
   linkReferences: any;
 } {
@@ -211,7 +213,8 @@ function adaptBytecodeOutput(bytecodeOutput: any): {
         : ""
     ),
     linkReferences:
-      bytecodeOutput !== undefined && bytecodeOutput.linkReferences !== undefined
+      bytecodeOutput !== undefined &&
+      bytecodeOutput.linkReferences !== undefined
         ? bytecodeOutput.linkReferences
         : {},
   };

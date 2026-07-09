@@ -330,6 +330,51 @@ Please make sure your node is running, and check your internet connection and ne
 
 The default sender is resolved in this order: the transaction's own \`from\` field, the network's \`from\` config field, and finally the first account returned by \`qrl_accounts\`.`,
     },
+    UNLINKED_BYTECODE: {
+      number: 125,
+      message:
+        "The bytecode of contract %contractName% has unresolved library references: %libraries%. Pass their deployed addresses through the `libraries` option.",
+      title: "Unresolved library references",
+      description: `The contract uses one or more external libraries whose addresses were not provided at deployment time.
+
+Deploy the libraries first and pass their addresses, e.g. \`qrl.getContractFactory("MyContract", { libraries: { MyLib: "Q..." } })\`.`,
+    },
+    LINKING_UNKNOWN_LIBRARY: {
+      number: 126,
+      message:
+        "Contract %contractName% does not need library %library%. Needed libraries: %libraries%.",
+      title: "Unknown library provided for linking",
+      description: `A library address was provided for a library that the contract's bytecode does not reference.
+
+Double check the library name; both the bare name and the fully qualified \`file.hyp:Library\` form are accepted.`,
+    },
+    LINKING_AMBIGUOUS_LIBRARY: {
+      number: 127,
+      message:
+        "The library name %library% is ambiguous for contract %contractName%. It matches: %candidates%. Use the fully qualified name.",
+      title: "Ambiguous library name for linking",
+      description: `Two or more libraries referenced by the contract share the same bare name.
+
+Use the fully qualified \`file.hyp:Library\` form to disambiguate.`,
+    },
+    LINKING_INVALID_ADDRESS: {
+      number: 128,
+      message:
+        "Invalid address %address% provided for library %library% of contract %contractName%.",
+      title: "Invalid library address for linking",
+      description: `The address provided for a library is not a valid QRL address.
+
+QRL addresses start with \`Q\` followed by 128 hex characters.`,
+    },
+    LINKING_PLACEHOLDER_MISMATCH: {
+      number: 129,
+      message:
+        "The bytecode of contract %contractName% does not contain the expected link placeholder for library %library% at offset %offset%. The artifact may be corrupted or produced by an incompatible compiler.",
+      title: "Link reference placeholder mismatch",
+      description: `A link reference reported by the compiler does not point at a \`__$...$__\` placeholder in the bytecode.
+
+Recompile the project with a matching hypc build; if the problem persists, report it.`,
+    },
   },
   TASK_DEFINITIONS: {
     PARAM_AFTER_VARIADIC: {

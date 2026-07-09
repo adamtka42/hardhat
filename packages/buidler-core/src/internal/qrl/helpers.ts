@@ -6,6 +6,8 @@ import {
   QrlContractFactory,
   QrlContractFunctionMap,
   QrlDeploymentResult,
+  QrlDeployOptions,
+  QrlFactoryOptions,
   QrlRuntimeHelpers,
   QrlTransactionReceipt,
   QrlTransactionRequest,
@@ -25,6 +27,7 @@ import {
   getFunctionSignature,
 } from "./abi";
 import { normalizeQrlAddress } from "./address";
+import { assertDeployableBytecode, linkQrlBytecode } from "./linking";
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -92,13 +95,25 @@ export function createQrlRuntimeHelpers(
   }
 
   async function getContractFactory(
-    contractName: string
+    contractName: string,
+    options: QrlFactoryOptions = {}
   ): Promise<QrlContractFactory> {
     const artifact = await readQrlArtifact(contractName);
+
+    // The factory holds already-linked bytecode, so `deploy` needs no
+    // library handling of its own.
+    const linkedArtifact: Artifact =
+      options.libraries !== undefined
+        ? {
+            ...artifact,
+            bytecode: linkQrlBytecode(artifact, options.libraries),
+          }
+        : artifact;
 
     return {
       contractName,
       artifact,
+      bytecode: linkedArtifact.bytecode,
       deploy: async (
         tx: QrlTransactionRequest = {},
         constructorDataOrArgs: string | any[] = "0x",
@@ -106,8 +121,8 @@ export function createQrlRuntimeHelpers(
       ) => {
         assertFactoryDeployArguments(tx, constructorDataOrArgs);
         const resolvedTx = await resolveDefaultSender(tx);
-        const deployment = await deployContract(
-          contractName,
+        const deployment = await deployArtifact(
+          linkedArtifact,
           resolvedTx,
           constructorDataOrArgs,
           waitOptions
@@ -228,9 +243,33 @@ export function createQrlRuntimeHelpers(
     contractName: string,
     tx: QrlTransactionRequest = {},
     constructorDataOrArgs: string | any[] = "0x",
-    waitOptions: QrlWaitOptions = {}
+    deployOptions: QrlDeployOptions = {}
   ): Promise<QrlDeploymentResult> {
     const artifact = await readQrlArtifact(contractName);
+    const linkedArtifact: Artifact =
+      deployOptions.libraries !== undefined
+        ? {
+            ...artifact,
+            bytecode: linkQrlBytecode(artifact, deployOptions.libraries),
+          }
+        : artifact;
+
+    return deployArtifact(
+      linkedArtifact,
+      tx,
+      constructorDataOrArgs,
+      deployOptions
+    );
+  }
+
+  async function deployArtifact(
+    artifact: Artifact,
+    tx: QrlTransactionRequest = {},
+    constructorDataOrArgs: string | any[] = "0x",
+    waitOptions: QrlWaitOptions = {}
+  ): Promise<QrlDeploymentResult> {
+    assertDeployableBytecode(artifact, artifact.bytecode);
+
     const constructorData = Array.isArray(constructorDataOrArgs)
       ? encodeQrlConstructorArgs(artifact.abi, constructorDataOrArgs)
       : constructorDataOrArgs;

@@ -47,6 +47,41 @@ const token = await Token.deploy(
 );
 ~~~
 
+## Deploying contracts with external libraries
+
+A Hyperion `library` with `external` functions is deployed once and shared by
+its consumers through `delegatecall`. The compiler leaves a placeholder in the
+consumer's bytecode, and the artifact records it under `linkReferences`.
+Deploy the library first and pass its address through the `libraries` option:
+
+~~~js
+const MathLib = await qrl.getContractFactory("MathLib");
+const mathLib = await MathLib.deploy();
+
+const UsesMathLib = await qrl.getContractFactory("UsesMathLib", {
+  libraries: { MathLib: mathLib.address },
+});
+const usesMathLib = await UsesMathLib.deploy();
+~~~
+
+The factory holds the linked bytecode, so every `deploy` call reuses it. The
+low-level helper accepts the same option:
+
+~~~js
+await qrl.deployContract("UsesMathLib", {}, [], {
+  libraries: { MathLib: mathLib.address },
+});
+~~~
+
+Library names are accepted in bare form (`MathLib`) and fully qualified form
+(`contracts/MathLib.hyp:MathLib`). Use the fully qualified form when two
+libraries share a bare name. Deploying bytecode with unresolved placeholders
+fails with `HH125: Unresolved library references`, naming the missing
+libraries.
+
+Libraries with only `internal` functions (like the bundled `console.hyp`) are
+inlined by the compiler and need no linking.
+
 ## Deploying to qrlLocal
 
 `qrlLocal` is the in-process QRL VM network. It is the fastest target for local
@@ -291,6 +326,12 @@ node. Use one of `qrl_accounts`, set `QRL_ACCOUNT_SEED`, configure
 HTTP deployments need either local seeds or node-managed accounts. Set
 `QRL_ACCOUNT_SEED` for local signing, or configure `accounts: "remote"` with a
 node that has unlocked accounts.
+
+### HH125: Unresolved library references
+
+The contract uses an external library and no address was provided for it.
+Deploy the library first and pass its address through the `libraries` option;
+see "Deploying contracts with external libraries" above.
 
 ### Connected to the wrong network
 

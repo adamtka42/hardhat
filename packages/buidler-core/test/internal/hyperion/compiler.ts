@@ -33,9 +33,7 @@ describe("Hyperion compiler", function () {
     let envHypcPath = path.join(this.tmpDir, "env-hypc");
     configuredHypcPath = await writeHypcScript(
       configuredHypcPath,
-      JSON.stringify(
-        createStandardJsonOutput({ bytecodeObject: "0x6000" })
-      )
+      JSON.stringify(createStandardJsonOutput({ bytecodeObject: "0x6000" }))
     );
     envHypcPath = await writeHypcScript(
       envHypcPath,

@@ -343,6 +343,22 @@ export interface QrlWaitOptions {
   pollIntervalMs?: number;
 }
 
+export interface QrlLibraryAddresses {
+  /**
+   * Deployed addresses of external libraries, keyed by bare library name
+   * (`MathLib`) or fully qualified name (`contracts/MathLib.hyp:MathLib`).
+   */
+  [libraryName: string]: string;
+}
+
+export interface QrlDeployOptions extends QrlWaitOptions {
+  libraries?: QrlLibraryAddresses;
+}
+
+export interface QrlFactoryOptions {
+  libraries?: QrlLibraryAddresses;
+}
+
 export interface QrlTransactionReceipt {
   transactionHash: string;
   blockHash?: string;
@@ -363,7 +379,10 @@ export interface QrlTransactionResponse {
 
 export interface QrlRuntimeHelpers {
   readArtifact(contractName: string): Promise<Artifact>;
-  getContractFactory(contractName: string): Promise<QrlContractFactory>;
+  getContractFactory(
+    contractName: string,
+    options?: QrlFactoryOptions
+  ): Promise<QrlContractFactory>;
   getContractAt(contractName: string, address: string): Promise<QrlContract>;
   sendTransaction(tx: QrlTransactionRequest): Promise<string>;
   call(tx: QrlTransactionRequest, blockTag?: string): Promise<string>;
@@ -376,13 +395,18 @@ export interface QrlRuntimeHelpers {
     contractName: string,
     tx?: QrlTransactionRequest,
     constructorDataOrArgs?: string | any[],
-    waitOptions?: QrlWaitOptions
+    deployOptions?: QrlDeployOptions
   ): Promise<QrlDeploymentResult>;
 }
 
 export interface QrlContractFactory {
   readonly contractName: string;
   readonly artifact: Artifact;
+  /**
+   * The deploy bytecode with the factory's `libraries` applied. Contains
+   * `__$...$__` placeholders while libraries remain unresolved.
+   */
+  readonly bytecode: string;
   /**
    * Deploys the contract and returns a ready-to-use contract wrapper with
    * deployment metadata attached (`deployTransactionHash`, `deployReceipt`,
