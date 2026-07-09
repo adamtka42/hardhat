@@ -9,7 +9,16 @@ import { HyperionOptimizerConfig } from "../../types";
 
 const execFileAsync = promisify(execFile);
 
-const HYPERION_OUTPUTS = "abi,bin,bin-runtime";
+// Standard JSON gives access to linkReferences (external library
+// placeholders), which the legacy combined-json output does not carry.
+// Note the output namespace is `qrvm`, not `evm`.
+const HYPERION_OUTPUT_SELECTION = [
+  "abi",
+  "qrvm.bytecode.object",
+  "qrvm.bytecode.linkReferences",
+  "qrvm.deployedBytecode.object",
+  "qrvm.deployedBytecode.linkReferences",
+];
 
 export interface HyperionInput {
   language: "Hyperion";
@@ -33,12 +42,31 @@ export async function compileHyperion(
       : process.env.HYPC_PATH !== undefined
       ? process.env.HYPC_PATH
       : "hypc";
-  const args = [
-    "--combined-json",
-    HYPERION_OUTPUTS,
-    "--base-path",
-    projectRoot,
-  ];
+  const standardJsonInput = {
+    language: "Hyperion",
+    sources: input.sources,
+    settings: {
+      optimizer: input.settings.optimizer.enabled
+        ? {
+            enabled: true,
+            runs: input.settings.optimizer.runs,
+          }
+        : { enabled: false },
+      outputSelection: {
+        "*": {
+          "*": HYPERION_OUTPUT_SELECTION,
+        },
+      },
+    },
+  };
+
+  // The input is passed through a temporary file instead of stdin so the
+  // exec call stays a simple argv invocation on every platform.
+  const inputDir = fs.mkdtempSync(path.join(os.tmpdir(), "hardhat-hypc-in-"));
+  const inputFile = path.join(inputDir, "input.json");
+  fs.writeFileSync(inputFile, JSON.stringify(standardJsonInput));
+
+  const args = ["--standard-json", inputFile, "--base-path", projectRoot];
 
   // Allow library imports from installed packages, e.g.
   // `import "@theqrl/hardhat/console.hyp";`. hypc reports ambiguous imports
@@ -56,16 +84,6 @@ export async function compileHyperion(
       args.push("--allow-paths", nodeModulesInclude.allowPaths.join(","));
     }
   }
-
-  if (input.settings.optimizer.enabled) {
-    args.push(
-      "--optimize",
-      "--optimize-runs",
-      `${input.settings.optimizer.runs}`
-    );
-  }
-
-  args.push(...input.sourcePaths);
 
   let stdout = "";
   let stderr = "";
@@ -93,12 +111,13 @@ export async function compileHyperion(
     };
   } finally {
     nodeModulesInclude?.cleanup();
+    fsExtra.removeSync(inputDir);
   }
 
-  return adaptCombinedJsonOutput(stdout, stderr);
+  return adaptStandardJsonOutput(stdout, stderr);
 }
 
-function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
+function adaptStandardJsonOutput(stdout: string, stderr: string): any {
   const jsonStart = stdout.indexOf("{");
   if (jsonStart === -1) {
     const message =
@@ -119,9 +138,9 @@ function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
   }
 
   const compilerMessages = stdout.slice(0, jsonStart).trim();
-  let combinedOutput: any;
+  let standardOutput: any;
   try {
-    combinedOutput = JSON.parse(stdout.slice(jsonStart));
+    standardOutput = JSON.parse(stdout.slice(jsonStart));
   } catch (error) {
     return {
       errors: [
@@ -139,68 +158,63 @@ function adaptCombinedJsonOutput(stdout: string, stderr: string): any {
   };
 
   const contracts =
-    combinedOutput.contracts !== undefined ? combinedOutput.contracts : {};
+    standardOutput.contracts !== undefined ? standardOutput.contracts : {};
 
-  for (const fullName of Object.keys(contracts)) {
-    const separator = fullName.lastIndexOf(":");
-    const sourceName =
-      separator === -1 ? fullName : fullName.slice(0, separator);
-    const contractName =
-      separator === -1 ? fullName : fullName.slice(separator + 1);
-    const contractOutput = contracts[fullName];
-    let abi: any;
-    try {
-      abi =
-        typeof contractOutput.abi === "string"
-          ? JSON.parse(contractOutput.abi)
-          : contractOutput.abi;
-    } catch (error) {
-      return {
-        errors: [
-          {
-            severity: "error",
-            formattedMessage: `hypc returned invalid ABI JSON for ${fullName}: ${
-              (error as Error).message
-            }`,
-          },
-        ],
+  for (const sourceName of Object.keys(contracts)) {
+    for (const contractName of Object.keys(contracts[sourceName])) {
+      const contractOutput = contracts[sourceName][contractName];
+      const qrvm = contractOutput.qrvm !== undefined ? contractOutput.qrvm : {};
+
+      if (output.contracts[sourceName] === undefined) {
+        output.contracts[sourceName] = {};
+      }
+
+      output.contracts[sourceName][contractName] = {
+        abi: contractOutput.abi !== undefined ? contractOutput.abi : [],
+        bytecodeOutput: {
+          bytecode: adaptBytecodeOutput(qrvm.bytecode),
+          deployedBytecode: adaptBytecodeOutput(qrvm.deployedBytecode),
+        },
       };
     }
-
-    if (output.contracts[sourceName] === undefined) {
-      output.contracts[sourceName] = {};
-    }
-
-    output.contracts[sourceName][contractName] = {
-      abi,
-      bytecodeOutput: {
-        bytecode: {
-          object: stripHexPrefix(
-            contractOutput.bin !== undefined ? contractOutput.bin : ""
-          ),
-          linkReferences: {},
-        },
-        deployedBytecode: {
-          object: stripHexPrefix(
-            contractOutput["bin-runtime"] !== undefined
-              ? contractOutput["bin-runtime"]
-              : ""
-          ),
-          linkReferences: {},
-        },
-      },
-    };
   }
 
-  const warnings = [compilerMessages, stderr].filter((msg) => msg !== "");
-  if (warnings.length > 0) {
-    output.errors = warnings.map((msg) => ({
+  // Standard JSON reports compiler diagnostics in its own errors array; the
+  // compile task consumes their severity and formattedMessage directly.
+  output.errors = Array.isArray(standardOutput.errors)
+    ? [...standardOutput.errors]
+    : [];
+
+  const extraMessages = [compilerMessages, stderr].filter((msg) => msg !== "");
+  output.errors.push(
+    ...extraMessages.map((msg) => ({
       severity: "warning",
       formattedMessage: msg,
-    }));
+    }))
+  );
+
+  if (output.errors.length === 0) {
+    delete output.errors;
   }
 
   return output;
+}
+
+function adaptBytecodeOutput(bytecodeOutput: any): {
+  object: string;
+  linkReferences: any;
+} {
+  return {
+    object: stripHexPrefix(
+      bytecodeOutput !== undefined && bytecodeOutput.object !== undefined
+        ? bytecodeOutput.object
+        : ""
+    ),
+    linkReferences:
+      bytecodeOutput !== undefined && bytecodeOutput.linkReferences !== undefined
+        ? bytecodeOutput.linkReferences
+        : {},
+  };
 }
 
 function stripHexPrefix(value: string): string {

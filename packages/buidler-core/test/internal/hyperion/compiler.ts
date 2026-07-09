@@ -33,27 +33,13 @@ describe("Hyperion compiler", function () {
     let envHypcPath = path.join(this.tmpDir, "env-hypc");
     configuredHypcPath = await writeHypcScript(
       configuredHypcPath,
-      JSON.stringify({
-        contracts: {
-          "contracts/Token.hyp:Token": {
-            abi: "[]",
-            bin: "0x6000",
-            "bin-runtime": "0x00",
-          },
-        },
-      })
+      JSON.stringify(
+        createStandardJsonOutput({ bytecodeObject: "0x6000" })
+      )
     );
     envHypcPath = await writeHypcScript(
       envHypcPath,
-      JSON.stringify({
-        contracts: {
-          "contracts/Token.hyp:Token": {
-            abi: "{ bad",
-            bin: "0x",
-            "bin-runtime": "0x",
-          },
-        },
-      })
+      JSON.stringify(createStandardJsonOutput({ bytecodeObject: "0xbad" }))
     );
     process.env.HYPERION_HYPC_PATH = envHypcPath;
 
@@ -124,27 +110,56 @@ describe("Hyperion compiler", function () {
     );
   });
 
-  it("returns a compiler error for invalid ABI JSON output", async function () {
+  it("passes through standard JSON compiler errors", async function () {
     let hypcPath = path.join(this.tmpDir, "hypc");
-    const combinedOutput = JSON.stringify({
-      contracts: {
-        "contracts/Token.hyp:Token": {
-          abi: "{ bad",
-          bin: "0x6000",
-          "bin-runtime": "0x00",
-        },
-      },
+    const standardOutput = createStandardJsonOutput({
+      bytecodeObject: "0x6000",
     });
-    hypcPath = await writeHypcScript(hypcPath, combinedOutput);
+    standardOutput.errors = [
+      {
+        severity: "error",
+        type: "TypeError",
+        message: "Bad thing happened",
+        formattedMessage: "TypeError: Bad thing happened",
+      },
+    ];
+    hypcPath = await writeHypcScript(hypcPath, JSON.stringify(standardOutput));
     process.env.HYPERION_HYPC_PATH = hypcPath;
 
     const output = await compileHyperion(createEmptyInput(), this.tmpDir);
 
     assert.lengthOf(output.errors, 1);
     assert.equal(output.errors[0].severity, "error");
-    assert.include(
+    assert.equal(output.errors[0].type, "TypeError");
+    assert.equal(
       output.errors[0].formattedMessage,
-      "hypc returned invalid ABI JSON for contracts/Token.hyp:Token"
+      "TypeError: Bad thing happened"
+    );
+  });
+
+  it("preserves link references from the compiler output", async function () {
+    let hypcPath = path.join(this.tmpDir, "hypc");
+    const linkReferences = {
+      "contracts/MathLib.hyp": {
+        MathLib: [{ start: 128, length: 64 }],
+      },
+    };
+    const standardOutput = createStandardJsonOutput({
+      bytecodeObject: "0x6000",
+      linkReferences,
+    });
+    hypcPath = await writeHypcScript(hypcPath, JSON.stringify(standardOutput));
+    process.env.HYPERION_HYPC_PATH = hypcPath;
+
+    const output = await compileHyperion(createEmptyInput(), this.tmpDir);
+
+    assert.isUndefined(output.errors);
+    const bytecodeOutput =
+      output.contracts["contracts/Token.hyp"].Token.bytecodeOutput;
+    assert.deepEqual(bytecodeOutput.bytecode.linkReferences, linkReferences);
+    assert.deepEqual(
+      bytecodeOutput.deployedBytecode.linkReferences,
+      linkReferences
     );
   });
 });
@@ -153,6 +168,34 @@ interface CapturedHypcArgs {
   args: string[];
   hasHardhatPackage: boolean;
   hasDuplicateQrlContractsPackage: boolean;
+}
+
+function createStandardJsonOutput(options: {
+  bytecodeObject: string;
+  linkReferences?: any;
+}): any {
+  const linkReferences =
+    options.linkReferences !== undefined ? options.linkReferences : {};
+
+  return {
+    contracts: {
+      "contracts/Token.hyp": {
+        Token: {
+          abi: [],
+          qrvm: {
+            bytecode: {
+              object: options.bytecodeObject,
+              linkReferences,
+            },
+            deployedBytecode: {
+              object: "0x00",
+              linkReferences,
+            },
+          },
+        },
+      },
+    },
+  };
 }
 
 function createEmptyInput(): HyperionInput {
