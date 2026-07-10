@@ -729,11 +729,11 @@ We recommend not using this kind of dependencies.`,
     JSONRPC_UNSUPPORTED_NETWORK: {
       number: 606,
       message:
-        "The local JSON-RPC server is not supported by the QRL-only fork yet.",
+        'The JSON-RPC server can only be started on a qrl-local network. Select a network of type "qrl-local" or omit --network to use qrlLocal.',
       title: "Unsupported network for JSON-RPC server.",
-      description: `This fork currently supports live go-qrl networks only.
+      description: `\`hardhat node\` serves the in-process local QRL network; it never proxies to an HTTP network.
 
-Configure a network with an HTTP URL that points to a running go-qrl node.`,
+Run it without \`--network\`, or pass a network whose config has \`type: "qrl-local"\`.`,
     },
   },
   ARTIFACTS: {

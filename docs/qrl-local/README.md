@@ -81,6 +81,10 @@ returns `0x0` for `qrl_gasPrice`.
 
 ## Running tests and scripts
 
+To expose the local network to external clients (frontends, wallets, other
+processes), run it as a standalone endpoint with
+[`hardhat node`](../guides/node.md).
+
 Run tests against the in-process network:
 
 ~~~sh
