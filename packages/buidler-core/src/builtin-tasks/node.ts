@@ -114,6 +114,16 @@ export default function () {
 
         logQrlLocalAccounts(qrlLocalConfig);
 
+        // Graceful shutdown: close the HTTP/WS servers and exit cleanly.
+        const shutdown = () => {
+          server
+            .close()
+            .then(() => process.exit(0))
+            .catch(() => process.exit(1));
+        };
+        process.once("SIGINT", shutdown);
+        process.once("SIGTERM", shutdown);
+
         await server.waitUntilClosed();
       } catch (error) {
         if (HardhatError.isHardhatError(error)) {

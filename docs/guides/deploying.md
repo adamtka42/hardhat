@@ -76,8 +76,10 @@ await qrl.deployContract("UsesMathLib", {}, [], {
 Library names are accepted in bare form (`MathLib`) and fully qualified form
 (`contracts/MathLib.hyp:MathLib`). Use the fully qualified form when two
 libraries share a bare name. Deploying bytecode with unresolved placeholders
-fails with `HH125: Unresolved library references`, naming the missing
-libraries.
+fails with `BDLR125: Unresolved library references`, naming the missing
+libraries. Related linking validation errors: BDLR126 (unknown library),
+BDLR127 (ambiguous bare name), BDLR128 (invalid address), BDLR129
+(placeholder mismatch), BDLR131 (conflicting addresses).
 
 Libraries with only `internal` functions (like the bundled `console.hyp`) are
 inlined by the compiler and need no linking.
@@ -327,7 +329,7 @@ HTTP deployments need either local seeds or node-managed accounts. Set
 `QRL_ACCOUNT_SEED` for local signing, or configure `accounts: "remote"` with a
 node that has unlocked accounts.
 
-### HH125: Unresolved library references
+### BDLR125: Unresolved library references
 
 The contract uses an external library and no address was provided for it.
 Deploy the library first and pass its address through the `libraries` option;

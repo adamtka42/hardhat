@@ -19,14 +19,19 @@ export async function buildQrlStackTraceLines(
     return [];
   }
 
-  // Failing spine: from the root, keep descending into the last child that
-  // failed (a revert bubbles up through the frames that propagated it).
+  // Failing spine: from the root, keep descending into the last child whose
+  // failure PROPAGATED — i.e. whose revert payload equals the parent's
+  // (Hyperion bubbles nested failures by re-reverting with the child's
+  // returndata). A handled nested failure has a different parent payload
+  // and must not be blamed for the parent's own revert.
   const spine: any[] = [];
   let current: any = rootFrame;
   while (current !== undefined) {
     spine.push(current);
     const failingChildren = (current.children ?? []).filter(
-      (child: any) => child.errorMessage !== undefined
+      (child: any) =>
+        child.errorMessage !== undefined &&
+        bytesEqual(child.returnValue, current.returnValue)
     );
     current = failingChildren[failingChildren.length - 1];
   }
@@ -71,4 +76,19 @@ function bytesToHex(bytes: Uint8Array | undefined): string {
     hex += byte.toString(16).padStart(2, "0");
   }
   return hex;
+}
+
+function bytesEqual(
+  a: Uint8Array | undefined,
+  b: Uint8Array | undefined
+): boolean {
+  if (a === undefined || b === undefined || a.length !== b.length) {
+    return false;
+  }
+  for (let index = 0; index < a.length; index++) {
+    if (a[index] !== b[index]) {
+      return false;
+    }
+  }
+  return true;
 }

@@ -375,6 +375,15 @@ QRL addresses start with \`Q\` followed by 128 hex characters.`,
 
 Recompile the project with a matching hypc build; if the problem persists, report it.`,
     },
+    LINKING_CONFLICTING_ADDRESSES: {
+      number: 131,
+      message:
+        "Library %library% of contract %contractName% was given two different addresses (via its bare and fully qualified names).",
+      title: "Conflicting library addresses for linking",
+      description: `The same library was provided twice — through its bare name and its fully qualified name — with different addresses.
+
+Remove one of the entries or make the addresses identical.`,
+    },
     INVALID_INITIAL_DATE: {
       number: 130,
       message:

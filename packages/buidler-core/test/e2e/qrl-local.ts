@@ -283,6 +283,19 @@ describe("QRL local e2e", function () {
     assert.include(output, "at Inner.poke (contracts/Nested.hyp:11)");
     assert.include(output, "at Outer.pokeInner (contracts/Nested.hyp:");
 
+    // A HANDLED nested failure must not be blamed: the trace points at the
+    // outer contract's own revert, without an Inner frame.
+    const handledSection = output.slice(
+      output.indexOf("HANDLED TRACE:"),
+      output.indexOf("HANDLED TRACE END")
+    );
+    assert.include(handledSection, "reason: 'own reason'");
+    assert.include(
+      handledSection,
+      "at Outer.handledThenOwnRevert (contracts/Nested.hyp:"
+    );
+    assert.notInclude(handledSection, "at Inner.fail");
+
     // Opt-out restores the plain message.
     await fsExtra.writeFile(
       path.join(this.tmpDir, "hardhat.notrace.config.js"),
@@ -386,12 +399,12 @@ async function symlinkPackage(target: string, linkPath: string) {
   await fsExtra.symlink(target, linkPath, "dir");
 }
 
-function runHardhat(
+async function runHardhat(
   projectRoot: string,
   env: NodeJS.ProcessEnv,
   args: string[]
 ) {
-  return execFileAsync(
+  const result = await execFileAsync(
     "node",
     ["node_modules/@theqrl/hardhat/internal/cli/cli.js", ...args],
     {
@@ -400,6 +413,18 @@ function runHardhat(
       maxBuffer: 1024 * 1024 * 20,
     }
   );
+  // The root test runner forces colors (FORCE_COLOR); assertions below
+  // expect plain text, so strip ANSI escapes from the captured output.
+  return {
+    ...result,
+    stdout: stripAnsi(result.stdout.toString()),
+    stderr: stripAnsi(result.stderr.toString()),
+  };
+}
+
+function stripAnsi(text: string): string {
+  // tslint:disable-next-line: tsr-detect-unsafe-regexp
+  return text.replace(/\u001b\[[0-9;]*m/g, "");
 }
 
 async function expectHardhatFailure(
@@ -847,6 +872,17 @@ contract Outer {
     function pokeInner(uint256 x) public {
         inner.poke(x);
     }
+
+    function handledThenOwnRevert() public view returns (uint256) {
+        // Low-level call whose failure is HANDLED; the revert below has its
+        // own, different reason and must be reported as the origin.
+        (bool ok, ) = address(inner).staticcall(
+            abi.encodeWithSignature("fail(uint256)", uint256(1))
+        );
+        ok;
+        require(false, "own reason");
+        return 0;
+    }
 }
 `;
 }
@@ -870,6 +906,15 @@ function getTraceScriptSource(): string {
   } catch (error) {
     console.log("TX TRACE:");
     console.log(error.message);
+  }
+
+  try {
+    await outer.handledThenOwnRevert();
+    console.log("handledThenOwnRevert unexpectedly succeeded");
+  } catch (error) {
+    console.log("HANDLED TRACE:");
+    console.log(error.message);
+    console.log("HANDLED TRACE END");
   }
 }
 

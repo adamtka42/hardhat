@@ -191,6 +191,10 @@ describe("Compile task cache", function () {
 
   it("invalidates the cache when an imported node_modules file changes", async function () {
     await this.env.run(TASK_COMPILE, { force: true });
+    const before = await readArtifact(
+      this.env.config.paths.artifacts,
+      "Consumer"
+    );
 
     await withRestoredFile(libFilePath(), async (originalContent) => {
       await fsExtra.writeFile(
@@ -201,7 +205,61 @@ describe("Compile task cache", function () {
       assert.isFalse(
         await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
       );
+
+      // A REGULAR compile (no force) must actually rebuild: the metadata
+      // hash embedded in the bytecode changes with the imported source.
+      await this.env.run(TASK_COMPILE, {});
+      const after = await readArtifact(
+        this.env.config.paths.artifacts,
+        "Consumer"
+      );
+      assert.notEqual(after.bytecode, before.bytecode);
     });
+  });
+
+  it("invalidates the cache when a symlinked package file changes", async function () {
+    const realPackageDir = path.join(process.cwd(), "linked-lib-src");
+    const linkPath = path.join(process.cwd(), "node_modules", "linked-lib");
+    const consumerPath = path.join(
+      process.cwd(),
+      "contracts",
+      "LinkedConsumer.hyp"
+    );
+
+    await fsExtra.ensureDir(realPackageDir);
+    await fsExtra.writeFile(
+      path.join(realPackageDir, "package.json"),
+      JSON.stringify({ name: "linked-lib", version: "1.0.0" })
+    );
+    await fsExtra.writeFile(
+      path.join(realPackageDir, "Linked.hyp"),
+      "pragma hyperion >=0.0;\n\ncontract Linked {}\n"
+    );
+    await fsExtra.symlink(realPackageDir, linkPath, "dir");
+    await fsExtra.writeFile(
+      consumerPath,
+      'pragma hyperion >=0.0;\n\nimport "linked-lib/Linked.hyp";\n\ncontract LinkedConsumer {}\n'
+    );
+
+    try {
+      await this.env.run(TASK_COMPILE, { force: true });
+      assert.isTrue(
+        await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+      );
+
+      await fsExtra.writeFile(
+        path.join(realPackageDir, "Linked.hyp"),
+        "pragma hyperion >=0.0;\n\ncontract Linked { uint256 internal touched; }\n"
+      );
+
+      assert.isFalse(
+        await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+      );
+    } finally {
+      await fsExtra.remove(consumerPath);
+      await fsExtra.remove(linkPath);
+      await fsExtra.remove(realPackageDir);
+    }
   });
 
   it("invalidates the cache when a project source changes", async function () {

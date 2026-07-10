@@ -209,6 +209,34 @@ describe("QRL library linking", function () {
     );
   });
 
+  it("rejects conflicting addresses for the same library via two aliases", function () {
+    const artifact = makeArtifact({
+      placeholders: [
+        {
+          sourceName: "contracts/MathLib.hyp",
+          libraryName: "MathLib",
+          seed: "a",
+        },
+      ],
+    });
+
+    expectHardhatError(
+      () =>
+        linkQrlBytecode(artifact, {
+          MathLib: LIBRARY_ADDRESS,
+          "contracts/MathLib.hyp:MathLib": OTHER_LIBRARY_ADDRESS,
+        }),
+      ERRORS.NETWORK.LINKING_CONFLICTING_ADDRESSES
+    );
+
+    // The same address through both aliases stays valid.
+    const linked = linkQrlBytecode(artifact, {
+      MathLib: LIBRARY_ADDRESS,
+      "contracts/MathLib.hyp:MathLib": LIBRARY_ADDRESS,
+    });
+    assert.equal(linked, `0x6080${"ab".repeat(64)}5f`);
+  });
+
   it("rejects invalid library addresses", function () {
     const artifact = makeArtifact({
       placeholders: [

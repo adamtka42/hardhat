@@ -32,7 +32,10 @@ export interface QrlDebugInfo {
  * compiler input/output JSON files. Returns `undefined` when the cache is
  * missing or unreadable — stack traces then degrade gracefully.
  */
-export function loadQrlDebugInfo(cachePath: string): QrlDebugInfo | undefined {
+export function loadQrlDebugInfo(
+  cachePath: string,
+  projectRoot?: string
+): QrlDebugInfo | undefined {
   try {
     const output = fsExtra.readJsonSync(
       path.join(cachePath, COMPILER_OUTPUT_FILENAME)
@@ -77,6 +80,28 @@ export function loadQrlDebugInfo(cachePath: string): QrlDebugInfo | undefined {
       }
       if (source?.ast !== undefined) {
         astBySourceName.set(sourceName, source.ast);
+      }
+
+      // The compiler input only carries project-local roots; imported
+      // sources (node_modules, symlinked packages) were read from disk by
+      // hypc. Recover their content the same way so library frames get real
+      // line numbers.
+      if (!sourceContent.has(sourceName) && projectRoot !== undefined) {
+        const candidates = [
+          path.join(projectRoot, sourceName),
+          path.join(projectRoot, "node_modules", sourceName),
+        ];
+        for (const candidate of candidates) {
+          try {
+            sourceContent.set(
+              sourceName,
+              fsExtra.readFileSync(candidate, "utf8")
+            );
+            break;
+          } catch {
+            // Try the next candidate; missing content degrades to line 0.
+          }
+        }
       }
     }
 

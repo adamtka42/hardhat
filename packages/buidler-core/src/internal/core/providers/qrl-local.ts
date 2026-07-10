@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import fsExtra from "fs-extra";
 import path from "path";
 
 import {
@@ -35,11 +36,14 @@ export class QrlLocalHardhatProvider extends EventEmitter
   private readonly _blockGasLimit: number;
   private readonly _stackTracesEnabled: boolean;
   private readonly _cachePath?: string;
+  private readonly _projectRoot?: string;
   private _stackTraceDecoder?: QrlStackTraceDecoder | null;
+  private _stackTraceCacheMtime?: number;
 
   constructor(config: QrlLocalNetworkConfig, paths?: ProjectPaths) {
     super();
     this._cachePath = paths?.cache;
+    this._projectRoot = paths?.root;
 
     const { vmQrl, utilQrl } = loadQrlJsModules(config);
     const consoleLogSupported =
@@ -212,11 +216,27 @@ export class QrlLocalHardhatProvider extends EventEmitter
   }
 
   private _getStackTraceDecoder(): QrlStackTraceDecoder | undefined {
-    if (this._stackTraceDecoder === undefined) {
-      const debugInfo =
-        this._cachePath === undefined
-          ? undefined
-          : loadQrlDebugInfo(this._cachePath);
+    if (this._cachePath === undefined) {
+      return undefined;
+    }
+
+    // Reload when the compile cache changes (or first appears), so a
+    // recompilation within the same HRE refreshes the source maps.
+    let mtime: number | undefined;
+    try {
+      mtime = fsExtra.statSync(
+        path.join(this._cachePath, "compiler-output.json")
+      ).mtimeMs;
+    } catch {
+      mtime = undefined;
+    }
+
+    if (
+      this._stackTraceDecoder === undefined ||
+      mtime !== this._stackTraceCacheMtime
+    ) {
+      this._stackTraceCacheMtime = mtime;
+      const debugInfo = loadQrlDebugInfo(this._cachePath, this._projectRoot);
       this._stackTraceDecoder =
         debugInfo === undefined ? null : new QrlStackTraceDecoder(debugInfo);
     }

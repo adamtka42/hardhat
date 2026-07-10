@@ -100,8 +100,16 @@ export function linkQrlBytecode(
     }
 
     const fullyQualifiedName = matchedNames.values().next().value as string;
+    const normalizedAddress = address.slice(1).toLowerCase();
+    const existing = resolved.get(fullyQualifiedName);
+    if (existing !== undefined && existing.address !== normalizedAddress) {
+      throw new HardhatError(ERRORS.NETWORK.LINKING_CONFLICTING_ADDRESSES, {
+        contractName: artifact.contractName,
+        library: fullyQualifiedName,
+      });
+    }
     resolved.set(fullyQualifiedName, {
-      address: address.slice(1).toLowerCase(),
+      address: normalizedAddress,
       used: false,
     });
   }

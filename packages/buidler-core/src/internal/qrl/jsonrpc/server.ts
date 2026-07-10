@@ -45,18 +45,24 @@ export class JsonRpcServer {
       port: number;
     };
 
-    return new HttpProvider(`http://${address}:${port}/`, name);
+    return new HttpProvider(`http://${formatHost(address)}:${port}/`, name);
   };
 
   public listen = (): Promise<{ address: string; port: number }> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       log(`Starting JSON-RPC server on port ${this._config.port}`);
+      // Bind failures (e.g. EADDRINUSE) are emitted as server errors and
+      // must reject instead of leaving the promise pending forever.
+      this._httpServer.once("error", reject);
       this._httpServer.listen(this._config.port, this._config.hostname, () => {
+        this._httpServer.removeListener("error", reject);
         // The actual address and port come from the server itself to
         // support random port allocation with port `0`.
-        resolve(
-          this._httpServer.address() as { address: string; port: number }
-        );
+        const { address, port } = this._httpServer.address() as {
+          address: string;
+          port: number;
+        };
+        resolve({ address: formatHost(address), port });
       });
     });
   };
@@ -103,4 +109,9 @@ export class JsonRpcServer {
       }),
     ]);
   };
+}
+
+/** Brackets IPv6 addresses so they are valid inside URLs. */
+export function formatHost(address: string): string {
+  return address.includes(":") ? `[${address}]` : address;
 }

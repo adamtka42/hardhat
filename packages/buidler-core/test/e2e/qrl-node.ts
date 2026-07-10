@@ -161,10 +161,11 @@ function startNode(
     child.on("exit", (code) =>
       reject(new Error(`node exited early (${code}):\n${output}`))
     );
-    setTimeout(
+    const timer = setTimeout(
       () => reject(new Error(`node did not start in time:\n${output}`)),
       60000
     );
+    timer.unref();
   });
 
   return { child, output: () => output, ready };
@@ -367,11 +368,25 @@ describe("QRL node e2e", function () {
         trace.result.structLogs[trace.result.structLogs.length - 1].op,
         "REVERT"
       );
+      // Graceful shutdown on SIGINT: clean exit code and a released port.
+      const exitCode = await new Promise((resolve) => {
+        node.child.once("exit", (code) => resolve(code));
+        node.child.kill("SIGINT");
+      });
+      assert.strictEqual(exitCode, 0);
+      await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_chainId",
+        params: [],
+        id: 99,
+      }).then(
+        () => assert.fail("port should be released after shutdown"),
+        () => undefined
+      );
     } finally {
-      // Graceful shutdown on SIGINT.
-      const exited = new Promise((resolve) => node.child.once("exit", resolve));
-      node.child.kill("SIGINT");
-      await exited;
+      if (node.child.exitCode === null) {
+        node.child.kill("SIGKILL");
+      }
     }
   });
 });
