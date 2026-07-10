@@ -120,6 +120,7 @@ const QrlLocalNetworkConfig = t.type({
   initialDate: optional(t.string),
   throwOnTransactionFailures: optional(t.boolean),
   throwOnCallFailures: optional(t.boolean),
+  allowUnlimitedContractSize: optional(t.boolean),
   qrlJsMonorepoPath: optional(t.string),
 });
 

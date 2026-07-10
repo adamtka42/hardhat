@@ -154,3 +154,11 @@ describe("plugin system", function () {
     });
   });
 });
+
+describe("Plugin public API", function () {
+  it("exports the qrl-local network name for plugin authors", function () {
+    // tslint:disable-next-line no-implicit-dependencies
+    const pluginApi = require("../../../src/plugins");
+    assert.equal(pluginApi.QRL_LOCAL_NETWORK_NAME, "qrlLocal");
+  });
+});

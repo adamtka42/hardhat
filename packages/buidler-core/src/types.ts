@@ -60,6 +60,11 @@ export interface QrlLocalNetworkConfig extends CommonNetworkConfig {
    * disabled the raw revert return data is returned instead.
    */
   throwOnCallFailures?: boolean;
+  /**
+   * Skip the deployed-code size limit, e.g. for coverage-instrumented
+   * contracts. Local testing only.
+   */
+  allowUnlimitedContractSize?: boolean;
   qrlJsMonorepoPath?: string;
 }
 

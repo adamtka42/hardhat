@@ -147,6 +147,15 @@ VM provider. Hardhat handles these methods directly:
 - `qrl_requestAccounts`
 - `qrl_gasPrice`
 
+The provider mirrors the go-qrl node's compatibility surface, so tooling that
+probes the connection on startup works against `qrlLocal` too:
+
+- `net_version`, `net_listening`, `net_peerCount`
+- `web3_clientVersion`, `web3_sha3` (keccak-256, like go-qrl)
+- `qrl_coinbase`, `qrl_mining`, `qrl_syncing`
+- `qrl_getBlockTransactionCountByNumber` / `...ByHash`
+- `qrl_getTransactionByBlockNumberAndIndex` / `...ByBlockHashAndIndex`
+
 The local provider also supports local test helpers such as:
 
 - `qrl_snapshot`

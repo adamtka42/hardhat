@@ -62,6 +62,17 @@ export class QrlLocalHardhatProvider extends EventEmitter
         "The loaded qrljs-monorepo build does not support transaction failure flags. Rebuild qrljs-monorepo to enable them."
       );
     }
+
+    const rpcCompatSupported = (vmQrl as any).QRL_RPC_COMPAT_SUPPORTED === true;
+    if (
+      config.allowUnlimitedContractSize !== undefined &&
+      !rpcCompatSupported
+    ) {
+      // tslint:disable-next-line: no-console
+      console.warn(
+        "The loaded qrljs-monorepo build does not support allowUnlimitedContractSize. Rebuild qrljs-monorepo to enable it."
+      );
+    }
     this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
     this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
     this._accounts = (config.accounts ?? []).map((account) =>
@@ -84,6 +95,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
           : parseInitialDate(config.initialDate),
       throwOnTransactionFailures: config.throwOnTransactionFailures,
       throwOnCallFailures: config.throwOnCallFailures,
+      allowUnlimitedContractSize: config.allowUnlimitedContractSize,
       defaultContext: {
         chainId: toRuntimeBigInt(this._chainId),
         gasLimit: toRuntimeBigInt(this._blockGasLimit),

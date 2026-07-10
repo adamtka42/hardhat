@@ -144,6 +144,10 @@ use `qrl_increaseTime` / `qrl_setNextBlockTimestamp` to shift time in tests.
 reverting transactions/calls throw with the decoded reason; see the
 [qrlLocal guide](../qrl-local/README.md) for details.
 
+`allowUnlimitedContractSize` skips the deployed-code size limit
+(`QRL_MAX_CODE_SIZE`), e.g. for coverage-instrumented contracts. Local testing
+only — real networks always enforce the limit.
+
 For a focused qrlLocal guide, see [../qrl-local/README.md](../qrl-local/README.md).
 
 ## HTTP go-qrl networks

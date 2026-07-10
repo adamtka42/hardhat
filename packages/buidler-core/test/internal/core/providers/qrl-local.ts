@@ -47,6 +47,7 @@ function createLocalProviderWithReverter(
   overrides: Partial<{
     throwOnTransactionFailures: boolean;
     throwOnCallFailures: boolean;
+    allowUnlimitedContractSize: boolean;
   }> = {}
 ) {
   return new QrlLocalHardhatProvider({
@@ -272,6 +273,77 @@ describe("QRL local Hardhat provider", function () {
 
     assert.isDefined(caught);
     assert.include(caught.message, "reason: 'locked'");
+  });
+
+  it("serves the RPC compatibility surface with go-qrl shapes", async () => {
+    const provider = createLocalProviderWithReverter();
+
+    assert.equal(await provider.send("net_version"), "1337");
+    assert.equal(await provider.send("net_listening"), true);
+    assert.equal(await provider.send("net_peerCount"), "0x0");
+    assert.match(
+      await provider.send("web3_clientVersion"),
+      /^QRLLocalProvider/
+    );
+    // keccak-256("") — the well-known empty-input hash, like go-qrl returns.
+    assert.equal(
+      await provider.send("web3_sha3", ["0x"]),
+      "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    );
+    assert.equal(await provider.send("qrl_mining"), false);
+    assert.equal(await provider.send("qrl_syncing"), false);
+    assert.match(await provider.send("qrl_coinbase"), /^Q[0-9a-fA-F]{128}$/);
+
+    await deployReverter(provider);
+    assert.equal(
+      await provider.send("qrl_getBlockTransactionCountByNumber", ["latest"]),
+      "0x1"
+    );
+    const block = await provider.send("qrl_getBlockByNumber", [
+      "latest",
+      false,
+    ]);
+    assert.equal(
+      await provider.send("qrl_getBlockTransactionCountByHash", [block.hash]),
+      "0x1"
+    );
+    const tx = await provider.send("qrl_getTransactionByBlockHashAndIndex", [
+      block.hash,
+      "0x0",
+    ]);
+    assert.equal(tx.from, SENDER);
+  });
+
+  it("deploys oversized contracts with allowUnlimitedContractSize", async () => {
+    const provider = createLocalProviderWithReverter({
+      allowUnlimitedContractSize: true,
+    });
+
+    // Init code returning 24577 zeroed bytes: PUSH3 size, PUSH0, RETURN.
+    const size = 24577;
+    const init = [
+      0x62,
+      Math.floor(size / 65536) % 256,
+      Math.floor(size / 256) % 256,
+      size % 256,
+      0x5f,
+      0xf3,
+    ];
+    const data = `0x${init
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")}`;
+
+    const txHash = await provider.send("qrl_sendTransaction", [
+      { from: SENDER, data, gas: "0x989680" },
+    ]);
+    const receipt = await provider.send("qrl_getTransactionReceipt", [txHash]);
+    assert.equal(receipt.status, "0x1");
+
+    const code = await provider.send("qrl_getCode", [
+      receipt.contractAddress,
+      "latest",
+    ]);
+    assert.equal((code.length - 2) / 2, size);
   });
 
   it("applies initialDate to the genesis block and supports time controls", async () => {
