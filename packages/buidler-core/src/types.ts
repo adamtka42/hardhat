@@ -43,6 +43,12 @@ export interface QrlLocalNetworkConfig extends CommonNetworkConfig {
   accounts?: QrlLocalAccountConfig[];
   automine?: boolean;
   blockGasLimit?: number;
+  /**
+   * Genesis block timestamp as an ISO 8601 date string. Later blocks default
+   * to `parent + 1` second, shifted by `qrl_increaseTime` /
+   * `qrl_setNextBlockTimestamp`.
+   */
+  initialDate?: string;
   qrlJsMonorepoPath?: string;
 }
 

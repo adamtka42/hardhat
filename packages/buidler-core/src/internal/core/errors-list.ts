@@ -375,6 +375,15 @@ QRL addresses start with \`Q\` followed by 128 hex characters.`,
 
 Recompile the project with a matching hypc build; if the problem persists, report it.`,
     },
+    INVALID_INITIAL_DATE: {
+      number: 130,
+      message:
+        "Invalid initialDate %value%. Use an ISO 8601 date string, e.g. 2026-01-01T00:00:00Z.",
+      title: "Invalid initialDate network config value",
+      description: `The \`initialDate\` value of a qrl-local network could not be parsed as a date.
+
+Use an ISO 8601 date string, e.g. \`2026-01-01T00:00:00Z\`.`,
+    },
   },
   TASK_DEFINITIONS: {
     PARAM_AFTER_VARIADIC: {

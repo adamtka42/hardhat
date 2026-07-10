@@ -136,6 +136,10 @@ optional.
 
 `automine` controls local mining behavior. The default local config enables it.
 
+`initialDate` sets the genesis block timestamp as an ISO 8601 date string
+(e.g. `"2026-01-01T00:00:00Z"`). Later blocks default to `parent + 1` second;
+use `qrl_increaseTime` / `qrl_setNextBlockTimestamp` to shift time in tests.
+
 For a focused qrlLocal guide, see [../qrl-local/README.md](../qrl-local/README.md).
 
 ## HTTP go-qrl networks

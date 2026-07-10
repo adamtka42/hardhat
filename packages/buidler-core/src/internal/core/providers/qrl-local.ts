@@ -39,6 +39,15 @@ export class QrlLocalHardhatProvider extends EventEmitter
         "The loaded qrljs-monorepo build does not support contract console logging. Rebuild qrljs-monorepo to enable it."
       );
     }
+
+    const timeControlsSupported =
+      (vmQrl as any).QRL_TIME_CONTROLS_SUPPORTED === true;
+    if (config.initialDate !== undefined && !timeControlsSupported) {
+      // tslint:disable-next-line: no-console
+      console.warn(
+        "The loaded qrljs-monorepo build does not support time controls. Rebuild qrljs-monorepo to enable initialDate."
+      );
+    }
     this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
     this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
     this._accounts = (config.accounts ?? []).map((account) =>
@@ -55,6 +64,10 @@ export class QrlLocalHardhatProvider extends EventEmitter
             : toRuntimeBigInt(account.nonce),
       })),
       automine: config.automine ?? true,
+      initialTimestamp:
+        config.initialDate === undefined || !timeControlsSupported
+          ? undefined
+          : parseInitialDate(config.initialDate),
       defaultContext: {
         chainId: toRuntimeBigInt(this._chainId),
         gasLimit: toRuntimeBigInt(this._blockGasLimit),
@@ -166,4 +179,15 @@ function parseLocalAccountBalance(balance: string | number | undefined): any {
 
 function toRuntimeBigInt(value: any): any {
   return (global as any).BigInt(value);
+}
+
+function parseInitialDate(initialDate: string): any {
+  const milliseconds = Date.parse(initialDate);
+  if (Number.isNaN(milliseconds)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_INITIAL_DATE, {
+      value: initialDate,
+    });
+  }
+
+  return toRuntimeBigInt(Math.floor(milliseconds / 1000));
 }

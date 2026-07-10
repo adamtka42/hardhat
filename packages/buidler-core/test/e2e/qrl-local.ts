@@ -185,6 +185,54 @@ describe("QRL local e2e", function () {
     assert.include(offOutput, "value after: 42");
   });
 
+  it("manipulates local chain time for timelock-style contracts", async function () {
+    this.timeout(420000);
+
+    const hypcPath = resolveHypcPath();
+    const qrlJsMonorepoPath = resolveQrlJsMonorepoPath();
+    if (hypcPath === undefined || qrlJsMonorepoPath === undefined) {
+      this.skip();
+      return;
+    }
+
+    await execFileAsync("npm", ["run", "build"], {
+      cwd: PACKAGE_ROOT,
+      maxBuffer: 1024 * 1024 * 20,
+    });
+
+    await prepareProject(this.tmpDir);
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "contracts", "Timelock.hyp"),
+      getTimelockSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "hardhat.initialdate.config.js"),
+      getInitialDateConfigSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "scripts", "time-e2e.js"),
+      getTimeScriptSource()
+    );
+
+    const env = {
+      ...process.env,
+      HYPERION_HYPC_PATH: hypcPath!,
+      QRLJS_MONOREPO_PATH: qrlJsMonorepoPath!,
+    };
+
+    const result = await runHardhat(this.tmpDir, env, [
+      "--config",
+      "hardhat.initialdate.config.js",
+      "run",
+      "scripts/time-e2e.js",
+    ]);
+    const output = result.stdout.toString();
+    assert.include(output, "genesis timestamp: 1767225600");
+    assert.include(output, "locked before increase: true");
+    assert.include(output, "increaseTime returned: 10000");
+    assert.include(output, "withdraw after increase: true");
+  });
+
   it("deploys contracts with external libraries on qrlLocal", async function () {
     this.timeout(420000);
 
@@ -675,6 +723,91 @@ contract ConsoleProbe {
         return value;
     }
 }
+`;
+}
+
+function getTimelockSource(): string {
+  return `// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+contract Timelock {
+    uint256 public unlockTime;
+
+    constructor(uint256 _unlockTime) {
+        unlockTime = _unlockTime;
+    }
+
+    function withdraw() public view returns (bool) {
+        require(block.timestamp >= unlockTime, "locked");
+        return true;
+    }
+}
+`;
+}
+
+function getInitialDateConfigSource(): string {
+  return `const localAccountAddress = \`Q\${"01".repeat(64)}\`;
+
+module.exports = {
+  defaultNetwork: "qrlLocal",
+  hyperion: {
+    compilerPath: process.env.HYPERION_HYPC_PATH,
+  },
+  networks: {
+    qrlLocal: {
+      type: "qrl-local",
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      blockGasLimit: 30000000,
+      initialDate: "2026-01-01T00:00:00Z",
+    },
+  },
+};
+`;
+}
+
+function getTimeScriptSource(): string {
+  return `async function main() {
+  const genesis = await network.provider.send("qrl_getBlockByNumber", ["latest", false]);
+  const genesisTimestamp = parseInt(genesis.timestamp, 16);
+  console.log("genesis timestamp:", genesisTimestamp);
+
+  const Timelock = await qrl.getContractFactory("Timelock");
+  const timelock = await Timelock.deploy({}, [genesisTimestamp + 5000]);
+
+  let locked = false;
+  try {
+    await timelock.withdraw();
+    console.log("withdraw before increase unexpectedly succeeded");
+  } catch (error) {
+    // Error("locked") revert data; reason string decoding is a separate
+    // feature, so assert on the raw revert payload.
+    const lockedHex = Buffer.from("locked").toString("hex");
+    locked =
+      error.message.includes("reverted") &&
+      typeof error.data === "string" &&
+      error.data.includes(lockedHex);
+    if (!locked) {
+      console.log("unexpected withdraw error: " + error.message);
+    }
+  }
+  console.log("locked before increase: " + locked);
+
+  const total = await network.provider.send("qrl_increaseTime", [10000]);
+  console.log("increaseTime returned: " + total);
+  await network.provider.send("qrl_mine", []);
+
+  console.log("withdraw after increase: " + (await timelock.withdraw()));
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 `;
 }
 

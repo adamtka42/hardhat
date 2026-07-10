@@ -152,6 +152,8 @@ The local provider also supports local test helpers such as:
 - `qrl_snapshot`
 - `qrl_revert`
 - `qrl_mine`
+- `qrl_increaseTime`
+- `qrl_setNextBlockTimestamp`
 
 For example:
 
@@ -160,6 +162,43 @@ const snapshot = await network.provider.send("qrl_snapshot");
 await network.provider.send("qrl_mine");
 await network.provider.send("qrl_revert", [snapshot]);
 ~~~
+
+## Time manipulation
+
+Block timestamps on `qrlLocal` are deterministic: the genesis block starts at
+`0` (or at the configured `initialDate`) and every mined block gets
+`parent + 1` second. Time-dependent contracts (vesting, timelocks, deadlines)
+are tested with the time helpers:
+
+~~~js
+// Shift the next block (and, through parent chaining, all later blocks)
+// forward by one hour. Returns the cumulative total of all increases as a
+// decimal string.
+const total = await network.provider.send("qrl_increaseTime", [3600]);
+
+// One-shot absolute timestamp for the next mined block. Must be greater
+// than the latest block timestamp.
+await network.provider.send("qrl_setNextBlockTimestamp", [1767225600]);
+
+// Explicit qrl_mine timestamps take precedence over both helpers.
+await network.provider.send("qrl_mine", [{ timestamp: 1767230000 }]);
+~~~
+
+To start the chain clock at a real date, set `initialDate` (ISO 8601) on the
+network config:
+
+~~~js
+qrlLocal: {
+  type: "qrl-local",
+  qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+  initialDate: "2026-01-01T00:00:00Z",
+},
+~~~
+
+Note that unlike the original Hardhat, `qrl_increaseTime` is not coupled to
+the wall clock: the shift is applied to the next mined block on top of the
+deterministic `parent + 1` sequence, which keeps test runs reproducible.
+`qrl_snapshot`/`qrl_revert` also restore pending time state.
 
 ## Differences from HTTP go-qrl networks
 

@@ -117,6 +117,7 @@ const QrlLocalNetworkConfig = t.type({
   automine: optional(t.boolean),
   consoleLog: optional(t.boolean),
   blockGasLimit: optional(t.number),
+  initialDate: optional(t.string),
   qrlJsMonorepoPath: optional(t.string),
 });
 
