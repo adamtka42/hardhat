@@ -118,6 +118,8 @@ const QrlLocalNetworkConfig = t.type({
   consoleLog: optional(t.boolean),
   blockGasLimit: optional(t.number),
   initialDate: optional(t.string),
+  throwOnTransactionFailures: optional(t.boolean),
+  throwOnCallFailures: optional(t.boolean),
   qrlJsMonorepoPath: optional(t.string),
 });
 

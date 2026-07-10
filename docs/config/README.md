@@ -140,6 +140,10 @@ optional.
 (e.g. `"2026-01-01T00:00:00Z"`). Later blocks default to `parent + 1` second;
 use `qrl_increaseTime` / `qrl_setNextBlockTimestamp` to shift time in tests.
 
+`throwOnTransactionFailures` / `throwOnCallFailures` (default `true`) make
+reverting transactions/calls throw with the decoded reason; see the
+[qrlLocal guide](../qrl-local/README.md) for details.
+
 For a focused qrlLocal guide, see [../qrl-local/README.md](../qrl-local/README.md).
 
 ## HTTP go-qrl networks

@@ -49,6 +49,17 @@ export interface QrlLocalNetworkConfig extends CommonNetworkConfig {
    * `qrl_setNextBlockTimestamp`.
    */
   initialDate?: string;
+  /**
+   * Throw from `qrl_sendTransaction` when an automined transaction reverts
+   * (default `true`). The transaction is still mined; the error carries the
+   * revert data and the transaction hash.
+   */
+  throwOnTransactionFailures?: boolean;
+  /**
+   * Throw from `qrl_call` when execution reverts (default `true`). When
+   * disabled the raw revert return data is returned instead.
+   */
+  throwOnCallFailures?: boolean;
   qrlJsMonorepoPath?: string;
 }
 

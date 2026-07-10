@@ -229,6 +229,8 @@ describe("QRL local e2e", function () {
     const output = result.stdout.toString();
     assert.include(output, "genesis timestamp: 1767225600");
     assert.include(output, "locked before increase: true");
+    assert.include(output, "poke throw decoded: true");
+    assert.include(output, "poke receipt status: 0x0");
     assert.include(output, "increaseTime returned: 10000");
     assert.include(output, "withdraw after increase: true");
   });
@@ -741,6 +743,11 @@ contract Timelock {
         require(block.timestamp >= unlockTime, "locked");
         return true;
     }
+
+    function poke() public {
+        require(block.timestamp >= unlockTime, "locked");
+        unlockTime = 0;
+    }
 }
 `;
 }
@@ -782,18 +789,29 @@ function getTimeScriptSource(): string {
     await timelock.withdraw();
     console.log("withdraw before increase unexpectedly succeeded");
   } catch (error) {
-    // Error("locked") revert data; reason string decoding is a separate
-    // feature, so assert on the raw revert payload.
-    const lockedHex = Buffer.from("locked").toString("hex");
-    locked =
-      error.message.includes("reverted") &&
-      typeof error.data === "string" &&
-      error.data.includes(lockedHex);
+    // The Error("locked") reason is decoded into the provider error message.
+    locked = error.message.includes("reason: 'locked'");
     if (!locked) {
       console.log("unexpected withdraw error: " + error.message);
     }
   }
   console.log("locked before increase: " + locked);
+
+  // A reverting TRANSACTION throws too, and the mined receipt stays
+  // queryable through the hash carried on the error. Explicit gas skips
+  // estimation, which would reject the reverting tx before it is sent.
+  try {
+    await timelock.poke({ gas: 100000 });
+    console.log("poke before increase unexpectedly succeeded");
+  } catch (error) {
+    console.log(
+      "poke throw decoded: " + error.message.includes("reason: 'locked'")
+    );
+    const receipt = await network.provider.send("qrl_getTransactionReceipt", [
+      error.transactionHash,
+    ]);
+    console.log("poke receipt status: " + receipt.status);
+  }
 
   const total = await network.provider.send("qrl_increaseTime", [10000]);
   console.log("increaseTime returned: " + total);

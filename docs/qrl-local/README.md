@@ -200,6 +200,39 @@ the wall clock: the shift is applied to the next mined block on top of the
 deterministic `parent + 1` sequence, which keeps test runs reproducible.
 `qrl_snapshot`/`qrl_revert` also restore pending time state.
 
+## Transaction failures
+
+By default `qrlLocal` throws when a transaction or call reverts, matching the
+original Hardhat in-memory network:
+
+- `qrl_call` throws a provider error with the raw revert payload in
+  `error.data`.
+- `qrl_sendTransaction` (with automine) throws too. The transaction IS still
+  mined: the error carries `error.transactionHash`, so the status-`0x0`
+  receipt stays queryable.
+- When the revert payload is a standard `Error(string)` or `Panic(uint256)`,
+  the decoded reason is appended to the error message, e.g.
+  `QRL execution reverted (reason: 'locked', tx: 0x…)`. Custom errors stay
+  decodable from `error.data`.
+- With `automine: false` nothing throws; the failure is only visible in the
+  receipt after `qrl_mine`.
+- Gas estimation of a reverting transaction fails before anything is sent;
+  pass an explicit `gas` value to submit a transaction you expect to revert.
+
+Both behaviors can be disabled per network:
+
+~~~js
+qrlLocal: {
+  type: "qrl-local",
+  qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+  throwOnTransactionFailures: false,
+  throwOnCallFailures: false,
+},
+~~~
+
+With the flags off, `qrl_sendTransaction` silently returns the hash of a
+status-`0x0` transaction and `qrl_call` returns the raw revert data.
+
 ## Differences from HTTP go-qrl networks
 
 `qrlLocal` does not connect to a go-qrl node and does not use node-managed

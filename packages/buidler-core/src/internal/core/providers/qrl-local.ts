@@ -6,6 +6,7 @@ import {
   QrlLocalAccountConfig,
   QrlLocalNetworkConfig,
 } from "../../../types";
+import { decodeQrlFunctionResult } from "../../qrl/abi";
 import { printQrlConsoleLog } from "../../qrl/console-log";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
@@ -48,6 +49,19 @@ export class QrlLocalHardhatProvider extends EventEmitter
         "The loaded qrljs-monorepo build does not support time controls. Rebuild qrljs-monorepo to enable initialDate."
       );
     }
+
+    const txFailureFlagsSupported =
+      (vmQrl as any).QRL_TX_FAILURE_FLAGS_SUPPORTED === true;
+    if (
+      (config.throwOnTransactionFailures !== undefined ||
+        config.throwOnCallFailures !== undefined) &&
+      !txFailureFlagsSupported
+    ) {
+      // tslint:disable-next-line: no-console
+      console.warn(
+        "The loaded qrljs-monorepo build does not support transaction failure flags. Rebuild qrljs-monorepo to enable them."
+      );
+    }
     this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
     this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
     this._accounts = (config.accounts ?? []).map((account) =>
@@ -68,6 +82,8 @@ export class QrlLocalHardhatProvider extends EventEmitter
         config.initialDate === undefined || !timeControlsSupported
           ? undefined
           : parseInitialDate(config.initialDate),
+      throwOnTransactionFailures: config.throwOnTransactionFailures,
+      throwOnCallFailures: config.throwOnCallFailures,
       defaultContext: {
         chainId: toRuntimeBigInt(this._chainId),
         gasLimit: toRuntimeBigInt(this._blockGasLimit),
@@ -100,10 +116,102 @@ export class QrlLocalHardhatProvider extends EventEmitter
           operation: "qrl_sendRawTransaction on qrlLocal",
         });
       default:
-        return this._provider.request({ method, params });
+        try {
+          return await this._provider.request({ method, params });
+        } catch (error) {
+          // Rethrow of the local provider's own error, enriched in place.
+          // tslint:disable-next-line only-hardhat-error
+          throw enrichQrlProviderError(error);
+        }
     }
   }
 }
+
+const ERROR_STRING_SELECTOR = "0x08c379a0";
+const PANIC_SELECTOR = "0x4e487b71";
+
+/**
+ * Adds the decoded revert reason and the failed transaction hash to local
+ * provider errors, keeping `code`, `data`, and `transactionHash` intact so
+ * callers can still decode custom errors and fetch the receipt.
+ */
+function enrichQrlProviderError(error: any): any {
+  if (error === undefined || error === null || typeof error !== "object") {
+    return error;
+  }
+
+  const details: string[] = [];
+
+  const reason = decodeQrlRevertReason(error.data);
+  if (reason !== undefined) {
+    details.push(reason);
+  }
+
+  if (typeof error.transactionHash === "string") {
+    details.push(`tx: ${error.transactionHash}`);
+  }
+
+  if (details.length > 0 && typeof error.message === "string") {
+    error.message = `${error.message} (${details.join(", ")})`;
+  }
+
+  return error;
+}
+
+function decodeQrlRevertReason(data: unknown): string | undefined {
+  if (typeof data !== "string" || !data.startsWith("0x")) {
+    return undefined;
+  }
+
+  const body = `0x${data.slice(ERROR_STRING_SELECTOR.length)}`;
+
+  try {
+    if (data.startsWith(ERROR_STRING_SELECTOR)) {
+      const [reason] = decodeQrlFunctionResult(
+        REVERT_REASON_ABI,
+        "Error(string)",
+        body
+      );
+      return `reason: '${reason}'`;
+    }
+
+    if (data.startsWith(PANIC_SELECTOR)) {
+      const [code] = decodeQrlFunctionResult(
+        REVERT_PANIC_ABI,
+        "Panic(uint256)",
+        body
+      );
+      return `panic code: 0x${code.toString(16)}`;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+// Synthetic fragments reusing the standard QRL ABI machinery, mirroring the
+// console-log approach: the revert payload types double as outputs so
+// `decodeQrlFunctionResult` can decode the error body.
+const REVERT_REASON_ABI = [
+  {
+    type: "function",
+    name: "Error",
+    inputs: [{ name: "reason", type: "string" }],
+    outputs: [{ name: "reason", type: "string" }],
+    stateMutability: "view",
+  },
+];
+
+const REVERT_PANIC_ABI = [
+  {
+    type: "function",
+    name: "Panic",
+    inputs: [{ name: "code", type: "uint256" }],
+    outputs: [{ name: "code", type: "uint256" }],
+    stateMutability: "view",
+  },
+];
 
 function loadQrlJsModules(config: QrlLocalNetworkConfig): QrlJsModules {
   const configuredPath =

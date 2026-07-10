@@ -43,6 +43,87 @@ function createLocalProvider() {
   });
 }
 
+function createLocalProviderWithReverter(
+  overrides: Partial<{
+    throwOnTransactionFailures: boolean;
+    throwOnCallFailures: boolean;
+  }> = {}
+) {
+  return new QrlLocalHardhatProvider({
+    type: "qrl-local",
+    chainId: 1337,
+    blockGasLimit: 30000000,
+    qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+    accounts: [{ address: SENDER, balance: "1000000000000" }],
+    ...overrides,
+  });
+}
+
+// Runtime: MSTORE(0, 42); REVERT(args=[0..64)) — reverts with a 64-byte
+// payload ending in 0x2a.
+const REVERTER_RUNTIME = [0x60, 0x2a, 0x5f, 0x52, 0x60, 0x40, 0x5f, 0xfd];
+
+// Runtime: CODECOPY the trailing payload into memory, then REVERT with it.
+function revertWithPayloadRuntime(payloadHex: string): number[] {
+  const payload = Buffer.from(payloadHex, "hex");
+  const lengthHi = Math.floor(payload.length / 256);
+  const lengthLo = payload.length % 256;
+  return [
+    0x61,
+    lengthHi,
+    lengthLo,
+    0x60,
+    0x0c,
+    0x5f,
+    0x39,
+    0x61,
+    lengthHi,
+    lengthLo,
+    0x5f,
+    0xfd,
+    ...payload,
+  ];
+}
+
+// Init code: CODECOPY the trailing runtime into memory and RETURN it.
+async function deployRuntime(
+  provider: QrlLocalHardhatProvider,
+  runtime: number[]
+): Promise<string> {
+  const lengthHi = Math.floor(runtime.length / 256);
+  const lengthLo = runtime.length % 256;
+  const init = [
+    0x61,
+    lengthHi,
+    lengthLo,
+    0x60,
+    0x0c,
+    0x5f,
+    0x39,
+    0x61,
+    lengthHi,
+    lengthLo,
+    0x5f,
+    0xf3,
+  ];
+  const data = `0x${[...init, ...runtime]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
+
+  const txHash = await provider.send("qrl_sendTransaction", [
+    { from: SENDER, data, gas: "0x30d40" },
+  ]);
+  const receipt = await provider.send("qrl_getTransactionReceipt", [txHash]);
+  assert.equal(receipt.status, "0x1");
+  return receipt.contractAddress;
+}
+
+async function deployReverter(
+  provider: QrlLocalHardhatProvider
+): Promise<string> {
+  return deployRuntime(provider, REVERTER_RUNTIME);
+}
+
 describe("QRL local Hardhat provider", function () {
   beforeEach(function () {
     const testTitle =
@@ -124,6 +205,73 @@ describe("QRL local Hardhat provider", function () {
       () => provider.send("qrl_sendRawTransaction", ["0x00"]),
       ERRORS.GENERAL.UNSUPPORTED_OPERATION
     );
+  });
+
+  it("throws on reverting transactions and keeps the receipt queryable", async () => {
+    const provider = createLocalProviderWithReverter();
+    const contractAddress = await deployReverter(provider);
+
+    let caught: any;
+    try {
+      await provider.send("qrl_sendTransaction", [
+        { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      ]);
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.isDefined(caught);
+    assert.match(caught.message, /revert/i);
+    // The failed tx hash is part of the message and a field on the error.
+    assert.match(caught.transactionHash, /^0x[0-9a-f]{64}$/);
+    assert.include(caught.message, `tx: ${caught.transactionHash}`);
+    // Raw revert data stays decodable for custom errors.
+    assert.isTrue(caught.data.endsWith("2a"));
+
+    const receipt = await provider.send("qrl_getTransactionReceipt", [
+      caught.transactionHash,
+    ]);
+    assert.equal(receipt.status, "0x0");
+  });
+
+  it("returns silent status-0 receipts when throwOnTransactionFailures is false", async () => {
+    const provider = createLocalProviderWithReverter({
+      throwOnTransactionFailures: false,
+    });
+    const contractAddress = await deployReverter(provider);
+
+    const txHash = await provider.send("qrl_sendTransaction", [
+      { from: SENDER, to: contractAddress, gas: "0x186a0" },
+    ]);
+
+    const receipt = await provider.send("qrl_getTransactionReceipt", [txHash]);
+    assert.equal(receipt.status, "0x0");
+  });
+
+  it("decodes Error(string) revert reasons in provider error messages", async () => {
+    const provider = createLocalProviderWithReverter();
+    // Runtime returning the canonical Error("locked") payload observed from
+    // hypc: selector + 64-byte offset/length words + padded string.
+    const errorStringData = `08c379a0${"40".padStart(128, "0")}${"6".padStart(
+      128,
+      "0"
+    )}${Buffer.from("locked").toString("hex").padEnd(128, "0")}`;
+    const contractAddress = await deployRuntime(
+      provider,
+      revertWithPayloadRuntime(errorStringData)
+    );
+
+    let caught: any;
+    try {
+      await provider.send("qrl_call", [
+        { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      ]);
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.isDefined(caught);
+    assert.include(caught.message, "reason: 'locked'");
   });
 
   it("applies initialDate to the genesis block and supports time controls", async () => {
