@@ -16,8 +16,10 @@ const HYPERION_OUTPUT_SELECTION = [
   "abi",
   "qrvm.bytecode.object",
   "qrvm.bytecode.linkReferences",
+  "qrvm.bytecode.sourceMap",
   "qrvm.deployedBytecode.object",
   "qrvm.deployedBytecode.linkReferences",
+  "qrvm.deployedBytecode.sourceMap",
 ];
 
 export interface HyperionInput {
@@ -55,6 +57,9 @@ export async function compileHyperion(
       outputSelection: {
         "*": {
           "*": HYPERION_OUTPUT_SELECTION,
+          // Per-source AST, used by the stack trace decoder to resolve
+          // function names for source locations.
+          "": ["ast"],
         },
       },
     },
@@ -155,6 +160,9 @@ function adaptStandardJsonOutput(stdout: string, stderr: string): any {
   }
   const output: any = {
     contracts: {},
+    // Per-source ASTs (and source ids), kept in the cached compiler output
+    // for the stack trace decoder.
+    sources: standardOutput.sources !== undefined ? standardOutput.sources : {},
   };
 
   const contracts =
@@ -205,6 +213,7 @@ function adaptBytecodeOutput(
 ): {
   object: string;
   linkReferences: any;
+  sourceMap?: string;
 } {
   return {
     object: stripHexPrefix(
@@ -217,6 +226,8 @@ function adaptBytecodeOutput(
       bytecodeOutput.linkReferences !== undefined
         ? bytecodeOutput.linkReferences
         : {},
+    sourceMap:
+      bytecodeOutput !== undefined ? bytecodeOutput.sourceMap : undefined,
   };
 }
 

@@ -3,11 +3,17 @@ import path from "path";
 
 import {
   IQrlProvider,
+  ProjectPaths,
   QrlLocalAccountConfig,
   QrlLocalNetworkConfig,
 } from "../../../types";
 import { decodeQrlFunctionResult } from "../../qrl/abi";
 import { printQrlConsoleLog } from "../../qrl/console-log";
+import {
+  buildQrlStackTraceLines,
+  loadQrlDebugInfo,
+  QrlStackTraceDecoder,
+} from "../../qrl/stack-traces";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
@@ -27,9 +33,13 @@ export class QrlLocalHardhatProvider extends EventEmitter
   private readonly _accounts: string[];
   private readonly _chainId: number;
   private readonly _blockGasLimit: number;
+  private readonly _stackTracesEnabled: boolean;
+  private readonly _cachePath?: string;
+  private _stackTraceDecoder?: QrlStackTraceDecoder | null;
 
-  constructor(config: QrlLocalNetworkConfig) {
+  constructor(config: QrlLocalNetworkConfig, paths?: ProjectPaths) {
     super();
+    this._cachePath = paths?.cache;
 
     const { vmQrl, utilQrl } = loadQrlJsModules(config);
     const consoleLogSupported =
@@ -73,6 +83,17 @@ export class QrlLocalHardhatProvider extends EventEmitter
         "The loaded qrljs-monorepo build does not support allowUnlimitedContractSize. Rebuild qrljs-monorepo to enable it."
       );
     }
+    const debugTraceSupported =
+      (vmQrl as any).QRL_DEBUG_TRACE_SUPPORTED === true;
+    if (config.stackTraces === true && !debugTraceSupported) {
+      // tslint:disable-next-line: no-console
+      console.warn(
+        "The loaded qrljs-monorepo build does not support execution tracing. Rebuild qrljs-monorepo to enable stack traces."
+      );
+    }
+    this._stackTracesEnabled =
+      config.stackTraces !== false && debugTraceSupported;
+
     this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
     this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
     this._accounts = (config.accounts ?? []).map((account) =>
@@ -131,11 +152,75 @@ export class QrlLocalHardhatProvider extends EventEmitter
         try {
           return await this._provider.request({ method, params });
         } catch (error) {
+          const enriched = enrichQrlProviderError(error);
+          if (this._stackTracesEnabled) {
+            try {
+              await this._appendStackTrace(enriched, method, params);
+            } catch {
+              // Stack trace decoding must never mask the original error.
+            }
+          }
           // Rethrow of the local provider's own error, enriched in place.
           // tslint:disable-next-line only-hardhat-error
-          throw enrichQrlProviderError(error);
+          throw enriched;
         }
     }
+  }
+
+  private async _appendStackTrace(
+    error: any,
+    method: string,
+    params: any[]
+  ): Promise<void> {
+    if (
+      error === undefined ||
+      error === null ||
+      typeof error.message !== "string" ||
+      error.code !== -32000
+    ) {
+      return;
+    }
+
+    let rootFrame: any;
+    if (typeof error.transactionHash === "string") {
+      rootFrame = await this._provider.traceTransactionFrames(
+        error.transactionHash
+      );
+    } else if (
+      (method === "qrl_call" || method === "qrl_estimateGas") &&
+      params[0] !== undefined
+    ) {
+      rootFrame = await this._provider.traceCallFrames(params[0]);
+    } else {
+      return;
+    }
+
+    const decoder = this._getStackTraceDecoder();
+    if (decoder === undefined) {
+      return;
+    }
+
+    const lines = await buildQrlStackTraceLines(rootFrame, decoder, (address) =>
+      this._provider.request({
+        method: "qrl_getCode",
+        params: [address, "latest"],
+      })
+    );
+    if (lines.length > 0) {
+      error.message = `${error.message}\n${lines.join("\n")}`;
+    }
+  }
+
+  private _getStackTraceDecoder(): QrlStackTraceDecoder | undefined {
+    if (this._stackTraceDecoder === undefined) {
+      const debugInfo =
+        this._cachePath === undefined
+          ? undefined
+          : loadQrlDebugInfo(this._cachePath);
+      this._stackTraceDecoder =
+        debugInfo === undefined ? null : new QrlStackTraceDecoder(debugInfo);
+    }
+    return this._stackTraceDecoder ?? undefined;
   }
 }
 

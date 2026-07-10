@@ -2,6 +2,7 @@ import {
   HttpNetworkConfig,
   IQrlProvider,
   NetworkConfig,
+  ProjectPaths,
   QrlLocalNetworkConfig,
   QrlProvider,
 } from "../../../types";
@@ -14,7 +15,8 @@ import { QrlLocalHardhatProvider } from "./qrl-local";
 
 export function createProvider(
   networkName: string,
-  networkConfig: NetworkConfig
+  networkConfig: NetworkConfig,
+  paths?: ProjectPaths
 ): IQrlProvider {
   let provider: QrlProvider;
 
@@ -23,7 +25,7 @@ export function createProvider(
   }
 
   if (isQrlLocalNetworkConfig(networkConfig)) {
-    provider = new QrlLocalHardhatProvider(networkConfig);
+    provider = new QrlLocalHardhatProvider(networkConfig, paths);
     return wrapQrlProvider(provider, networkConfig);
   }
 

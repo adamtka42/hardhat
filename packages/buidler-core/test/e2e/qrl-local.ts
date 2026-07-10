@@ -235,6 +235,70 @@ describe("QRL local e2e", function () {
     assert.include(output, "withdraw after increase: true");
   });
 
+  it("prints Hyperion stack traces for nested reverts", async function () {
+    this.timeout(420000);
+
+    const hypcPath = resolveHypcPath();
+    const qrlJsMonorepoPath = resolveQrlJsMonorepoPath();
+    if (hypcPath === undefined || qrlJsMonorepoPath === undefined) {
+      this.skip();
+      return;
+    }
+
+    await execFileAsync("npm", ["run", "build"], {
+      cwd: PACKAGE_ROOT,
+      maxBuffer: 1024 * 1024 * 20,
+    });
+
+    await prepareProject(this.tmpDir);
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "contracts", "Nested.hyp"),
+      getNestedSource()
+    );
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "scripts", "trace-e2e.js"),
+      getTraceScriptSource()
+    );
+
+    const env = {
+      ...process.env,
+      HYPERION_HYPC_PATH: hypcPath!,
+      QRLJS_MONOREPO_PATH: qrlJsMonorepoPath!,
+    };
+
+    const result = await runHardhat(this.tmpDir, env, [
+      "run",
+      "scripts/trace-e2e.js",
+    ]);
+    const output = result.stdout.toString();
+
+    // Call path: nested revert shows both frames, innermost first.
+    assert.include(output, "reason: 'too small'");
+    const innerAt = output.indexOf("at Inner.fail (contracts/Nested.hyp:6)");
+    const outerAt = output.indexOf("at Outer.callInner (contracts/Nested.hyp:");
+    assert.isAbove(innerAt, -1, `missing Inner frame in:\n${output}`);
+    assert.isAbove(outerAt, innerAt, `missing Outer frame in:\n${output}`);
+
+    // Transaction path: traced through the replay of the mined tx.
+    assert.include(output, "at Inner.poke (contracts/Nested.hyp:11)");
+    assert.include(output, "at Outer.pokeInner (contracts/Nested.hyp:");
+
+    // Opt-out restores the plain message.
+    await fsExtra.writeFile(
+      path.join(this.tmpDir, "hardhat.notrace.config.js"),
+      getNoTraceConfigSource()
+    );
+    const offResult = await runHardhat(this.tmpDir, env, [
+      "--config",
+      "hardhat.notrace.config.js",
+      "run",
+      "scripts/trace-e2e.js",
+    ]);
+    const offOutput = offResult.stdout.toString();
+    assert.include(offOutput, "reason: 'too small'");
+    assert.notInclude(offOutput, "at Inner.fail");
+  });
+
   it("deploys contracts with external libraries on qrlLocal", async function () {
     this.timeout(420000);
 
@@ -725,6 +789,96 @@ contract ConsoleProbe {
         return value;
     }
 }
+`;
+}
+
+function getNoTraceConfigSource(): string {
+  return `const localAccountAddress = \`Q\${"01".repeat(64)}\`;
+
+module.exports = {
+  defaultNetwork: "qrlLocal",
+  hyperion: {
+    compilerPath: process.env.HYPERION_HYPC_PATH,
+  },
+  networks: {
+    qrlLocal: {
+      type: "qrl-local",
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      blockGasLimit: 30000000,
+      stackTraces: false,
+    },
+  },
+};
+`;
+}
+
+function getNestedSource(): string {
+  return `// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+contract Inner {
+    function fail(uint256 x) public pure returns (uint256) {
+        require(x > 10, "too small");
+        return x - 10;
+    }
+
+    function poke(uint256 x) public {
+        require(x > 10, "too small");
+        counter += x;
+    }
+
+    uint256 public counter;
+}
+
+contract Outer {
+    Inner public inner;
+
+    constructor() {
+        inner = new Inner();
+    }
+
+    function callInner(uint256 x) public view returns (uint256) {
+        return inner.fail(x);
+    }
+
+    function pokeInner(uint256 x) public {
+        inner.poke(x);
+    }
+}
+`;
+}
+
+function getTraceScriptSource(): string {
+  return `async function main() {
+  const Outer = await qrl.getContractFactory("Outer");
+  const outer = await Outer.deploy();
+
+  try {
+    await outer.callInner(5);
+    console.log("callInner unexpectedly succeeded");
+  } catch (error) {
+    console.log("CALL TRACE:");
+    console.log(error.message);
+  }
+
+  try {
+    await outer.pokeInner(5, { gas: 300000 });
+    console.log("pokeInner unexpectedly succeeded");
+  } catch (error) {
+    console.log("TX TRACE:");
+    console.log(error.message);
+  }
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 `;
 }
 

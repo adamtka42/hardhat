@@ -65,6 +65,12 @@ export interface QrlLocalNetworkConfig extends CommonNetworkConfig {
    * contracts. Local testing only.
    */
   allowUnlimitedContractSize?: boolean;
+  /**
+   * Append Hyperion stack traces (contract, function, file:line) to failed
+   * transaction/call errors. Enabled by default when the compile cache and a
+   * tracing-capable qrljs build are available.
+   */
+  stackTraces?: boolean;
   qrlJsMonorepoPath?: string;
 }
 

@@ -121,6 +121,7 @@ const QrlLocalNetworkConfig = t.type({
   throwOnTransactionFailures: optional(t.boolean),
   throwOnCallFailures: optional(t.boolean),
   allowUnlimitedContractSize: optional(t.boolean),
+  stackTraces: optional(t.boolean),
   qrlJsMonorepoPath: optional(t.string),
 });
 

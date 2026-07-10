@@ -148,6 +148,10 @@ reverting transactions/calls throw with the decoded reason; see the
 (`QRL_MAX_CODE_SIZE`), e.g. for coverage-instrumented contracts. Local testing
 only — real networks always enforce the limit.
 
+`stackTraces` (default `true`) appends Hyperion stack traces to failed
+transaction/call errors; see the
+[stack traces guide](../guides/stack-traces.md).
+
 For a focused qrlLocal guide, see [../qrl-local/README.md](../qrl-local/README.md).
 
 ## HTTP go-qrl networks

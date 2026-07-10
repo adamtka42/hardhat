@@ -155,6 +155,8 @@ probes the connection on startup works against `qrlLocal` too:
 - `qrl_coinbase`, `qrl_mining`, `qrl_syncing`
 - `qrl_getBlockTransactionCountByNumber` / `...ByHash`
 - `qrl_getTransactionByBlockNumberAndIndex` / `...ByBlockHashAndIndex`
+- `debug_traceCall`, `debug_traceTransaction` (go-qrl-shaped `structLogs`;
+  see the [stack traces guide](../guides/stack-traces.md))
 
 The local provider also supports local test helpers such as:
 
@@ -223,6 +225,9 @@ original Hardhat in-memory network:
   the decoded reason is appended to the error message, e.g.
   `QRL execution reverted (reason: 'locked', tx: 0x…)`. Custom errors stay
   decodable from `error.data`.
+- A Hyperion stack trace (`at Contract.function (file:line)` per frame) is
+  appended below the message; see the
+  [stack traces guide](../guides/stack-traces.md).
 - With `automine: false` nothing throws; the failure is only visible in the
   receipt after `qrl_mine`.
 - Gas estimation of a reverting transaction fails before anything is sent;

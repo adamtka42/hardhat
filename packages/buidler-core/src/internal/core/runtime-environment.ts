@@ -69,7 +69,7 @@ export class Environment implements HardhatRuntimeEnvironment {
 
     const provider = lazyObject(() => {
       log(`Creating provider for network ${networkName}`);
-      return createProvider(networkName, networkConfig);
+      return createProvider(networkName, networkConfig, config.paths);
     });
 
     this.network = {
