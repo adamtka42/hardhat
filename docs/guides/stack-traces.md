@@ -65,15 +65,21 @@ const callTrace = await network.provider.send("debug_traceCall", [
 Notes:
 
 - `structLogs` follows the go-qrl/geth shape; stack values are **512-bit**
-  hex words (wider than Ethereum's 256-bit — tools that parse hex strings
-  work unchanged).
+  hex words and memory is chunked into **64-byte** words (the QRL VM word
+  size), matching go-qrl.
 - Historical transactions are traceable: the local chain retains the
   pre-block state of every mined block. `qrl_revert` drops the retained
   states of rolled-back blocks.
-- `gasCost` is derived by differencing consecutive steps within a frame — an
-  approximation for frame-crossing opcodes.
-- Not supported yet: custom tracers (`tracer` config) and memory capture
-  (`enableMemory`); both return a clear error.
+- `gasCost` is exact for a frame's final instruction and derived by
+  differencing consecutive steps otherwise — for frame-crossing opcodes
+  (CALL/CREATE) this includes the child's consumption, which differs from
+  go-qrl's pre-execution opcode cost.
+- `enableMemory` is supported (64-byte word chunks); `limit` stops
+  collection as soon as it is reached.
+- **Storage is never captured** — a deliberate divergence from go-qrl, whose
+  default records SLOAD/SSTORE. Omitting `disableStorage` returns a trace
+  without storage; explicitly requesting it (`disableStorage: false`) fails
+  with a clear error. Custom tracers (`tracer` config) are rejected too.
 
 ## Limitations
 
@@ -82,5 +88,10 @@ Notes:
   argument counts, non-payable transfers, etc.).
 - Frames whose bytecode cannot be matched to a compiled contract (e.g.
   contracts deployed from other projects) are silently skipped.
+- Failure attribution follows matching revert payloads: an empty-payload
+  bubble stops at the outer contract, and a HANDLED nested failure whose
+  reason is byte-identical to the outer contract's own revert is attributed
+  to the inner one — both are undecidable without instruction-level
+  analysis.
 - Gas estimation failures of reverting transactions are traced through the
   call path (`qrl_estimateGas` uses the same decoding).

@@ -20,14 +20,15 @@ export async function buildQrlStackTraceLines(
   }
 
   // Failing spine: from the root, keep descending into the last child whose
-  // failure PROPAGATED — i.e. whose NON-EMPTY revert payload equals the
-  // parent's (Hyperion bubbles nested failures by re-reverting with the
-  // child's returndata). A handled nested failure has a different parent
-  // payload and must not be blamed for the parent's own revert. Known
-  // limitation (documented): empty-payload bubbles and a handled child that
-  // shares the parent's exact reason string cannot be distinguished without
-  // instruction-level analysis — in both cases the trace conservatively
-  // stops at the parent, whose own location is still correct.
+  // NON-EMPTY revert payload equals the parent's — Hyperion bubbles nested
+  // failures by re-reverting with the child's returndata, so equal payloads
+  // are TREATED AS propagation and the trace descends. A handled child with
+  // a DIFFERENT payload is correctly not blamed. Two undecidable cases
+  // (without instruction-level analysis), both documented in the guide:
+  // - empty payloads never match, so an empty-revert bubble stops at the
+  //   parent (whose own location is still correct);
+  // - a HANDLED child whose reason is byte-identical to the parent's own
+  //   later revert is misattributed to the child.
   const spine: any[] = [];
   let current: any = rootFrame;
   while (current !== undefined) {

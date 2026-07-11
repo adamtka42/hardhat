@@ -215,6 +215,13 @@ the wall clock: the shift is applied to the next mined block on top of the
 deterministic `parent + 1` sequence, which keeps test runs reproducible.
 `qrl_snapshot`/`qrl_revert` also restore pending time state.
 
+With `automine: false`, the timestamp of the block under assembly is FROZEN
+the moment its first transaction executes (so the mined header always
+matches what the contracts observed). Time manipulation performed after that
+point applies to the FOLLOWING block, is validated against the frozen
+timestamp, and explicit `qrl_mine` options are rejected while transactions
+are pending.
+
 ## Transaction failures
 
 By default `qrlLocal` throws when a transaction or call reverts, matching the
