@@ -52,10 +52,21 @@ export class JsonRpcServer {
     return new Promise((resolve, reject) => {
       log(`Starting JSON-RPC server on port ${this._config.port}`);
       // Bind failures (e.g. EADDRINUSE) are emitted as server errors and
-      // must reject instead of leaving the promise pending forever.
+      // must reject instead of leaving the promise pending forever. The
+      // shared WebSocket server RE-EMITS them, so it needs a handler too —
+      // otherwise Node crashes with an unhandled 'error' event.
       this._httpServer.once("error", reject);
+      this._wsServer.once("error", reject);
       this._httpServer.listen(this._config.port, this._config.hostname, () => {
         this._httpServer.removeListener("error", reject);
+        this._wsServer.removeListener("error", reject);
+        // Post-startup errors must never crash the node process.
+        this._httpServer.on("error", (error) =>
+          log(`http server error: ${error.message}`)
+        );
+        this._wsServer.on("error", (error) =>
+          log(`ws server error: ${error.message}`)
+        );
         // The actual address and port come from the server itself to
         // support random port allocation with port `0`.
         const { address, port } = this._httpServer.address() as {

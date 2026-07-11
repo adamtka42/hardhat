@@ -162,12 +162,15 @@ Fix:
 
 ### BDLR114: Legacy in-memory network unsupported
 
-The old Ethereum in-memory development network/server mode is not supported in
-the QRL-only fork.
+The legacy `buidlerevm` network name from the Ethereum fork is not supported.
+(Historical note: early fork versions also threw this from `hardhat node`;
+the standalone server is now fully supported — see the
+[node guide](../guides/node.md).)
 
 Fix:
 
-- use `qrlLocal` for in-process tests,
+- use `qrlLocal` for in-process tests or `hardhat node` for a standalone
+  endpoint,
 - or configure an HTTP network that points at go-qrl.
 
 ### BDLR115: Invalid QRL address
@@ -281,6 +284,50 @@ networks: {
 
 Or use a network that exposes accounts through `qrl_accounts` (a configured
 `accounts` list or a node with unlocked accounts).
+
+### BDLR125: Unresolved library references
+
+The contract uses an external Hyperion library and no address was provided
+for it at deployment. Deploy the library first and pass its address:
+
+~~~js
+const Consumer = await qrl.getContractFactory("Consumer", {
+  libraries: { MathLib: mathLib.address },
+});
+~~~
+
+See [deploying contracts with external libraries](../guides/deploying.md).
+
+### BDLR126: Unknown library provided for linking
+
+A `libraries` entry names a library the contract's bytecode does not
+reference. Check the name; both `MathLib` and
+`contracts/MathLib.hyp:MathLib` forms are accepted.
+
+### BDLR127: Ambiguous library name for linking
+
+Two libraries referenced by the contract share the same bare name. Use the
+fully qualified `file.hyp:Library` form.
+
+### BDLR128: Invalid library address for linking
+
+Library addresses must be valid QRL addresses (`Q` + 128 hex characters).
+
+### BDLR129: Link reference placeholder mismatch
+
+A link reference reported by the compiler does not point at a `__$...$__`
+placeholder — the artifact is corrupted or was produced by an incompatible
+hypc build. Recompile the project.
+
+### BDLR130: Invalid initialDate network config value
+
+`initialDate` on a qrl-local network must be an ISO 8601 date string, e.g.
+`"2026-01-01T00:00:00Z"`.
+
+### BDLR131: Conflicting library addresses for linking
+
+The same library was provided twice — through its bare and fully qualified
+names — with different addresses. Remove one entry or make them identical.
 
 ## Ledger errors
 
