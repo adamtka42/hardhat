@@ -645,7 +645,7 @@ describe("QRL local", function () {
     );
     await assert.rejects(
       () => hre.network.provider.send("qrl_sendRawTransaction", ["0x00"]),
-      /qrl_sendRawTransaction on qrlLocal is not supported/
+      /invalid raw transaction/i
     );
     await assert.rejects(
       () =>

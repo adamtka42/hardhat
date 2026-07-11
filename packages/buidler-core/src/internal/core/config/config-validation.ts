@@ -103,6 +103,7 @@ const HttpNetworkConfig = t.type({
 const QrlLocalAccountConfig = t.type({
   address: t.string,
   balance: optional(t.union([t.string, t.number])),
+  seed: optional(t.string),
   nonce: optional(t.number),
 });
 
@@ -262,6 +263,20 @@ export function getValidationErrors(config: any): string[] {
                     `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.balance`,
                     account.balance,
                     "non-negative integer balance"
+                  )
+                );
+              }
+
+              if (
+                account.seed !== undefined &&
+                (typeof account.seed !== "string" ||
+                  !QRL_EXTENDED_SEED_REGEX.test(account.seed))
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.seed`,
+                    account.seed,
+                    "51-byte QRL extended seed hex string"
                   )
                 );
               }

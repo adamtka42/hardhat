@@ -108,6 +108,7 @@ module.exports = {
       accounts: [
         {
           address: "Q" + "01".repeat(64),
+          seed: process.env.QRL_LOCAL_SEED,
           balance: "1000000000000000000000000",
           nonce: 0,
         },
@@ -128,7 +129,9 @@ module.exports = {
 
 `accounts` is an array of local account objects. Each account needs a QRL
 address. `balance` can be a decimal string, hex string, or number. `nonce` is
-optional.
+optional. `seed` is an optional prefixed 51-byte extended QRL seed. It must
+derive the configured address and enables `qrl_sign` for that account. Keep
+seeds in environment variables and never commit them.
 
 `from` sets the default sender address for transactions on this network.
 

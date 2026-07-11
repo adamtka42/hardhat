@@ -28,6 +28,12 @@ local network supports works over the wire:
   (`net_*`, `web3_*`),
 - local helpers: `qrl_mine`, `qrl_snapshot`/`qrl_revert`,
   `qrl_increaseTime`, `qrl_setNextBlockTimestamp`,
+- log, block, and pending-transaction filters (`qrl_newFilter`,
+  `qrl_newBlockFilter`, `qrl_newPendingTransactionFilter`,
+  `qrl_getFilterChanges`, `qrl_getFilterLogs`, `qrl_uninstallFilter`),
+- pending transaction inspection through `qrl_pendingTransactions`,
+- signed transaction submission through `qrl_sendRawTransaction`,
+- message signing through `qrl_sign` for accounts configured with a seed,
 - `debug_traceCall` / `debug_traceTransaction`,
 - failed transactions/calls return their revert `data` and
   `transactionHash` through the JSON-RPC error object,
@@ -69,11 +75,32 @@ networks: {
 npx hardhat test --network nodeHttp
 ~~~
 
+## Local signing
+
+`qrl_sendRawTransaction` verifies the ML-DSA signature and public key before
+executing a transaction. The signed transaction must use the local chain id
+and the sender's current nonce.
+
+An account can optionally include its extended QRL seed. This enables
+`qrl_sign` for that account:
+
+~~~js
+accounts: [
+  {
+    address: process.env.QRL_LOCAL_ADDRESS,
+    seed: process.env.QRL_LOCAL_SEED,
+    balance: "1000000000000000000000000",
+  },
+],
+~~~
+
+The seed must derive the configured address. Accounts without a seed continue
+to support normal local transactions, but cannot be used with `qrl_sign`.
+The node banner never prints the seed.
+
 ## Limitations
 
 - `qrl_subscribe` (WebSocket subscriptions) is not implemented by the local
   provider yet; request/response over WebSocket works.
-- `qrl_sendRawTransaction` is not supported by the local network yet, so
-  clients must submit unsigned transactions via `qrl_sendTransaction`.
-- The account banner prints addresses and balances only — the local accounts
-  carry no key material.
+- Installed filters do not expire automatically. Uninstall filters that are
+  no longer needed with `qrl_uninstallFilter`.

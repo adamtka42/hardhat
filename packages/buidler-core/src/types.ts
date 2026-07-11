@@ -33,6 +33,12 @@ export interface QrlLedgerAccountsConfig extends OtherAccountsConfig {
 }
 
 export interface QrlLocalAccountConfig {
+  /**
+   * Optional extended seed enabling `qrl_sign` for this account. Local
+   * transactions never need it — the local network accepts unsigned
+   * transactions — and it is NEVER printed by `hardhat node`.
+   */
+  seed?: string;
   address: string;
   balance?: string | number;
   nonce?: number;

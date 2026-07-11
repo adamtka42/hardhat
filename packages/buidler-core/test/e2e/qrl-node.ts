@@ -45,7 +45,58 @@ function resolveQrlJsMonorepoPath(): string | undefined {
     : undefined;
 }
 
-const SENDER = `Q${"01".repeat(64)}`;
+const NODE_ACCOUNT_SEED = `0x010000${"05".repeat(48)}`;
+// tslint:disable-next-line: no-var-requires
+const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+const SENDER = seedToAccount(NODE_ACCOUNT_SEED).address;
+const RAW_TX_RECEIVER = `Q${"02".repeat(64)}`;
+
+function signedRawTransfer(qrlJsMonorepoPath: string): string {
+  const txQrl = require(path.join(
+    qrlJsMonorepoPath,
+    "packages",
+    "tx",
+    "dist",
+    "cjs",
+    "index.js"
+  )).qrl;
+  const accountsEntry = require.resolve("@theqrl/web3-qrl-accounts");
+  const { newMLDSA87WalletFromExtendedSeed } = require(path.join(
+    path.dirname(accountsEntry),
+    "qrl_wallet.js"
+  ));
+  const wallet = newMLDSA87WalletFromExtendedSeed(
+    Uint8Array.from(Buffer.from(NODE_ACCOUNT_SEED.slice(2), "hex"))
+  );
+  const descriptor = wallet.descriptor.toBytes();
+  const unsigned = new txQrl.QRLDynamicFeeTransaction({
+    chainId: (global as any).BigInt(1337),
+    nonce: (global as any).BigInt(0),
+    gasTipCap: (global as any).BigInt(0),
+    gasFeeCap: (global as any).BigInt(0),
+    gasLimit: (global as any).BigInt(21000),
+    to: RAW_TX_RECEIVER,
+    value: (global as any).BigInt(7),
+    data: new Uint8Array(0),
+    descriptor,
+    extraParams: new Uint8Array(),
+  });
+  const signed = new txQrl.QRLDynamicFeeTransaction({
+    chainId: unsigned.chainId,
+    nonce: unsigned.nonce,
+    gasTipCap: unsigned.gasTipCap,
+    gasFeeCap: unsigned.gasFeeCap,
+    gasLimit: unsigned.gasLimit,
+    to: unsigned.to,
+    value: unsigned.value,
+    data: unsigned.data,
+    descriptor,
+    extraParams: new Uint8Array(),
+    signature: wallet.sign(unsigned.getMessageToSign()),
+    publicKey: wallet.getPK(),
+  });
+  return `0x${Buffer.from(signed.serialize()).toString("hex")}`;
+}
 
 async function prepareProject(projectRoot: string) {
   await fsExtra.ensureDir(path.join(projectRoot, "contracts"));
@@ -80,7 +131,7 @@ contract Probe {
 
   await fsExtra.writeFile(
     path.join(projectRoot, "hardhat.config.js"),
-    `const localAccountAddress = \`Q\${"01".repeat(64)}\`;
+    `const localAccountAddress = process.env.QRL_NODE_E2E_ADDRESS;
 
 module.exports = {
   defaultNetwork: "qrlLocal",
@@ -93,7 +144,11 @@ module.exports = {
       chainId: 1337,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
-      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      accounts: [{
+        address: localAccountAddress,
+        balance: "1000000000000",
+        seed: process.env.QRL_NODE_E2E_SEED,
+      }],
       blockGasLimit: 30000000,
     },
     nodeHttp: {
@@ -234,6 +289,8 @@ describe("QRL node e2e", function () {
       ...process.env,
       HYPERION_HYPC_PATH: hypcPath,
       QRLJS_MONOREPO_PATH: qrlJsMonorepoPath,
+      QRL_NODE_E2E_ADDRESS: SENDER,
+      QRL_NODE_E2E_SEED: NODE_ACCOUNT_SEED,
     };
 
     // Compile ahead of time so the node serves ready artifacts.
@@ -271,7 +328,8 @@ describe("QRL node e2e", function () {
       // right after the sentinel; wait for the chunk to arrive.
       await waitFor(() => node.output().includes("Account #0"));
       assert.include(node.output(), `Account #0: ${SENDER}`);
-      assert.notMatch(node.output(), /seed|private/i);
+      assert.notInclude(node.output(), NODE_ACCOUNT_SEED);
+      assert.notMatch(node.output(), /private/i);
 
       // Raw HTTP: single request and an independent batch.
       const chainId = await rpcRequest(port, {
@@ -281,6 +339,47 @@ describe("QRL node e2e", function () {
         id: 1,
       });
       assert.equal(chainId.result, "0x539");
+
+      // Real offline ML-DSA-87 signing through the standalone JSON-RPC
+      // endpoint: decode, verify, derive sender, execute, and return receipt.
+      const rawResponse = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_sendRawTransaction",
+        params: [signedRawTransfer(qrlJsMonorepoPath)],
+        id: 10,
+      });
+      assert.match(rawResponse.result, /^0x[0-9a-f]{64}$/);
+      const rawReceipt = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_getTransactionReceipt",
+        params: [rawResponse.result],
+        id: 11,
+      });
+      assert.equal(rawReceipt.result.status, "0x1");
+      assert.equal(rawReceipt.result.from.toLowerCase(), SENDER.toLowerCase());
+      const receiverBalance = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_getBalance",
+        params: [RAW_TX_RECEIVER, "latest"],
+        id: 12,
+      });
+      assert.equal(receiverBalance.result, "0x7");
+
+      const signedMessage = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_sign",
+        params: [SENDER, "0xdeadbeef"],
+        id: 13,
+      });
+      assert.match(signedMessage.result, /^0x[0-9a-f]+$/i);
+
+      const blockFilter = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_newBlockFilter",
+        params: [],
+        id: 14,
+      });
+      assert.match(blockFilter.result, /^0x[0-9a-f]+$/i);
 
       const batch = await rpcRequest(port, [
         { jsonrpc: "2.0", method: "net_version", params: [], id: 2 },
@@ -308,6 +407,21 @@ describe("QRL node e2e", function () {
       );
       assert.include(scriptResult.stdout.toString(), "value over http: 42");
 
+      const blockChanges = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_getFilterChanges",
+        params: [blockFilter.result],
+        id: 15,
+      });
+      assert.isAtLeast(blockChanges.result.length, 2);
+      const uninstalled = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_uninstallFilter",
+        params: [blockFilter.result],
+        id: 16,
+      });
+      assert.isTrue(uninstalled.result);
+
       // Contract console.log printed in the NODE process, not the client.
       assert.include(node.output(), "store 42");
       assert.notInclude(scriptResult.stdout.toString(), "store 42");
@@ -318,7 +432,7 @@ describe("QRL node e2e", function () {
         await rpcRequest(port, {
           jsonrpc: "2.0",
           method: "qrl_getBlockByNumber",
-          params: ["0x1", true],
+          params: ["0x2", true],
           id: 4,
         })
       ).result.transactions[0].hash;

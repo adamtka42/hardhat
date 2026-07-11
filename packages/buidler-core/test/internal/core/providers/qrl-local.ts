@@ -195,17 +195,20 @@ describe("QRL local Hardhat provider", function () {
     assert.equal(await provider.send("qrl_blockNumber"), "0x0");
   });
 
-  it("rejects legacy eth methods and raw local transactions", async () => {
+  it("rejects legacy eth methods and malformed raw transactions", async () => {
     const provider = createLocalProvider();
 
     await expectHardhatErrorAsync(
       () => provider.send("eth_blockNumber"),
       ERRORS.NETWORK.LEGACY_ETH_RPC_UNSUPPORTED
     );
-    await expectHardhatErrorAsync(
-      () => provider.send("qrl_sendRawTransaction", ["0x00"]),
-      ERRORS.GENERAL.UNSUPPORTED_OPERATION
-    );
+    // Raw transactions are supported now; junk payloads fail parsing.
+    try {
+      await provider.send("qrl_sendRawTransaction", ["0x00"]);
+      assert.fail("junk raw transaction should be rejected");
+    } catch (error) {
+      assert.equal((error as any).code, -32602);
+    }
   });
 
   it("throws on reverting transactions and keeps the receipt queryable", async () => {
@@ -344,6 +347,181 @@ describe("QRL local Hardhat provider", function () {
       "latest",
     ]);
     assert.equal((code.length - 2) / 2, size);
+  });
+
+  it("submits an offline-signed ML-DSA-87 transaction end to end", async function () {
+    this.timeout(60000);
+    const seed = `0x010000${"01".repeat(48)}`;
+    const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+    const accountsEntry = require.resolve("@theqrl/web3-qrl-accounts");
+    const { newMLDSA87WalletFromExtendedSeed } = require(path.join(
+      path.dirname(accountsEntry),
+      "qrl_wallet.js"
+    ));
+    const signerAddress = seedToAccount(seed).address;
+
+    const provider = new QrlLocalHardhatProvider({
+      type: "qrl-local",
+      chainId: 1337,
+      blockGasLimit: 30000000,
+      qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+      accounts: [{ address: signerAddress, balance: "1000000000000" }],
+    });
+
+    // Build and sign the transaction fully offline with qrljs + the ML-DSA
+    // wallet — the same flow an external signer uses.
+    const txQrl = require(path.join(
+      QRLJS_MONOREPO_PATH,
+      "packages",
+      "tx",
+      "dist",
+      "cjs",
+      "index.js"
+    )).qrl;
+    const wallet = newMLDSA87WalletFromExtendedSeed(
+      Uint8Array.from(Buffer.from(seed.slice(2), "hex"))
+    );
+    // The signer embeds ITS OWN descriptor (encoded in the extended seed);
+    // verification and sender derivation read it back from the payload.
+    const descriptor = wallet.descriptor.toBytes();
+    const unsigned = new txQrl.QRLDynamicFeeTransaction({
+      chainId: (global as any).BigInt(1337),
+      nonce: (global as any).BigInt(0),
+      gasTipCap: (global as any).BigInt(0),
+      gasFeeCap: (global as any).BigInt(0),
+      gasLimit: (global as any).BigInt(21000),
+      to: RECEIVER,
+      value: (global as any).BigInt(7),
+      data: new Uint8Array(0),
+      descriptor,
+      extraParams: new Uint8Array(),
+    });
+    const signed = new txQrl.QRLDynamicFeeTransaction({
+      chainId: (global as any).BigInt(1337),
+      nonce: (global as any).BigInt(0),
+      gasTipCap: (global as any).BigInt(0),
+      gasFeeCap: (global as any).BigInt(0),
+      gasLimit: (global as any).BigInt(21000),
+      to: RECEIVER,
+      value: (global as any).BigInt(7),
+      data: new Uint8Array(0),
+      descriptor,
+      extraParams: new Uint8Array(),
+      signature: wallet.sign(unsigned.getMessageToSign()),
+      publicKey: wallet.getPK(),
+    });
+    const raw = `0x${Buffer.from(signed.serialize()).toString("hex")}`;
+
+    const txHash = await provider.send("qrl_sendRawTransaction", [raw]);
+    const receipt = await provider.send("qrl_getTransactionReceipt", [txHash]);
+    assert.equal(receipt.status, "0x1");
+    assert.equal(receipt.from.toLowerCase(), signerAddress.toLowerCase());
+    assert.equal(await provider.send("qrl_getBalance", [RECEIVER]), "0x7");
+
+    // Tampered signature must be rejected.
+    const tampered = new txQrl.QRLDynamicFeeTransaction({
+      chainId: (global as any).BigInt(1337),
+      nonce: (global as any).BigInt(1),
+      gasTipCap: (global as any).BigInt(0),
+      gasFeeCap: (global as any).BigInt(0),
+      gasLimit: (global as any).BigInt(21000),
+      to: RECEIVER,
+      value: (global as any).BigInt(7),
+      data: new Uint8Array(0),
+      descriptor,
+      extraParams: new Uint8Array(),
+      signature: wallet.sign(unsigned.getMessageToSign()),
+      publicKey: wallet.getPK(),
+    });
+    const rawTampered = `0x${Buffer.from(tampered.serialize()).toString(
+      "hex"
+    )}`;
+    try {
+      await provider.send("qrl_sendRawTransaction", [rawTampered]);
+      assert.fail("tampered raw transaction should be rejected");
+    } catch (error) {
+      assert.match((error as any).message, /signature verification failed/);
+    }
+  });
+
+  it("signs messages with qrl_sign for seeded local accounts", async function () {
+    this.timeout(60000);
+    const seed = `0x010000${"03".repeat(48)}`;
+    const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+    const account = seedToAccount(seed);
+
+    const provider = new QrlLocalHardhatProvider({
+      type: "qrl-local",
+      chainId: 1337,
+      qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+      accounts: [
+        { address: account.address, balance: "1000", seed },
+        { address: SENDER, balance: "1000" },
+      ],
+    });
+
+    const data = "0xdeadbeef";
+    const signature = await provider.send("qrl_sign", [account.address, data]);
+    const expected = account.sign(data);
+    assert.equal(signature, expected.signature);
+
+    const accountsEntry = require.resolve("@theqrl/web3-qrl-accounts");
+    const {
+      newMLDSA87WalletFromExtendedSeed,
+      verifyMLDSA87Signature,
+    } = require(path.join(path.dirname(accountsEntry), "qrl_wallet.js"));
+    const wallet = newMLDSA87WalletFromExtendedSeed(
+      Uint8Array.from(Buffer.from(seed.slice(2), "hex"))
+    );
+    assert.isTrue(
+      verifyMLDSA87Signature(
+        Uint8Array.from(Buffer.from(signature.slice(2), "hex")),
+        Uint8Array.from(Buffer.from(expected.messageHash.slice(2), "hex")),
+        wallet.getPK(),
+        wallet.getDescriptor()
+      )
+    );
+
+    // Accounts without a seed cannot sign.
+    await expectHardhatErrorAsync(
+      () => provider.send("qrl_sign", [SENDER, "0xdeadbeef"]),
+      ERRORS.NETWORK.NOT_LOCAL_ACCOUNT
+    );
+  });
+
+  it("validates qrl_sign data and seed/address consistency", async () => {
+    const seed = `0x010000${"04".repeat(48)}`;
+    const provider = new QrlLocalHardhatProvider({
+      type: "qrl-local",
+      chainId: 1337,
+      qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+      accounts: [{ address: SENDER, balance: "1000", seed }],
+    });
+
+    await expectHardhatErrorAsync(
+      () => provider.send("qrl_sign", [SENDER, "0x1"]),
+      ERRORS.NETWORK.INVALID_HEX_DATA
+    );
+    await expectHardhatErrorAsync(
+      () => provider.send("qrl_sign", ["0x1234", "0x00"]),
+      ERRORS.NETWORK.INVALID_QRL_ADDRESS
+    );
+    await expectHardhatErrorAsync(
+      () => provider.send("qrl_sign", [SENDER, "0x00"]),
+      ERRORS.NETWORK.NOT_LOCAL_ACCOUNT
+    );
+  });
+
+  it("exposes filters and the pending pool through the wrapper", async () => {
+    const provider = createLocalProvider();
+
+    const filterId = await provider.send("qrl_newBlockFilter");
+    await provider.send("qrl_mine");
+    const changes = await provider.send("qrl_getFilterChanges", [filterId]);
+    assert.lengthOf(changes, 1);
+    assert.isTrue(await provider.send("qrl_uninstallFilter", [filterId]));
+
+    assert.deepEqual(await provider.send("qrl_pendingTransactions"), []);
   });
 
   it("applies initialDate to the genesis block and supports time controls", async () => {

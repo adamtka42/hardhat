@@ -285,6 +285,7 @@ describe("Config validation", function () {
                   {
                     address: localAddress,
                     balance: "1000",
+                    seed: `0x010000${"01".repeat(48)}`,
                     nonce: 0,
                   },
                 ],
@@ -328,6 +329,29 @@ describe("Config validation", function () {
             ERRORS.GENERAL.INVALID_CONFIG,
             "64-byte QRL address"
           );
+        });
+
+        it("Should reject invalid local account seeds", function () {
+          for (const seed of [
+            "0x010000",
+            `010000${"01".repeat(48)}`,
+            `0x010000${"01".repeat(47)}zz`,
+            123,
+          ]) {
+            expectHardhatError(
+              () =>
+                validateConfig({
+                  networks: {
+                    qrlLocal: {
+                      type: "qrl-local",
+                      accounts: [{ address: localAddress, seed }],
+                    },
+                  },
+                }),
+              ERRORS.GENERAL.INVALID_CONFIG,
+              "51-byte QRL extended seed hex string"
+            );
+          }
         });
 
         it("Should reject non-local account config forms", function () {

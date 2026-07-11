@@ -9,6 +9,7 @@ import {
   QrlLocalNetworkConfig,
 } from "../../../types";
 import { decodeQrlFunctionResult } from "../../qrl/abi";
+import { isValidQrlAddress } from "../../qrl/address";
 import { printQrlConsoleLog } from "../../qrl/console-log";
 import {
   buildQrlStackTraceLines,
@@ -35,6 +36,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
   private readonly _chainId: number;
   private readonly _blockGasLimit: number;
   private readonly _stackTracesEnabled: boolean;
+  private readonly _accountConfigs: QrlLocalAccountConfig[];
   private readonly _cachePath?: string;
   private readonly _projectRoot?: string;
   private _stackTraceDecoder?: QrlStackTraceDecoder | null;
@@ -78,6 +80,8 @@ export class QrlLocalHardhatProvider extends EventEmitter
     }
 
     const rpcCompatSupported = (vmQrl as any).QRL_RPC_COMPAT_SUPPORTED === true;
+    const rpcCompletionSupported =
+      (vmQrl as any).QRL_RPC_COMPLETION_SUPPORTED === true;
     if (
       config.allowUnlimitedContractSize !== undefined &&
       !rpcCompatSupported
@@ -100,6 +104,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
 
     this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
     this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
+    this._accountConfigs = config.accounts ?? [];
     this._accounts = (config.accounts ?? []).map((account) =>
       normalizeLocalAccountAddress(utilQrl, account)
     );
@@ -121,6 +126,9 @@ export class QrlLocalHardhatProvider extends EventEmitter
       throwOnTransactionFailures: config.throwOnTransactionFailures,
       throwOnCallFailures: config.throwOnCallFailures,
       allowUnlimitedContractSize: config.allowUnlimitedContractSize,
+      rawTransactionSigner: rpcCompletionSupported
+        ? createRawTransactionSigner(utilQrl, this._chainId)
+        : undefined,
       defaultContext: {
         chainId: toRuntimeBigInt(this._chainId),
         gasLimit: toRuntimeBigInt(this._blockGasLimit),
@@ -148,10 +156,8 @@ export class QrlLocalHardhatProvider extends EventEmitter
         return [...this._accounts];
       case "qrl_gasPrice":
         return "0x0";
-      case "qrl_sendRawTransaction":
-        throw new HardhatError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
-          operation: "qrl_sendRawTransaction on qrlLocal",
-        });
+      case "qrl_sign":
+        return this._signWithLocalSeed(params);
       default:
         try {
           return await this._provider.request({ method, params });
@@ -215,6 +221,56 @@ export class QrlLocalHardhatProvider extends EventEmitter
     }
   }
 
+  private async _signWithLocalSeed(params: any[]): Promise<string> {
+    const [address, data] = params;
+    if (typeof address !== "string" || !isValidQrlAddress(address)) {
+      throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, {
+        address: String(address),
+      });
+    }
+    if (data === undefined) {
+      throw new HardhatError(ERRORS.NETWORK.QRLSIGN_MISSING_DATA_PARAM);
+    }
+    if (typeof data !== "string" || !QRL_HEX_DATA_REGEX.test(data)) {
+      throw new HardhatError(ERRORS.NETWORK.INVALID_HEX_DATA, { value: data });
+    }
+    const normalizedData =
+      data.startsWith("0x") || data.startsWith("0X") ? data.slice(2) : data;
+    if (normalizedData.length % 2 !== 0) {
+      throw new HardhatError(ERRORS.NETWORK.INVALID_HEX_DATA, { value: data });
+    }
+
+    const account = this._accountConfigs.find(
+      (candidate) =>
+        typeof address === "string" &&
+        candidate.address.toLowerCase() === address.toLowerCase()
+    );
+    if (account === undefined || account.seed === undefined) {
+      throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+        account: `${address}`,
+      });
+    }
+
+    const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+    let wallet: any;
+    try {
+      wallet = seedToAccount(account.seed);
+    } catch {
+      throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+        account: `${address} (the configured seed is invalid)`,
+      });
+    }
+    if (wallet.address.toLowerCase() !== account.address.toLowerCase()) {
+      // The configured seed derives a DIFFERENT address — a config mistake
+      // that must fail loudly instead of signing as someone else.
+      throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+        account: `${address} (the configured seed derives ${wallet.address})`,
+      });
+    }
+
+    return wallet.sign(data).signature;
+  }
+
   private _getStackTraceDecoder(): QrlStackTraceDecoder | undefined {
     if (this._cachePath === undefined) {
       return undefined;
@@ -245,6 +301,37 @@ export class QrlLocalHardhatProvider extends EventEmitter
 }
 
 const ERROR_STRING_SELECTOR = "0x08c379a0";
+const QRL_HEX_DATA_REGEX = /^(0x|0X)?[0-9a-fA-F]*$/;
+
+function createRawTransactionSigner(utilQrl: any, chainId: number): any {
+  const accountsEntry = require.resolve("@theqrl/web3-qrl-accounts");
+  const {
+    addressFromPublicKeyAndDescriptor,
+    descriptorFromBytes,
+    verifyMLDSA87Signature,
+  } = require(path.join(path.dirname(accountsEntry), "qrl_wallet.js"));
+
+  return {
+    chainId: toRuntimeBigInt(chainId),
+    hash: (tx: any) => tx.getMessageToSign(),
+    verify: (tx: any) =>
+      verifyMLDSA87Signature(
+        tx.signature,
+        tx.getMessageToSign(),
+        tx.publicKey,
+        descriptorFromBytes(tx.descriptor)
+      ),
+    sender: (tx: any) =>
+      utilQrl.QRLAddress.fromBytes(
+        Uint8Array.from(
+          addressFromPublicKeyAndDescriptor(
+            tx.publicKey,
+            descriptorFromBytes(tx.descriptor)
+          )
+        )
+      ),
+  };
+}
 const PANIC_SELECTOR = "0x4e487b71";
 
 /**

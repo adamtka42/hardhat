@@ -150,6 +150,12 @@ VM provider. Hardhat handles these methods directly:
 - `qrl_accounts`
 - `qrl_requestAccounts`
 - `qrl_gasPrice`
+- `qrl_sendRawTransaction`
+- `qrl_sign` (for accounts configured with a seed)
+- `qrl_pendingTransactions`
+- `qrl_newFilter`, `qrl_newBlockFilter`,
+  `qrl_newPendingTransactionFilter`
+- `qrl_getFilterChanges`, `qrl_getFilterLogs`, `qrl_uninstallFilter`
 
 The provider mirrors the go-qrl node's compatibility surface, so tooling that
 probes the connection on startup works against `qrlLocal` too:
@@ -264,13 +270,15 @@ status-`0x0` transaction and `qrl_call` returns the raw revert data.
 accounts. Accounts are configured in `hardhat.config.js`.
 
 HTTP networks can use locally signed QRL extended seeds or `accounts: "remote"`.
-`qrlLocal` uses configured local account objects instead.
+`qrlLocal` uses configured local account objects instead. A local account can
+optionally include a seed to enable `qrl_sign`; the seed must derive the
+configured address.
 
 `qrlLocal` rejects `eth_*` RPC methods. Use `qrl_*` methods only.
 
-`qrlLocal` rejects `qrl_sendRawTransaction`. Use `qrl_sendTransaction` through
-Hardhat's normal contract helpers or provider calls. Raw QRL transaction
-submission belongs to HTTP go-qrl networks.
+`qrlLocal` accepts signed QRL transactions through `qrl_sendRawTransaction`.
+It verifies the ML-DSA signature and public key, then validates the local chain
+id and current account nonce before execution.
 
 Chain id validation is applied to HTTP networks with configured `chainId`.
 `qrlLocal` exposes its configured chain id directly from the in-process provider.
@@ -301,6 +309,6 @@ Use an HTTP go-qrl network instead of `qrlLocal` when you need to validate:
 
 - private-network ports and connectivity,
 - node-managed accounts,
-- local signing with `QRL_ACCOUNT_SEED`,
-- raw transaction submission,
+- remote-node account management and signing behavior,
+- consensus and transaction-pool behavior of the actual node,
 - behavior that depends on the actual go-qrl node.
