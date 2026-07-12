@@ -135,9 +135,12 @@ Manifests and compiler binaries are cached below:
 cache/hyperion-compilers/
 ~~~
 
-If the repository is temporarily unavailable, a previously cached valid
-manifest and compiler can be used offline. `hardhat clean` removes this
-project-local compiler cache along with other generated cache data.
+A valid cached manifest is reused without a network request when it contains the
+requested version. QRL Hardhat refreshes the manifest only when the cache is
+missing, invalid, or does not contain that version. This also allows a cached
+manifest and compiler to be used while the repository is unavailable.
+`hardhat clean` removes this project-local compiler cache along with other
+generated cache data.
 
 A repository can be tested locally without additional infrastructure:
 

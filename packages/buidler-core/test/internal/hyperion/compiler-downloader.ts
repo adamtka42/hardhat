@@ -46,6 +46,7 @@ describe("Hyperion compiler resolver and downloader", function () {
   let repositoryUrl: string;
   let manifest: HyperionCompilersManifest;
   let compilerRequests: number;
+  let manifestRequests: number;
   const environmentVariables = [
     "HYPERION_HYPC_PATH",
     "HYPC_PATH",
@@ -58,9 +59,11 @@ describe("Hyperion compiler resolver and downloader", function () {
     environmentVariables.forEach((name) => delete process.env[name]);
 
     compilerRequests = 0;
+    manifestRequests = 0;
     manifest = createManifest(COMPILER);
     server = http.createServer((request, response) => {
       if (request.url === "/list.json") {
+        manifestRequests += 1;
         response.setHeader("content-type", "application/json");
         response.end(JSON.stringify(manifest));
         return;
@@ -115,6 +118,7 @@ describe("Hyperion compiler resolver and downloader", function () {
     assert.equal(first.longVersion, LONG_VERSION);
     assert.isTrue(await fsExtra.pathExists(first.path));
     assert.equal(compilerRequests, 1);
+    assert.equal(manifestRequests, 1);
 
     const execution = await execFileAsync(first.path, ["--version"]);
     assert.include(execution.stdout.toString(), LONG_VERSION);
@@ -145,6 +149,7 @@ describe("Hyperion compiler resolver and downloader", function () {
     );
     assert.equal(second.path, first.path);
     assert.equal(compilerRequests, 1);
+    assert.equal(manifestRequests, 1);
 
     await closeServer(server!);
     server = undefined;
@@ -196,6 +201,31 @@ describe("Hyperion compiler resolver and downloader", function () {
     assert.deepEqual(await fsExtra.readFile(repaired.path), COMPILER);
   });
 
+  it("restores execute permissions on a valid cached compiler", async function () {
+    if (process.platform === "win32") {
+      this.skip();
+    }
+
+    const config = createConfig(repositoryUrl);
+    const first = await resolveHyperionCompiler(
+      config,
+      this.tmpDir,
+      path.join(this.tmpDir, "cache")
+    );
+    await fsExtra.chmod(first.path, 0o644);
+
+    const cached = await resolveHyperionCompiler(
+      config,
+      this.tmpDir,
+      path.join(this.tmpDir, "cache")
+    );
+
+    assert.equal(cached.path, first.path);
+    assert.equal(compilerRequests, 1);
+    const execution = await execFileAsync(cached.path, ["--version"]);
+    assert.include(execution.stdout.toString(), LONG_VERSION);
+  });
+
   it("removes a download that doesn't match the manifest checksum", async function () {
     manifest = createManifest(COMPILER, "0".repeat(64));
 
@@ -229,6 +259,27 @@ describe("Hyperion compiler resolver and downloader", function () {
 
     assert.equal(resolved.source, "downloaded");
     assert.equal(compilerRequests, 1);
+  });
+
+  it("refreshes a cached manifest when the requested version is missing", async function () {
+    const config = createConfig(repositoryUrl);
+    await resolveHyperionCompiler(
+      config,
+      this.tmpDir,
+      path.join(this.tmpDir, "cache")
+    );
+    assert.equal(manifestRequests, 1);
+
+    await expectHardhatErrorAsync(
+      () =>
+        resolveHyperionCompiler(
+          { ...config, version: "9.9.9" },
+          this.tmpDir,
+          path.join(this.tmpDir, "cache")
+        ),
+      ERRORS.BUILTIN_TASKS.HYPERION_COMPILER_VERSION_NOT_FOUND
+    );
+    assert.equal(manifestRequests, 2);
   });
 
   it("reports a version missing from the repository", async function () {

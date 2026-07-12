@@ -53,7 +53,7 @@ export class HyperionCompilerDownloader {
   }
 
   public async resolve(version: string): Promise<ResolvedHyperionCompiler> {
-    const manifest = await this._getManifest();
+    const manifest = await this._getManifest(version);
     const hasRelease = Object.prototype.hasOwnProperty.call(
       manifest.releases,
       version
@@ -96,6 +96,7 @@ export class HyperionCompilerDownloader {
 
     if (await fsExtra.pathExists(destination)) {
       if (await this._verifyCompiler(destination, validatedBuild.checksum)) {
+        await this._makeExecutable(destination);
         return resolvedDownloadedCompiler(
           destination,
           build,
@@ -118,9 +119,7 @@ export class HyperionCompilerDownloader {
       );
     }
 
-    if (process.platform !== "win32") {
-      await fsExtra.chmod(destination, 0o755);
-    }
+    await this._makeExecutable(destination);
     return resolvedDownloadedCompiler(
       destination,
       build,
@@ -129,8 +128,49 @@ export class HyperionCompilerDownloader {
     );
   }
 
-  private async _getManifest(): Promise<HyperionCompilersManifest> {
+  private async _makeExecutable(compilerPath: string): Promise<void> {
+    if (process.platform !== "win32") {
+      await fsExtra.chmod(compilerPath, 0o755);
+    }
+  }
+
+  private async _getManifest(
+    version: string
+  ): Promise<HyperionCompilersManifest> {
     const manifestPath = path.join(this._repositoryCacheDir, "list.json");
+    const cachedManifest = await this._readCachedManifest(manifestPath);
+    if (
+      cachedManifest !== undefined &&
+      Object.prototype.hasOwnProperty.call(cachedManifest.releases, version)
+    ) {
+      return cachedManifest;
+    }
+
+    return this._downloadManifest(manifestPath);
+  }
+
+  private async _readCachedManifest(
+    manifestPath: string
+  ): Promise<HyperionCompilersManifest | undefined> {
+    if (!(await fsExtra.pathExists(manifestPath))) {
+      return undefined;
+    }
+
+    try {
+      return validateManifest(
+        await fsExtra.readJson(manifestPath),
+        this._repositoryUrl
+      );
+    } catch {
+      await fsExtra.remove(manifestPath);
+      return undefined;
+    }
+  }
+
+  private async _downloadManifest(
+    manifestPath: string
+  ): Promise<HyperionCompilersManifest> {
+    const temporary = `${manifestPath}.${process.pid}.${Date.now()}.tmp`;
     try {
       const response = await nodeFetch(
         new URL("list.json", this._repositoryUrl).href
@@ -149,20 +189,11 @@ export class HyperionCompilerDownloader {
         this._repositoryUrl
       );
       await fsExtra.ensureDir(path.dirname(manifestPath));
-      await fsExtra.writeJson(manifestPath, manifest, { spaces: 2 });
+      await fsExtra.writeJson(temporary, manifest, { spaces: 2 });
+      await fsExtra.move(temporary, manifestPath, { overwrite: true });
       return manifest;
     } catch (error) {
-      if (await fsExtra.pathExists(manifestPath)) {
-        try {
-          return validateManifest(
-            await fsExtra.readJson(manifestPath),
-            this._repositoryUrl
-          );
-        } catch {
-          // Report the original repository failure instead of a stale cache.
-        }
-      }
-
+      await fsExtra.remove(temporary);
       if (HardhatError.isHardhatError(error)) {
         throw error;
       }
