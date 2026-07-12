@@ -10,6 +10,7 @@ import {
   COMPILER_INPUT_FILENAME,
   COMPILER_OUTPUT_FILENAME,
 } from "../../../src/internal/constants";
+import { CompilerFingerprint } from "../../../src/internal/hyperion/compiler-version";
 import { HyperionConfig, ProjectPaths } from "../../../src/types";
 import { useTmpDir } from "../../helpers/fs";
 
@@ -48,6 +49,41 @@ describe("Compile cache utils", function () {
     await cacheHardhatConfig(paths, secondConfig);
 
     assert.isTrue(await areArtifactsCached([0], secondConfig, paths));
+  });
+
+  it("invalidates the cache when the hypc binary fingerprint changes", async function () {
+    const config = createHyperionConfig("/tmp/hypc-a");
+    const fingerprint: CompilerFingerprint = {
+      resolvedPath: "/tmp/hypc-a",
+      longVersion: "0.2.0+commit.11111111",
+      mtimeMs: 1000,
+      size: 4096,
+    };
+
+    await cacheHardhatConfig(paths, config, fingerprint);
+    assert.isTrue(await areArtifactsCached([0], config, paths, fingerprint));
+
+    // A rebuild at the same path with the same version string still misses:
+    // mtime and size are part of the key.
+    assert.isFalse(
+      await areArtifactsCached([0], config, paths, {
+        ...fingerprint,
+        mtimeMs: 2000,
+        size: 4097,
+      })
+    );
+
+    // A different detected version misses even with identical stats.
+    assert.isFalse(
+      await areArtifactsCached([0], config, paths, {
+        ...fingerprint,
+        longVersion: "0.3.0+commit.22222222",
+      })
+    );
+
+    // A cache written before fingerprints existed misses once and rebuilds.
+    await cacheHardhatConfig(paths, config);
+    assert.isFalse(await areArtifactsCached([0], config, paths, fingerprint));
   });
 });
 

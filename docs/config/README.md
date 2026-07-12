@@ -81,12 +81,15 @@ module.exports = {
 };
 ~~~
 
-`version` is metadata for the compiler configuration. The current compiler flow
-uses a local compiler binary.
+`version` declares the expected compiler version. `"local"` (the default)
+accepts any binary; a concrete version like `"0.2.0"` is checked against
+`hypc --version` and warns on mismatch. It never downloads a compiler — see
+the [compilation guide](../guides/compile-contracts.md) for the exact
+semantics.
 
-`compilerPath` points at the `hypc` executable. If omitted, QRL Hardhat uses its
-default compiler lookup. Projects that work from a monorepo checkout often set
-`HYPERION_HYPC_PATH`.
+`compilerPath` points at the `hypc` executable. If omitted, QRL Hardhat falls
+back to `HYPERION_HYPC_PATH`, then `HYPC_PATH`, then `hypc` from `PATH`.
+Projects that work from a monorepo checkout often set `HYPERION_HYPC_PATH`.
 
 `optimizer.enabled` and `optimizer.runs` are passed into the Hyperion compiler
 input.

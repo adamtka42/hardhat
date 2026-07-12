@@ -7,6 +7,8 @@ import { promisify } from "util";
 
 import { HyperionOptimizerConfig } from "../../types";
 
+import { resolveHypcPath } from "./compiler-version";
+
 const execFileAsync = promisify(execFile);
 
 // Standard JSON gives access to linkReferences (external library
@@ -36,14 +38,7 @@ export async function compileHyperion(
   projectRoot: string,
   compilerPath?: string
 ): Promise<any> {
-  const hypcPath =
-    compilerPath !== undefined
-      ? compilerPath
-      : process.env.HYPERION_HYPC_PATH !== undefined
-      ? process.env.HYPERION_HYPC_PATH
-      : process.env.HYPC_PATH !== undefined
-      ? process.env.HYPC_PATH
-      : "hypc";
+  const hypcPath = resolveHypcPath(compilerPath);
   const standardJsonInput = {
     language: "Hyperion",
     sources: input.sources,

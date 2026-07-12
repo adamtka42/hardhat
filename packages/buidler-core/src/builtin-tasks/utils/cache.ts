@@ -6,22 +6,28 @@ import {
   COMPILER_INPUT_FILENAME,
   COMPILER_OUTPUT_FILENAME,
 } from "../../internal/constants";
+import { CompilerFingerprint } from "../../internal/hyperion/compiler-version";
 import { glob } from "../../internal/util/glob";
 import { getPackageJson } from "../../internal/util/packageInfo";
 import { HyperionConfig, ProjectPaths } from "../../types";
 
 // Checks the earliest date of modification for compiled files against the latest date for source files (including libraries).
-// Furthermore, cache is invalidated if Hardhat's version changes, or a different compiler config is set in the config.
+// Furthermore, cache is invalidated if Hardhat's version changes, a different
+// compiler config is set in the config, or the resolved hypc binary changes
+// (path, mtime, size or detected version — the config's `version` string
+// alone cannot tell two local builds apart).
 export async function areArtifactsCached(
   sourceTimestamps: number[],
   newHyperionConfig: HyperionConfig,
-  paths: ProjectPaths
+  paths: ProjectPaths,
+  compilerFingerprint?: CompilerFingerprint
 ): Promise<boolean> {
   const oldConfig = await getLastUsedConfig(paths.cache);
 
   if (
     oldConfig === undefined ||
     !compareHyperionConfigs(oldConfig.hyperion, newHyperionConfig) ||
+    !isEqual(oldConfig.compiler, compilerFingerprint) ||
     !(await compareHardhatVersion(oldConfig.hardhatVersion))
   ) {
     return false;
@@ -88,7 +94,14 @@ function getPathToCachedLastConfigPath(cachePath: string) {
 
 async function getLastUsedConfig(
   cachePath: string
-): Promise<{ hyperion: HyperionConfig; hardhatVersion: string } | undefined> {
+): Promise<
+  | {
+      hyperion: HyperionConfig;
+      hardhatVersion: string;
+      compiler?: CompilerFingerprint;
+    }
+  | undefined
+> {
   const pathToConfig = getPathToCachedLastConfigPath(cachePath);
 
   if (!(await fsExtra.pathExists(pathToConfig))) {
@@ -112,12 +125,14 @@ async function getLastUsedConfigTimestamp(
 
 export async function cacheHardhatConfig(
   paths: ProjectPaths,
-  config: HyperionConfig
+  config: HyperionConfig,
+  compilerFingerprint?: CompilerFingerprint
 ) {
   const pathToLastConfigUsed = getPathToCachedLastConfigPath(paths.cache);
   const newJson = {
     hyperion: config,
     hardhatVersion: await getCurrentHardhatVersion(),
+    compiler: compilerFingerprint,
   };
 
   await fsExtra.ensureDir(path.dirname(pathToLastConfigUsed));

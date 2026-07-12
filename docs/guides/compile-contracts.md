@@ -69,14 +69,30 @@ module.exports = {
 };
 ~~~
 
-`compilerPath` points at the `hypc` executable. Projects that use a local
-Hyperion checkout commonly set it with `HYPERION_HYPC_PATH`.
+`compilerPath` points at the `hypc` executable. The binary is resolved in this
+order:
+
+1. `hyperion.compilerPath` from the config,
+2. the `HYPERION_HYPC_PATH` environment variable,
+3. the `HYPC_PATH` environment variable,
+4. `hypc` from `PATH`.
 
 `optimizer.enabled` and `optimizer.runs` are passed into the Hyperion standard
 JSON input.
 
-`version` is metadata in the Hardhat compiler config. The current QRL compile
-flow uses a local Hyperion compiler binary.
+`version` declares which compiler version the project expects:
+
+- `"local"` (the default) accepts whatever binary resolves — no check is made.
+  The detected version is logged when running with `DEBUG=buidler*`.
+- A concrete version such as `"0.2.0"` is compared against the output of
+  `hypc --version`. On a mismatch the compile prints a one-line warning and
+  continues with the binary's actual version — it is never an error, because
+  local Hyperion builds carry `-ci`/`+commit` suffixes. A version matches when
+  it equals the detected long version or is its release prefix (for example
+  `"0.2.0"` matches `0.2.0-ci.2026.5.21+commit.cd63ffc3`).
+
+Hyperion has no binary distribution registry yet, so unlike upstream Hardhat's
+`solc.version`, the `version` field never downloads a compiler.
 
 ## Compiler input and output
 
@@ -143,6 +159,10 @@ recompiles when:
 - artifacts are missing,
 - `cache/compiler-input.json` or `cache/compiler-output.json` is missing,
 - the stored Hyperion config differs from the current config,
+- the resolved `hypc` binary changed — its path, modification time, size, or
+  detected version differs from the one that produced the cache. Rebuilding
+  the compiler at the same path invalidates the cache even when the version
+  string is unchanged,
 - the QRL Hardhat package version differs from the cached version.
 
 Use `npx hardhat clean` when you want to remove cache and artifacts explicitly.

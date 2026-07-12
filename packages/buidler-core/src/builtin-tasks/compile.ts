@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import debug from "debug";
 import fsExtra from "fs-extra";
 import path from "path";
 
@@ -14,6 +15,11 @@ import { internalTask, task, types } from "../internal/core/config/config-env";
 import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
 import { compileHyperion, HyperionInput } from "../internal/hyperion/compiler";
+import {
+  getCompilerFingerprint,
+  getVersionMismatchWarning,
+  resolveHypcPath,
+} from "../internal/hyperion/compiler-version";
 import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
 import { Resolver } from "../internal/hyperion/resolver";
 import { glob } from "../internal/util/glob";
@@ -32,6 +38,8 @@ import {
   TASK_COMPILE_RUN_COMPILER,
 } from "./task-names";
 import { areArtifactsCached, cacheHardhatConfig } from "./utils/cache";
+
+const log = debug("buidler:core:tasks:compile");
 
 async function cacheCompilerJsonFiles(
   config: ResolvedHardhatConfig,
@@ -170,7 +178,14 @@ export default function () {
 
     await cacheCompilerJsonFiles(config, input, output);
 
-    await cacheHardhatConfig(config.paths, config.hyperion);
+    const compilerFingerprint = await getCompilerFingerprint(
+      resolveHypcPath(config.hyperion.compilerPath)
+    );
+    await cacheHardhatConfig(
+      config.paths,
+      config.hyperion,
+      compilerFingerprint
+    );
 
     return output;
   });
@@ -204,7 +219,19 @@ export default function () {
       return false;
     }
 
-    return areArtifactsCached(sourceTimestamps, config.hyperion, config.paths);
+    // The binary fingerprint (path, mtime, size, detected version) is part
+    // of the cache key: swapping or rebuilding hypc must recompile even
+    // when the config itself is unchanged.
+    const compilerFingerprint = await getCompilerFingerprint(
+      resolveHypcPath(config.hyperion.compilerPath)
+    );
+
+    return areArtifactsCached(
+      sourceTimestamps,
+      config.hyperion,
+      config.paths,
+      compilerFingerprint
+    );
   });
 
   internalTask(TASK_BUILD_ARTIFACTS, async ({ force }, { config, run }) => {
@@ -213,6 +240,28 @@ export default function () {
     if (sources.length === 0) {
       console.log("No Hyperion source file available.");
       return;
+    }
+
+    // Sanity-check the configured compiler version against the resolved
+    // binary once per run. `version: "local"` (the default) skips the check;
+    // a concrete version only warns — local hypc builds are the norm until
+    // Hyperion has a binary distribution channel.
+    const compilerFingerprint = await getCompilerFingerprint(
+      resolveHypcPath(config.hyperion.compilerPath)
+    );
+    if (compilerFingerprint !== undefined) {
+      log(
+        "Detected hypc %s at %s",
+        compilerFingerprint.longVersion ?? "(version not detected)",
+        compilerFingerprint.resolvedPath
+      );
+    }
+    const versionWarning = getVersionMismatchWarning(
+      config.hyperion.version,
+      compilerFingerprint
+    );
+    if (versionWarning !== undefined) {
+      console.warn(chalk.yellow(versionWarning));
     }
 
     const isCached: boolean = await run(TASK_COMPILE_CHECK_CACHE, { force });
