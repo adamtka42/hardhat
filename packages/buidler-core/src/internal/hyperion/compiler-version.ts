@@ -19,16 +19,31 @@ export interface CompilerFingerprint {
 /**
  * Resolves the hypc binary exactly like the compiler invocation does:
  * config `compilerPath`, then HYPERION_HYPC_PATH, then HYPC_PATH, then
- * `hypc` from PATH.
+ * `hypc` from PATH. Path-like values are made absolute against the project
+ * root (the compiler runs with `cwd: projectRoot`), so the version probe
+ * and the compilation always target the same binary. Bare names are
+ * returned as-is and looked up on PATH at execution time.
  */
-export function resolveHypcPath(compilerPath?: string): string {
-  return compilerPath !== undefined
-    ? compilerPath
-    : process.env.HYPERION_HYPC_PATH !== undefined
-    ? process.env.HYPERION_HYPC_PATH
-    : process.env.HYPC_PATH !== undefined
-    ? process.env.HYPC_PATH
-    : "hypc";
+export function resolveHypcPath(
+  compilerPath: string | undefined,
+  projectRoot: string
+): string {
+  const configured =
+    compilerPath !== undefined
+      ? compilerPath
+      : process.env.HYPERION_HYPC_PATH !== undefined
+      ? process.env.HYPERION_HYPC_PATH
+      : process.env.HYPC_PATH !== undefined
+      ? process.env.HYPC_PATH
+      : "hypc";
+
+  return isPathLike(configured)
+    ? path.resolve(projectRoot, configured)
+    : configured;
+}
+
+function isPathLike(binary: string): boolean {
+  return binary.includes(path.sep) || binary.includes("/");
 }
 
 /**
@@ -83,12 +98,15 @@ const versionCache = new Map<
 /**
  * Stats and version-probes the resolved hypc binary. Returns undefined when
  * the binary cannot be found — the compile itself will then fail with the
- * real error, and the cache treats "unknown binary" as a miss.
+ * real error, and the cache treats "unknown binary" as a miss. The project
+ * root anchors relative and empty PATH entries, mirroring how execFile
+ * resolves a bare name with `cwd: projectRoot`.
  */
 export async function getCompilerFingerprint(
-  hypcPath: string
+  hypcPath: string,
+  projectRoot: string
 ): Promise<CompilerFingerprint | undefined> {
-  const resolvedPath = resolveBinaryOnPath(hypcPath);
+  const resolvedPath = resolveBinaryOnPath(hypcPath, projectRoot);
   if (resolvedPath === undefined) {
     return undefined;
   }
@@ -147,23 +165,28 @@ function makeFingerprint(
   return fingerprint;
 }
 
-function resolveBinaryOnPath(binary: string): string | undefined {
-  if (binary.includes(path.sep) || binary.includes("/")) {
+function resolveBinaryOnPath(
+  binary: string,
+  projectRoot: string
+): string | undefined {
+  if (isPathLike(binary)) {
     return fs.existsSync(binary) ? path.resolve(binary) : undefined;
   }
 
   const pathEntries = (process.env.PATH ?? "").split(path.delimiter);
+  // The bare name is tried first so an explicit `hypc.exe` does not get a
+  // second PATHEXT extension appended.
   const extensions =
     process.platform === "win32"
-      ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")
+      ? ["", ...(process.env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")]
       : [""];
 
   for (const entry of pathEntries) {
-    if (entry === "") {
-      continue;
-    }
+    // Relative and empty PATH entries resolve against the project root —
+    // exactly what execFile sees when running with `cwd: projectRoot`.
+    const entryDir = path.resolve(projectRoot, entry);
     for (const extension of extensions) {
-      const candidate = path.join(entry, binary + extension.toLowerCase());
+      const candidate = path.join(entryDir, binary + extension.toLowerCase());
       try {
         if (fs.statSync(candidate).isFile()) {
           return candidate;

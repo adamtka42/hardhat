@@ -38,7 +38,7 @@ export async function compileHyperion(
   projectRoot: string,
   compilerPath?: string
 ): Promise<any> {
-  const hypcPath = resolveHypcPath(compilerPath);
+  const hypcPath = resolveHypcPath(compilerPath, projectRoot);
   const standardJsonInput = {
     language: "Hyperion",
     sources: input.sources,

@@ -99,7 +99,79 @@ describe("Compile task", function () {
     assert.match(artifact.bytecode, /^0x[0-9a-f]*$/i);
     assert.match(artifact.deployedBytecode, /^0x[0-9a-f]*$/i);
   });
+
+  it("prints no version warning for the default local version", async function () {
+    const warnings = captureConsoleWarn();
+    try {
+      await this.env.run(TASK_COMPILE, { force: true });
+    } finally {
+      warnings.restore();
+    }
+
+    assert.lengthOf(warnings.versionWarnings(), 0);
+  });
 });
+
+describe("Compile task compiler version check", function () {
+  useFixtureProject("compiler-version-project");
+  useEnvironment();
+  useHypcEnvironment();
+
+  beforeEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  afterEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  it("warns exactly once per run on a version mismatch, also on cache hits", async function () {
+    const firstRun = captureConsoleWarn();
+    try {
+      await this.env.run(TASK_COMPILE, { force: true });
+    } finally {
+      firstRun.restore();
+    }
+
+    assert.lengthOf(firstRun.versionWarnings(), 1);
+    assert.include(firstRun.versionWarnings()[0], "0.0.1-version-check");
+
+    // The compile itself succeeded despite the warning.
+    const artifact = await readArtifact(this.env.config.paths.artifacts, "A");
+    assert.equal(artifact.contractName, "A");
+
+    // A cached run must still surface the same single warning.
+    const secondRun = captureConsoleWarn();
+    try {
+      await this.env.run(TASK_COMPILE, { force: false });
+    } finally {
+      secondRun.restore();
+    }
+
+    assert.lengthOf(secondRun.versionWarnings(), 1);
+  });
+});
+
+function captureConsoleWarn(): {
+  versionWarnings: () => string[];
+  restore: () => void;
+} {
+  const originalWarn = console.warn;
+  const messages: string[] = [];
+  console.warn = (...args: any[]) => {
+    messages.push(args.join(" "));
+  };
+
+  return {
+    versionWarnings: () =>
+      messages.filter((message) => message.includes("claims version")),
+    restore: () => {
+      console.warn = originalWarn;
+    },
+  };
+}
 
 describe("Compile task with external libraries", function () {
   useFixtureProject("library-project");

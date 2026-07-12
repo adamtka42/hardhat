@@ -42,23 +42,36 @@ describe("Compile cache utils", function () {
   it("reloads the cached Hyperion config after it changes", async function () {
     const firstConfig = createHyperionConfig("/tmp/hypc-a");
     const secondConfig = createHyperionConfig("/tmp/hypc-b");
+    const fingerprint = createFingerprint("/tmp/hypc-a");
 
-    await cacheHardhatConfig(paths, firstConfig);
-    assert.isTrue(await areArtifactsCached([0], firstConfig, paths));
+    await cacheHardhatConfig(paths, firstConfig, fingerprint);
+    assert.isTrue(
+      await areArtifactsCached([0], firstConfig, paths, fingerprint)
+    );
 
-    await cacheHardhatConfig(paths, secondConfig);
+    await cacheHardhatConfig(paths, secondConfig, fingerprint);
 
-    assert.isTrue(await areArtifactsCached([0], secondConfig, paths));
+    assert.isTrue(
+      await areArtifactsCached([0], secondConfig, paths, fingerprint)
+    );
+  });
+
+  it("never reports a cache hit without a compiler fingerprint", async function () {
+    const config = createHyperionConfig("/tmp/hypc-a");
+
+    // A legacy cache has no stored fingerprint; an unresolvable binary has
+    // none either. The two must not compare equal as a hit.
+    await cacheHardhatConfig(paths, config);
+    assert.isFalse(await areArtifactsCached([0], config, paths, undefined));
+
+    // Even a fingerprint-carrying cache misses when the binary is gone.
+    await cacheHardhatConfig(paths, config, createFingerprint("/tmp/hypc-a"));
+    assert.isFalse(await areArtifactsCached([0], config, paths, undefined));
   });
 
   it("invalidates the cache when the hypc binary fingerprint changes", async function () {
     const config = createHyperionConfig("/tmp/hypc-a");
-    const fingerprint: CompilerFingerprint = {
-      resolvedPath: "/tmp/hypc-a",
-      longVersion: "0.2.0+commit.11111111",
-      mtimeMs: 1000,
-      size: 4096,
-    };
+    const fingerprint = createFingerprint("/tmp/hypc-a");
 
     await cacheHardhatConfig(paths, config, fingerprint);
     assert.isTrue(await areArtifactsCached([0], config, paths, fingerprint));
@@ -86,6 +99,15 @@ describe("Compile cache utils", function () {
     assert.isFalse(await areArtifactsCached([0], config, paths, fingerprint));
   });
 });
+
+function createFingerprint(resolvedPath: string): CompilerFingerprint {
+  return {
+    resolvedPath,
+    longVersion: "0.2.0+commit.11111111",
+    mtimeMs: 1000,
+    size: 4096,
+  };
+}
 
 function createHyperionConfig(compilerPath: string): HyperionConfig {
   return {

@@ -22,6 +22,14 @@ export async function areArtifactsCached(
   paths: ProjectPaths,
   compilerFingerprint?: CompilerFingerprint
 ): Promise<boolean> {
+  // No resolvable hypc binary means nothing can be verified — never report
+  // a cache hit (a legacy cache without a stored fingerprint would otherwise
+  // compare equal to an undefined one). The compile itself then surfaces
+  // the real "binary not found" error.
+  if (compilerFingerprint === undefined) {
+    return false;
+  }
+
   const oldConfig = await getLastUsedConfig(paths.cache);
 
   if (

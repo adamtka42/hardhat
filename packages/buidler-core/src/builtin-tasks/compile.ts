@@ -179,7 +179,8 @@ export default function () {
     await cacheCompilerJsonFiles(config, input, output);
 
     const compilerFingerprint = await getCompilerFingerprint(
-      resolveHypcPath(config.hyperion.compilerPath)
+      resolveHypcPath(config.hyperion.compilerPath, config.paths.root),
+      config.paths.root
     );
     await cacheHardhatConfig(
       config.paths,
@@ -223,7 +224,8 @@ export default function () {
     // of the cache key: swapping or rebuilding hypc must recompile even
     // when the config itself is unchanged.
     const compilerFingerprint = await getCompilerFingerprint(
-      resolveHypcPath(config.hyperion.compilerPath)
+      resolveHypcPath(config.hyperion.compilerPath, config.paths.root),
+      config.paths.root
     );
 
     return areArtifactsCached(
@@ -247,7 +249,8 @@ export default function () {
     // a concrete version only warns — local hypc builds are the norm until
     // Hyperion has a binary distribution channel.
     const compilerFingerprint = await getCompilerFingerprint(
-      resolveHypcPath(config.hyperion.compilerPath)
+      resolveHypcPath(config.hyperion.compilerPath, config.paths.root),
+      config.paths.root
     );
     if (compilerFingerprint !== undefined) {
       log(

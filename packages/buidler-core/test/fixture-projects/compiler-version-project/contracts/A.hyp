@@ -1,0 +1,2 @@
+pragma hyperion >=0.0;
+contract A {}
