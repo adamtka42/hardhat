@@ -15,11 +15,9 @@ import { internalTask, task, types } from "../internal/core/config/config-env";
 import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
 import { compileHyperion, HyperionInput } from "../internal/hyperion/compiler";
-import {
-  getCompilerFingerprint,
-  getVersionMismatchWarning,
-  resolveHypcPath,
-} from "../internal/hyperion/compiler-version";
+import { resolveHyperionCompiler } from "../internal/hyperion/compiler-resolver";
+import { ResolvedHyperionCompiler } from "../internal/hyperion/compiler-types";
+import { getVersionMismatchWarning } from "../internal/hyperion/compiler-version";
 import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
 import { Resolver } from "../internal/hyperion/resolver";
 import { glob } from "../internal/util/glob";
@@ -35,6 +33,7 @@ import {
   TASK_COMPILE_GET_DEPENDENCY_GRAPH,
   TASK_COMPILE_GET_RESOLVED_SOURCES,
   TASK_COMPILE_GET_SOURCE_PATHS,
+  TASK_COMPILE_RESOLVE_COMPILER,
   TASK_COMPILE_RUN_COMPILER,
 } from "./task-names";
 import { areArtifactsCached, cacheHardhatConfig } from "./utils/cache";
@@ -122,6 +121,14 @@ export default function () {
     };
   });
 
+  internalTask(TASK_COMPILE_RESOLVE_COMPILER, async (_, { config }) => {
+    return resolveHyperionCompiler(
+      config.hyperion,
+      config.paths.root,
+      config.paths.cache
+    );
+  });
+
   internalTask(TASK_COMPILE_RUN_COMPILER)
     .addParam(
       "input",
@@ -129,112 +136,131 @@ export default function () {
       undefined,
       types.json
     )
-    .setAction(async ({ input }: { input: HyperionInput }, { config }) => {
-      return compileHyperion(
+    .addOptionalParam("compilerPath", "The resolved hypc path")
+    .setAction(
+      async (
+        {
+          input,
+          compilerPath,
+        }: { input: HyperionInput; compilerPath?: string },
+        { config }
+      ) => {
+        return compileHyperion(
+          input,
+          config.paths.root,
+          compilerPath ?? config.hyperion.compilerPath
+        );
+      }
+    );
+
+  internalTask(TASK_COMPILE_COMPILE)
+    .addOptionalParam(
+      "compiler",
+      "The resolved Hyperion compiler",
+      undefined,
+      types.json
+    )
+    .setAction(async ({ compiler }: any, { config, run }) => {
+      const resolvedCompiler: ResolvedHyperionCompiler =
+        compiler ?? (await run(TASK_COMPILE_RESOLVE_COMPILER));
+      const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
+
+      console.log("Compiling Hyperion sources...");
+      const output = await run(TASK_COMPILE_RUN_COMPILER, {
         input,
-        config.paths.root,
-        config.hyperion.compilerPath
-      );
-    });
+        compilerPath: resolvedCompiler.path,
+      });
 
-  internalTask(TASK_COMPILE_COMPILE, async (_, { config, run }) => {
-    const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
+      let hasErrors = false;
+      let hasConsoleLogErrors = false;
+      if (output.errors) {
+        for (const error of output.errors) {
+          hasErrors = hasErrors || error.severity === "error";
+          if (error.severity === "error") {
+            hasErrors = true;
 
-    console.log("Compiling Hyperion sources...");
-    const output = await run(TASK_COMPILE_RUN_COMPILER, { input });
+            if (isConsoleLogError(error)) {
+              hasConsoleLogErrors = true;
+            }
 
-    let hasErrors = false;
-    let hasConsoleLogErrors = false;
-    if (output.errors) {
-      for (const error of output.errors) {
-        hasErrors = hasErrors || error.severity === "error";
-        if (error.severity === "error") {
-          hasErrors = true;
-
-          if (isConsoleLogError(error)) {
-            hasConsoleLogErrors = true;
+            console.error(chalk.red(error.formattedMessage));
+          } else {
+            console.log("\n");
+            console.warn(chalk.yellow(error.formattedMessage));
           }
-
-          console.error(chalk.red(error.formattedMessage));
-        } else {
-          console.log("\n");
-          console.warn(chalk.yellow(error.formattedMessage));
         }
       }
-    }
 
-    if (hasConsoleLogErrors) {
-      console.error(
-        chalk.red(
-          `The console.log call you made isn’t supported. See the QRL Hardhat documentation for the list of supported methods.`
-        )
-      );
-      console.log();
-    }
+      if (hasConsoleLogErrors) {
+        console.error(
+          chalk.red(
+            `The console.log call you made isn’t supported. See the QRL Hardhat documentation for the list of supported methods.`
+          )
+        );
+        console.log();
+      }
 
-    if (hasErrors || !output.contracts) {
-      throw new HardhatError(ERRORS.BUILTIN_TASKS.COMPILE_FAILURE);
-    }
+      if (hasErrors || !output.contracts) {
+        throw new HardhatError(ERRORS.BUILTIN_TASKS.COMPILE_FAILURE);
+      }
 
-    await cacheCompilerJsonFiles(config, input, output);
+      await cacheCompilerJsonFiles(config, input, output);
 
-    const compilerFingerprint = await getCompilerFingerprint(
-      resolveHypcPath(config.hyperion.compilerPath, config.paths.root),
-      config.paths.root
-    );
-    await cacheHardhatConfig(
-      config.paths,
-      config.hyperion,
-      compilerFingerprint
-    );
-
-    return output;
-  });
-
-  internalTask(TASK_COMPILE_CHECK_CACHE, async ({ force }, { config, run }) => {
-    if (force) {
-      return false;
-    }
-
-    // The dependency graph includes every transitively imported file, so
-    // changes to imported libraries (e.g. under node_modules) also
-    // invalidate the cache, not just changes to project-local sources.
-    let sourceTimestamps: number[];
-    try {
-      const dependencyGraph: DependencyGraph = await run(
-        TASK_COMPILE_GET_DEPENDENCY_GRAPH
+      await cacheHardhatConfig(
+        config.paths,
+        config.hyperion,
+        resolvedCompiler.identity
       );
 
-      sourceTimestamps = dependencyGraph
-        .getResolvedFiles()
-        .map((file) => file.lastModificationDate.getTime());
-    } catch (error) {
-      // Never let the cache check break a build that would compile fine:
-      // hypc resolves imports on its own, so if the resolver fails here we
-      // just recompile instead of risking a stale cache hit.
-      console.warn(
-        chalk.yellow(
-          "Could not resolve Hyperion dependencies for cache checking, recompiling."
-        )
+      return output;
+    });
+
+  internalTask(TASK_COMPILE_CHECK_CACHE)
+    .addOptionalParam(
+      "compiler",
+      "The resolved Hyperion compiler",
+      undefined,
+      types.json
+    )
+    .setAction(async ({ force, compiler }: any, { config, run }) => {
+      if (force) {
+        return false;
+      }
+
+      const resolvedCompiler: ResolvedHyperionCompiler =
+        compiler ?? (await run(TASK_COMPILE_RESOLVE_COMPILER));
+
+      // The dependency graph includes every transitively imported file, so
+      // changes to imported libraries (e.g. under node_modules) also
+      // invalidate the cache, not just changes to project-local sources.
+      let sourceTimestamps: number[];
+      try {
+        const dependencyGraph: DependencyGraph = await run(
+          TASK_COMPILE_GET_DEPENDENCY_GRAPH
+        );
+
+        sourceTimestamps = dependencyGraph
+          .getResolvedFiles()
+          .map((file) => file.lastModificationDate.getTime());
+      } catch (error) {
+        // Never let the cache check break a build that would compile fine:
+        // hypc resolves imports on its own, so if the resolver fails here we
+        // just recompile instead of risking a stale cache hit.
+        console.warn(
+          chalk.yellow(
+            "Could not resolve Hyperion dependencies for cache checking, recompiling."
+          )
+        );
+        return false;
+      }
+
+      return areArtifactsCached(
+        sourceTimestamps,
+        config.hyperion,
+        config.paths,
+        resolvedCompiler.identity
       );
-      return false;
-    }
-
-    // The binary fingerprint (path, mtime, size, detected version) is part
-    // of the cache key: swapping or rebuilding hypc must recompile even
-    // when the config itself is unchanged.
-    const compilerFingerprint = await getCompilerFingerprint(
-      resolveHypcPath(config.hyperion.compilerPath, config.paths.root),
-      config.paths.root
-    );
-
-    return areArtifactsCached(
-      sourceTimestamps,
-      config.hyperion,
-      config.paths,
-      compilerFingerprint
-    );
-  });
+    });
 
   internalTask(TASK_BUILD_ARTIFACTS, async ({ force }, { config, run }) => {
     const sources = await run(TASK_COMPILE_GET_SOURCE_PATHS);
@@ -244,30 +270,27 @@ export default function () {
       return;
     }
 
-    // Sanity-check the configured compiler version against the resolved
-    // binary once per run. `version: "local"` (the default) skips the check;
-    // a concrete version only warns — local hypc builds are the norm until
-    // Hyperion has a binary distribution channel.
-    const compilerFingerprint = await getCompilerFingerprint(
-      resolveHypcPath(config.hyperion.compilerPath, config.paths.root),
-      config.paths.root
+    const compiler: ResolvedHyperionCompiler = await run(
+      TASK_COMPILE_RESOLVE_COMPILER
     );
-    if (compilerFingerprint !== undefined) {
-      log(
-        "Detected hypc %s at %s",
-        compilerFingerprint.longVersion ?? "(version not detected)",
-        compilerFingerprint.resolvedPath
-      );
-    }
+    log(
+      "Resolved %s hypc %s at %s",
+      compiler.source,
+      compiler.longVersion ?? "(version not detected)",
+      compiler.path
+    );
     const versionWarning = getVersionMismatchWarning(
       config.hyperion.version,
-      compilerFingerprint
+      compiler
     );
     if (versionWarning !== undefined) {
       console.warn(chalk.yellow(versionWarning));
     }
 
-    const isCached: boolean = await run(TASK_COMPILE_CHECK_CACHE, { force });
+    const isCached: boolean = await run(TASK_COMPILE_CHECK_CACHE, {
+      force,
+      compiler,
+    });
 
     if (isCached) {
       console.log(
@@ -276,7 +299,7 @@ export default function () {
       return;
     }
 
-    const compilationOutput = await run(TASK_COMPILE_COMPILE);
+    const compilationOutput = await run(TASK_COMPILE_COMPILE, { compiler });
 
     if (compilationOutput === undefined) {
       return;

@@ -699,6 +699,48 @@ Please double check your imports.`,
 
 Please check Hardhat's output for more details.`,
     },
+    HYPERION_COMPILER_REPOSITORY_ERROR: {
+      number: 607,
+      message:
+        "Couldn't load the Hyperion compiler repository at %url%: %error%",
+      title: "Hyperion compiler repository is unavailable",
+      description: `Hardhat couldn't load the configured Hyperion compiler manifest.
+
+Check the repository URL and your network connection, or configure a local compiler path.`,
+    },
+    HYPERION_COMPILER_VERSION_NOT_FOUND: {
+      number: 608,
+      message: "Hyperion compiler version %version% is not available in %url%.",
+      title: "Hyperion compiler version is unavailable",
+      description: `The configured Hyperion compiler repository doesn't contain the requested version.
+
+Choose a version listed by the repository or configure a local compiler path.`,
+    },
+    HYPERION_COMPILER_DOWNLOAD_FAILED: {
+      number: 609,
+      message: "Couldn't download Hyperion compiler %version%: %error%",
+      title: "Hyperion compiler download failed",
+      description: `Hardhat couldn't download the selected Hyperion compiler build.
+
+Check the repository URL and your network connection.`,
+    },
+    HYPERION_COMPILER_INVALID_CHECKSUM: {
+      number: 610,
+      message:
+        "Downloaded Hyperion compiler %version% has an invalid %algorithm% checksum.",
+      title: "Invalid Hyperion compiler download",
+      description: `The downloaded Hyperion compiler doesn't match the checksum from the repository manifest.
+
+The file was removed and won't be executed.`,
+    },
+    HYPERION_COMPILER_NOT_FOUND: {
+      number: 611,
+      message: "Hyperion compiler %path% couldn't be resolved.",
+      title: "Hyperion compiler not found",
+      description: `Hardhat couldn't resolve the configured local hypc executable.
+
+Check hyperion.compilerPath, HYPERION_HYPC_PATH, HYPC_PATH, or your PATH.`,
+    },
     RUN_FILE_NOT_FOUND: {
       number: 601,
       message: "Script %script% doesn't exist.",

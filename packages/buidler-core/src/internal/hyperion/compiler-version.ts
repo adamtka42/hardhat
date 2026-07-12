@@ -3,18 +3,15 @@ import * as fs from "fs";
 import * as path from "path";
 import { promisify } from "util";
 
+import { LocalCompilerIdentity } from "./compiler-types";
+
 const execFileAsync = promisify(execFile);
 
 // Identifies the exact hypc binary a compilation ran with. The detected
 // version string alone is not enough as a cache key: two local builds can
 // carry the same version, so the resolved path, mtime and size are part of
 // the fingerprint to catch binary swaps and rebuilds.
-export interface CompilerFingerprint {
-  resolvedPath: string;
-  longVersion?: string;
-  mtimeMs: number;
-  size: number;
-}
+export type CompilerFingerprint = LocalCompilerIdentity;
 
 /**
  * Resolves the hypc binary exactly like the compiler invocation does:
@@ -66,17 +63,20 @@ export function parseHypcVersionOutput(output: string): string | undefined {
  */
 export function getVersionMismatchWarning(
   configuredVersion: string,
-  fingerprint: CompilerFingerprint | undefined
+  compiler:
+    | { path: string; longVersion?: string }
+    | CompilerFingerprint
+    | undefined
 ): string | undefined {
   if (configuredVersion === "local") {
     return undefined;
   }
 
-  if (fingerprint === undefined || fingerprint.longVersion === undefined) {
+  if (compiler === undefined || compiler.longVersion === undefined) {
     return `Hyperion config claims version ${configuredVersion}, but the version of the hypc binary could not be detected.`;
   }
 
-  const detected = fingerprint.longVersion;
+  const detected = compiler.longVersion;
   if (
     detected === configuredVersion ||
     detected.startsWith(`${configuredVersion}+`) ||
@@ -85,7 +85,9 @@ export function getVersionMismatchWarning(
     return undefined;
   }
 
-  return `Hyperion config claims version ${configuredVersion}, but ${fingerprint.resolvedPath} reports ${detected}. Compiling with the binary's version.`;
+  const compilerPath =
+    "path" in compiler ? compiler.path : compiler.resolvedPath;
+  return `Hyperion config claims version ${configuredVersion}, but ${compilerPath} reports ${detected}. Compiling with the binary's version.`;
 }
 
 // `hypc --version` results memoized per binary identity, so repeated
@@ -155,6 +157,7 @@ function makeFingerprint(
   longVersion: string | undefined
 ): CompilerFingerprint {
   const fingerprint: CompilerFingerprint = {
+    source: "local",
     resolvedPath,
     mtimeMs: stats.mtimeMs,
     size: stats.size,

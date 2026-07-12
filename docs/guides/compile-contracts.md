@@ -54,7 +54,7 @@ by the compile task.
 
 ## Hyperion compiler configuration
 
-Configure the Hyperion compiler with the `hyperion` field:
+The default configuration uses a local compiler:
 
 ~~~js
 module.exports = {
@@ -69,30 +69,85 @@ module.exports = {
 };
 ~~~
 
-`compilerPath` points at the `hypc` executable. The binary is resolved in this
-order:
+Local compiler selection follows this order:
 
 1. `hyperion.compilerPath` from the config,
 2. the `HYPERION_HYPC_PATH` environment variable,
 3. the `HYPC_PATH` environment variable,
 4. `hypc` from `PATH`.
 
+An explicit local path or either local-path environment variable always takes
+precedence over downloading. `version: "local"` also always selects the local
+backend.
+
+To select a compiler from an HTTP(S) repository, configure a concrete version
+and repository URL:
+
+~~~js
+module.exports = {
+  hyperion: {
+    version: "0.2.0",
+    compilerRepositoryUrl: "https://compilers.example/hyperion/linux-amd64/",
+    optimizer: {
+      enabled: false,
+      runs: 200,
+    },
+  },
+};
+~~~
+
+The URL can instead be provided through
+`HYPERION_COMPILER_REPOSITORY_URL`. There is no default compiler repository
+today. Without a repository URL, a concrete version still uses the local
+compiler and is compared with `hypc --version`; a mismatch produces a warning
+but does not stop compilation.
+
+Downloaded compiler selection uses `list.json` at the repository root:
+
+~~~json
+{
+  "builds": [
+    {
+      "path": "builds/hypc-0.2.0",
+      "version": "0.2.0",
+      "longVersion": "0.2.0+commit.abcdef12",
+      "keccak256": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ],
+  "releases": {
+    "0.2.0": "builds/hypc-0.2.0"
+  },
+  "latestRelease": "0.2.0"
+}
+~~~
+
+The upstream-compatible `keccak256` field is preferred. Repositories may
+alternatively provide `sha256`, or a `checksum` plus a `checksumAlgorithm`
+of `sha256` or `keccak256`. Each build must contain exactly one checksum.
+QRL Hardhat verifies the compiler before every use, deletes a corrupt cached
+file, and downloads it again. A newly downloaded file with an invalid checksum
+is removed and never executed. Build paths must remain below the repository
+URL.
+
+Manifests and compiler binaries are cached below:
+
+~~~text
+cache/hyperion-compilers/
+~~~
+
+If the repository is temporarily unavailable, a previously cached valid
+manifest and compiler can be used offline. `hardhat clean` removes this
+project-local compiler cache along with other generated cache data.
+
+A repository can be tested locally without additional infrastructure:
+
+~~~sh
+python3 -m http.server 8080 --directory ./compiler-repository
+HYPERION_COMPILER_REPOSITORY_URL=http://127.0.0.1:8080/ npx hardhat compile
+~~~
+
 `optimizer.enabled` and `optimizer.runs` are passed into the Hyperion standard
 JSON input.
-
-`version` declares which compiler version the project expects:
-
-- `"local"` (the default) accepts whatever binary resolves — no check is made.
-  The detected version is logged when running with `DEBUG=buidler*`.
-- A concrete version such as `"0.2.0"` is compared against the output of
-  `hypc --version`. On a mismatch the compile prints a one-line warning and
-  continues with the binary's actual version — it is never an error, because
-  local Hyperion builds carry `-ci`/`+commit` suffixes. A version matches when
-  it equals the detected long version or is its release prefix (for example
-  `"0.2.0"` matches `0.2.0-ci.2026.5.21+commit.cd63ffc3`).
-
-Hyperion has no binary distribution registry yet, so unlike upstream Hardhat's
-`solc.version`, the `version` field never downloads a compiler.
 
 ## Compiler input and output
 
@@ -159,10 +214,10 @@ recompiles when:
 - artifacts are missing,
 - `cache/compiler-input.json` or `cache/compiler-output.json` is missing,
 - the stored Hyperion config differs from the current config,
-- the resolved `hypc` binary changed — its path, modification time, size, or
-  detected version differs from the one that produced the cache. Rebuilding
-  the compiler at the same path invalidates the cache even when the version
-  string is unchanged,
+- the resolved local `hypc` changed: its path, modification time, size, or
+  detected version differs from the one that produced the cache,
+- a downloaded compiler's version, long version, checksum, checksum algorithm,
+  or repository URL differs from the cached identity,
 - the QRL Hardhat package version differs from the cached version.
 
 Use `npx hardhat clean` when you want to remove cache and artifacts explicitly.
@@ -187,6 +242,12 @@ Set `hyperion.compilerPath` or `HYPERION_HYPC_PATH` to a valid `hypc` binary:
 ~~~sh
 HYPERION_HYPC_PATH=/path/to/hypc npx hardhat compile
 ~~~
+
+### Compiler download fails
+
+Check `hyperion.compilerRepositoryUrl`, the requested `version`, and the
+repository's `list.json`. For an offline build, either retain a previously
+verified project cache or configure `compilerPath`/`HYPERION_HYPC_PATH`.
 
 ### Stale artifacts
 

@@ -122,6 +122,7 @@ export interface ProjectPaths {
 export interface HyperionConfig {
   version: string;
   compilerPath?: string;
+  compilerRepositoryUrl?: string;
   optimizer: HyperionOptimizerConfig;
 }
 

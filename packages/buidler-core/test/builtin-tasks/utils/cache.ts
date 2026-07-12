@@ -69,6 +69,30 @@ describe("Compile cache utils", function () {
     assert.isFalse(await areArtifactsCached([0], config, paths, undefined));
   });
 
+  it("invalidates the cache when a downloaded compiler identity changes", async function () {
+    const config = createHyperionConfig(
+      undefined,
+      "https://compilers.example/"
+    );
+    const identity = {
+      source: "downloaded" as const,
+      version: "1.2.3",
+      longVersion: "1.2.3+commit.abcdef12",
+      checksum: "11".repeat(32),
+      checksumAlgorithm: "sha256" as const,
+      repositoryUrl: "https://compilers.example/",
+    };
+
+    await cacheHardhatConfig(paths, config, identity);
+    assert.isTrue(await areArtifactsCached([0], config, paths, identity));
+    assert.isFalse(
+      await areArtifactsCached([0], config, paths, {
+        ...identity,
+        checksum: "22".repeat(32),
+      })
+    );
+  });
+
   it("invalidates the cache when the hypc binary fingerprint changes", async function () {
     const config = createHyperionConfig("/tmp/hypc-a");
     const fingerprint = createFingerprint("/tmp/hypc-a");
@@ -102,6 +126,7 @@ describe("Compile cache utils", function () {
 
 function createFingerprint(resolvedPath: string): CompilerFingerprint {
   return {
+    source: "local",
     resolvedPath,
     longVersion: "0.2.0+commit.11111111",
     mtimeMs: 1000,
@@ -109,10 +134,14 @@ function createFingerprint(resolvedPath: string): CompilerFingerprint {
   };
 }
 
-function createHyperionConfig(compilerPath: string): HyperionConfig {
+function createHyperionConfig(
+  compilerPath?: string,
+  compilerRepositoryUrl?: string
+): HyperionConfig {
   return {
-    version: "local",
-    compilerPath,
+    version: compilerRepositoryUrl === undefined ? "local" : "1.2.3",
+    ...(compilerPath === undefined ? {} : { compilerPath }),
+    ...(compilerRepositoryUrl === undefined ? {} : { compilerRepositoryUrl }),
     optimizer: {
       enabled: false,
       runs: 200,

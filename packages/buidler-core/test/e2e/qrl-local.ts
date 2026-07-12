@@ -105,8 +105,10 @@ describe("QRL local e2e", function () {
       },
       ["compile", "--force"]
     );
-    assert.include(badCompilerResult.output, "Compilation failed");
-    assert.include(badCompilerResult.output, "missing-hypc");
+    assert.include(
+      badCompilerResult.output,
+      "Hyperion compiler /tmp/missing-hypc couldn't be resolved"
+    );
   });
 
   it("prints contract console logs on qrlLocal", async function () {

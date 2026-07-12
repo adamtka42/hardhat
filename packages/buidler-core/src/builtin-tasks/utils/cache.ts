@@ -6,7 +6,7 @@ import {
   COMPILER_INPUT_FILENAME,
   COMPILER_OUTPUT_FILENAME,
 } from "../../internal/constants";
-import { CompilerFingerprint } from "../../internal/hyperion/compiler-version";
+import { CompilerIdentity } from "../../internal/hyperion/compiler-types";
 import { glob } from "../../internal/util/glob";
 import { getPackageJson } from "../../internal/util/packageInfo";
 import { HyperionConfig, ProjectPaths } from "../../types";
@@ -20,13 +20,13 @@ export async function areArtifactsCached(
   sourceTimestamps: number[],
   newHyperionConfig: HyperionConfig,
   paths: ProjectPaths,
-  compilerFingerprint?: CompilerFingerprint
+  compilerIdentity?: CompilerIdentity
 ): Promise<boolean> {
   // No resolvable hypc binary means nothing can be verified — never report
   // a cache hit (a legacy cache without a stored fingerprint would otherwise
   // compare equal to an undefined one). The compile itself then surfaces
   // the real "binary not found" error.
-  if (compilerFingerprint === undefined) {
+  if (compilerIdentity === undefined) {
     return false;
   }
 
@@ -35,7 +35,7 @@ export async function areArtifactsCached(
   if (
     oldConfig === undefined ||
     !compareHyperionConfigs(oldConfig.hyperion, newHyperionConfig) ||
-    !isEqual(oldConfig.compiler, compilerFingerprint) ||
+    !isEqual(oldConfig.compiler, compilerIdentity) ||
     !(await compareHardhatVersion(oldConfig.hardhatVersion))
   ) {
     return false;
@@ -106,7 +106,7 @@ async function getLastUsedConfig(
   | {
       hyperion: HyperionConfig;
       hardhatVersion: string;
-      compiler?: CompilerFingerprint;
+      compiler?: CompilerIdentity;
     }
   | undefined
 > {
@@ -134,13 +134,13 @@ async function getLastUsedConfigTimestamp(
 export async function cacheHardhatConfig(
   paths: ProjectPaths,
   config: HyperionConfig,
-  compilerFingerprint?: CompilerFingerprint
+  compilerIdentity?: CompilerIdentity
 ) {
   const pathToLastConfigUsed = getPathToCachedLastConfigPath(paths.cache);
   const newJson = {
     hyperion: config,
     hardhatVersion: await getCurrentHardhatVersion(),
-    compiler: compilerFingerprint,
+    compiler: compilerIdentity,
   };
 
   await fsExtra.ensureDir(path.dirname(pathToLastConfigUsed));

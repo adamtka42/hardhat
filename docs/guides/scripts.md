@@ -254,6 +254,8 @@ Common environment variables for scripts:
   transactions.
 - `QRLJS_MONOREPO_PATH`: built `qrljs-monorepo` checkout used by `qrlLocal`.
 - `HYPERION_HYPC_PATH`: local Hyperion compiler binary.
+- `HYPERION_COMPILER_REPOSITORY_URL`: optional HTTP(S) Hyperion compiler
+  repository.
 - `HARDHAT_DEFAULT_NETWORK`: default network override if your config uses it.
 
 Private devnets often expose dynamic Docker or Kurtosis ports. Check the current

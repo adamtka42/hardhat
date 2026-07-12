@@ -90,6 +90,7 @@ describe("hypc version detection", function () {
 
   describe("getVersionMismatchWarning", function () {
     const fingerprint: CompilerFingerprint = {
+      source: "local",
       resolvedPath: "/usr/local/bin/hypc",
       longVersion: "0.2.0-ci.2026.5.21+commit.cd63ffc3.mod.Linux.g++",
       mtimeMs: 1,
@@ -141,6 +142,7 @@ describe("hypc version detection", function () {
       );
       assert.include(
         getVersionMismatchWarning("0.2.0", {
+          source: "local",
           resolvedPath: "/usr/local/bin/hypc",
           mtimeMs: 1,
           size: 2,

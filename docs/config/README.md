@@ -81,15 +81,25 @@ module.exports = {
 };
 ~~~
 
-`version` declares the expected compiler version. `"local"` (the default)
-accepts any binary; a concrete version like `"0.2.0"` is checked against
-`hypc --version` and warns on mismatch. It never downloads a compiler — see
-the [compilation guide](../guides/compile-contracts.md) for the exact
-semantics.
+`version` selects the expected compiler version. `"local"` (the default)
+uses a local binary. A concrete version such as `"0.2.0"` is downloaded only
+when `compilerRepositoryUrl` or `HYPERION_COMPILER_REPOSITORY_URL` is set and
+no explicit local compiler override is present.
 
-`compilerPath` points at the `hypc` executable. If omitted, QRL Hardhat falls
-back to `HYPERION_HYPC_PATH`, then `HYPC_PATH`, then `hypc` from `PATH`.
-Projects that work from a monorepo checkout often set `HYPERION_HYPC_PATH`.
+`compilerPath` points at a local `hypc` executable. Local selection takes
+precedence over downloads and follows this order:
+
+1. `hyperion.compilerPath`,
+2. `HYPERION_HYPC_PATH`,
+3. `HYPC_PATH`,
+4. `hypc` from `PATH`.
+
+`compilerRepositoryUrl` points at an HTTP(S) compiler repository containing
+`list.json` and compiler builds. It has no default today. This keeps existing
+local projects unchanged while allowing a future official repository to become
+the default without changing the compile pipeline. See the
+[compilation guide](../guides/compile-contracts.md) for manifest and checksum
+details.
 
 `optimizer.enabled` and `optimizer.runs` are passed into the Hyperion compiler
 input.
@@ -324,6 +334,9 @@ large timeouts are common for integration tests.
 `QRLJS_MONOREPO_PATH` points at a built `qrljs-monorepo` checkout for `qrlLocal`.
 
 `HYPERION_HYPC_PATH` points at a local `hypc` compiler binary.
+
+`HYPERION_COMPILER_REPOSITORY_URL` points at an optional HTTP(S) compiler
+repository.
 
 `HARDHAT_DEFAULT_NETWORK` can override `defaultNetwork` if your config uses it.
 

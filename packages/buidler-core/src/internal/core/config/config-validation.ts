@@ -146,6 +146,7 @@ const HyperionOptimizerConfig = t.type({
 const HyperionConfig = t.type({
   version: optional(t.string),
   compilerPath: optional(t.string),
+  compilerRepositoryUrl: optional(t.string),
   optimizer: optional(HyperionOptimizerConfig),
 });
 

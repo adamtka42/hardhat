@@ -41,6 +41,12 @@ describe("Config validation", function () {
       },
     };
 
+    const invalidCompilerRepositoryUrlType = {
+      hyperion: {
+        compilerRepositoryUrl: 123,
+      },
+    };
+
     const invalidOptimizerEnabledType = {
       hyperion: {
         optimizer: {
@@ -79,6 +85,11 @@ describe("Config validation", function () {
       );
 
       expectHardhatError(
+        () => validateConfig(invalidCompilerRepositoryUrlType),
+        ERRORS.GENERAL.INVALID_CONFIG
+      );
+
+      expectHardhatError(
         () => validateConfig(invalidOptimizerEnabledType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
@@ -108,6 +119,7 @@ describe("Config validation", function () {
         hyperion: {
           version: "123",
           compilerPath: "/usr/local/bin/hypc",
+          compilerRepositoryUrl: "https://compilers.example/",
           optimizer: {
             enabled: true,
             runs: 123,
