@@ -14,8 +14,10 @@ project structure, configuration, compile, test, and scripts.
 - Node.js 20 or later.
 - npm.
 - A Hyperion compiler available to Hardhat's compile task.
-- For local in-process tests: a built `qrljs-monorepo` checkout, exposed with
-  `QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath`.
+- For local in-process tests: nothing extra — installed packages ship the QRL
+  VM runtime bundled. (Working from this repository's source tree instead
+  still needs a built `qrljs-monorepo` checkout exposed with
+  `QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath`.)
 - For live/private networks: a running go-qrl HTTP JSON-RPC node.
 - For locally signed live transactions: a QRL extended seed in
   `QRL_ACCOUNT_SEED`, or use `accounts: "remote"` with a node-managed account.
@@ -98,16 +100,16 @@ a running go-qrl node.
 
 ### qrlLocal
 
-`qrlLocal` runs a local QRL VM in-process. It does not require a go-qrl node,
-but it needs the QRL VM packages from a built `qrljs-monorepo` checkout.
+`qrlLocal` runs a local QRL VM in-process. It does not require a go-qrl node;
+installed packages include the QRL VM runtime, so it works directly:
 
 ~~~sh
-export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
 npx hardhat test --network qrlLocal
 ~~~
 
-You can also set the path directly in `hardhat.config.js` with
-`qrlJsMonorepoPath`.
+For qrljs/Hardhat development you can point at a built `qrljs-monorepo`
+checkout instead, with `QRLJS_MONOREPO_PATH` or `qrlJsMonorepoPath` in
+`hardhat.config.js`.
 
 ### HTTP networks
 
@@ -313,9 +315,12 @@ Legacy `eth_*` compatibility is intentionally not the primary interface.
 
 ## Troubleshooting
 
-### qrlLocal cannot load qrljs-monorepo
+### qrlLocal cannot load the QRL runtime
 
-Build `qrljs-monorepo` first and set the path:
+Installed packages ship the runtime bundled; this error normally appears only
+when `QRLJS_MONOREPO_PATH` (or `qrlJsMonorepoPath`) points at a missing or
+unbuilt checkout — a set override never falls back to the bundle. Either unset
+the override or build the checkout:
 
 ~~~sh
 cd /path/to/qrljs-monorepo
@@ -326,6 +331,9 @@ cd /path/to/qrl-hardhat-example
 export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
 npx hardhat test --network qrlLocal
 ~~~
+
+When running Hardhat from this repository's source tree (not a packed
+installation), the bundle is absent and the override is required.
 
 Alternatively, use an HTTP network:
 

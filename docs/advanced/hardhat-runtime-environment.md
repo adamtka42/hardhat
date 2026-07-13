@@ -80,8 +80,9 @@ Prefer `qrl_*` methods. Legacy `eth_*` compatibility is not the primary surface
 of this fork.
 
 For HTTP networks, the provider points at the configured go-qrl endpoint. For
-`qrlLocal`, it points at the in-process QRL VM provider loaded from a built
-`qrljs-monorepo` checkout.
+`qrlLocal`, it points at the in-process QRL VM provider — loaded from the
+runtime bundled with the package, or from a built `qrljs-monorepo` checkout
+when the development override is set.
 
 Contract console logging is wired through the `qrlLocal` provider. When a
 Hyperion contract imports `@theqrl/hardhat/console.hyp`, local executions can

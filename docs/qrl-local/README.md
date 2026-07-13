@@ -11,8 +11,16 @@ network behavior, external RPC infrastructure, or raw transaction submission.
 
 ## Requirements
 
-`qrlLocal` loads VM packages from a built `qrljs-monorepo` checkout. Build that
-checkout first and expose its path to Hardhat:
+Installed `@theqrl/hardhat` packages ship the QRL VM runtime bundled inside
+the artifact, so `qrlLocal` works out of the box — no extra repositories or
+environment variables:
+
+~~~sh
+npx hardhat test --network qrlLocal
+~~~
+
+For qrljs or Hardhat development you can override the bundled runtime with a
+locally built `qrljs-monorepo` checkout:
 
 ~~~sh
 cd /path/to/qrljs-monorepo
@@ -24,8 +32,9 @@ export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
 npx hardhat test --network qrlLocal
 ~~~
 
-You can also set the path in `hardhat.config.js` with
-`networks.qrlLocal.qrlJsMonorepoPath`.
+A set override is authoritative: when the checkout is missing or unbuilt the
+error surfaces instead of silently falling back to the bundle. The path can
+also be set in `hardhat.config.js` with `networks.qrlLocal.qrlJsMonorepoPath`.
 
 ## Configuration
 
@@ -63,8 +72,10 @@ module.exports = {
 
 `chainId` defaults to `1`.
 
-`qrlJsMonorepoPath` points at a built `qrljs-monorepo` checkout. If omitted,
-Hardhat reads `QRLJS_MONOREPO_PATH`.
+`qrlJsMonorepoPath` optionally points at a built `qrljs-monorepo` checkout to
+override the bundled runtime (a development feature). If omitted, Hardhat
+reads `QRLJS_MONOREPO_PATH`; when neither is set, the runtime bundled with
+the package is used.
 
 `accounts` is an array of local account objects. Each account needs a QRL
 address. `balance` can be a decimal string, hex string, or safe non-negative

@@ -7,6 +7,7 @@ import {
   qrlAddressFromSeed,
   qrlAddressToBytes,
 } from "../../qrl/address";
+import { loadQrlJsTxRuntime } from "../../qrl/runtime";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
@@ -268,7 +269,7 @@ function createQrlJsDynamicFeeTransaction(
   chainId: number,
   data: string
 ): any | undefined {
-  const txQrl = loadQrlJsTxModule();
+  const txQrl = loadQrlJsTxRuntime();
 
   if (txQrl === undefined) {
     return undefined;
@@ -286,33 +287,6 @@ function createQrlJsDynamicFeeTransaction(
     descriptor: ML_DSA_87_DESCRIPTOR,
     extraParams: EMPTY_EXTRA_PARAMS,
   });
-}
-
-function loadQrlJsTxModule(): any | undefined {
-  const qrlJsMonorepoPath = process.env.QRLJS_MONOREPO_PATH;
-
-  if (qrlJsMonorepoPath === undefined) {
-    return undefined;
-  }
-
-  const qrlJsTxPath = path.join(
-    path.resolve(qrlJsMonorepoPath),
-    "packages",
-    "tx",
-    "dist",
-    "cjs",
-    "index.js"
-  );
-
-  try {
-    return require(qrlJsTxPath).qrl;
-  } catch (error) {
-    throw new HardhatError(ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE, {
-      path: qrlJsTxPath,
-      network: "qrlLocal",
-      message: error.message,
-    });
-  }
 }
 
 function isQrlJsTransaction(transaction: any): boolean {

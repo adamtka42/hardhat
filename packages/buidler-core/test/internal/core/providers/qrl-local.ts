@@ -608,18 +608,39 @@ describe("QRL local Hardhat provider", function () {
     );
   });
 
-  it("explains how to configure qrlLocal when qrljs-monorepo path is unset", () => {
+  it("without an override uses the bundled runtime or explains how to configure one", function () {
     const previousQrlJsMonorepoPath = process.env.QRLJS_MONOREPO_PATH;
     delete process.env.QRLJS_MONOREPO_PATH;
 
+    const bundlePresent = fsExtra.pathExistsSync(
+      path.join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "..",
+        "qrljs-runtime",
+        "runtime.cjs"
+      )
+    );
+
     try {
+      if (bundlePresent) {
+        // With a bundled runtime present, no override is required at all.
+        const provider = new QrlLocalHardhatProvider({
+          type: "qrl-local",
+        });
+        assert.instanceOf(provider, QrlLocalHardhatProvider);
+        return;
+      }
+
       expectHardhatError(
         () =>
           new QrlLocalHardhatProvider({
             type: "qrl-local",
           }),
         ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
-        /QRLJS_MONOREPO_PATH.*--network qrl/s
+        /QRLJS_MONOREPO_PATH/s
       );
     } finally {
       if (previousQrlJsMonorepoPath === undefined) {

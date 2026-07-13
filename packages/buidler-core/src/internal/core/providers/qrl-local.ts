@@ -11,6 +11,7 @@ import {
 import { decodeQrlFunctionResult } from "../../qrl/abi";
 import { isValidQrlAddress } from "../../qrl/address";
 import { printQrlConsoleLog } from "../../qrl/console-log";
+import { loadQrlJsRuntime } from "../../qrl/runtime";
 import {
   buildQrlStackTraceLines,
   loadQrlDebugInfo,
@@ -23,11 +24,6 @@ import { numberToRpcQuantity } from "./provider-utils";
 
 const DEFAULT_CHAIN_ID = 1;
 const DEFAULT_BLOCK_GAS_LIMIT = 30000000;
-
-interface QrlJsModules {
-  vmQrl: any;
-  utilQrl: any;
-}
 
 export class QrlLocalHardhatProvider extends EventEmitter
   implements IQrlProvider {
@@ -47,7 +43,10 @@ export class QrlLocalHardhatProvider extends EventEmitter
     this._cachePath = paths?.cache;
     this._projectRoot = paths?.root;
 
-    const { vmQrl, utilQrl } = loadQrlJsModules(config);
+    const { vmQrl, utilQrl } = loadQrlJsRuntime(
+      "qrlLocal",
+      config.qrlJsMonorepoPath
+    );
     const consoleLogSupported =
       (vmQrl as any).QRL_CONSOLE_LOG_SUPPORTED === true;
     if (config.consoleLog === true && !consoleLogSupported) {
@@ -416,59 +415,6 @@ const REVERT_PANIC_ABI = [
     stateMutability: "view",
   },
 ];
-
-function loadQrlJsModules(config: QrlLocalNetworkConfig): QrlJsModules {
-  const configuredPath =
-    config.qrlJsMonorepoPath ?? process.env.QRLJS_MONOREPO_PATH;
-
-  if (configuredPath === undefined) {
-    throwQrlJsMonorepoUnavailable(
-      "<unset>",
-      "qrlLocal requires a built qrljs-monorepo. Set networks.qrlLocal.qrlJsMonorepoPath or QRLJS_MONOREPO_PATH, or run with --network qrl / HARDHAT_DEFAULT_NETWORK=qrl to use an HTTP node"
-    );
-  }
-
-  const monorepoPath = path.resolve(configuredPath);
-  const vmPath = path.join(monorepoPath, "packages/vm/dist/cjs/index.js");
-  const utilPath = path.join(monorepoPath, "packages/util/dist/cjs/index.js");
-
-  let vm;
-  let util;
-
-  try {
-    vm = require(vmPath);
-    util = require(utilPath);
-  } catch (error) {
-    throwQrlJsMonorepoUnavailable(monorepoPath, error.message);
-  }
-
-  if (vm.qrl?.QRLLocalProvider === undefined) {
-    throwQrlJsMonorepoUnavailable(
-      monorepoPath,
-      "packages/vm does not export qrl.QRLLocalProvider"
-    );
-  }
-
-  if (util.qrl?.QRLAddress === undefined) {
-    throwQrlJsMonorepoUnavailable(
-      monorepoPath,
-      "packages/util does not export qrl.QRLAddress"
-    );
-  }
-
-  return { vmQrl: vm.qrl, utilQrl: util.qrl };
-}
-
-function throwQrlJsMonorepoUnavailable(
-  monorepoPath: string,
-  message: string
-): never {
-  throw new HardhatError(ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE, {
-    path: monorepoPath,
-    network: "qrlLocal",
-    message,
-  });
-}
 
 function normalizeLocalAccountAddress(
   utilQrl: any,
