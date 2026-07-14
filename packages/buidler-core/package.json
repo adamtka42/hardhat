@@ -38,6 +38,9 @@
     "prepack": "npm run build && npm run bundle-qrljs-runtime",
     "clean": "node ../../node_modules/rimraf/bin.js builtin-tasks internal *.d.ts *.map *.js build-test qrljs-runtime tsconfig.tsbuildinfo"
   },
+  "qrljsRuntime": {
+    "vmVersionRange": "^10.1.2"
+  },
   "files": [
     "builtin-tasks/",
     "console.hyp",
@@ -67,6 +70,7 @@
     "@types/sinon": "^7.5.1",
     "@types/ws": "^7.2.1",
     "chai": "^4.2.0",
+    "esbuild": "0.28.1",
     "sinon": "^9.0.0",
     "time-require": "^0.1.2"
   },

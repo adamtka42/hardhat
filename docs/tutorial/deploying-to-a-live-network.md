@@ -44,7 +44,6 @@ npx hardhat run scripts/deploy.js --network <network-name>
 Running against qrlLocal is useful for checking that the deployment code works:
 
 ```sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat run scripts/deploy.js --network qrlLocal
 ```
 

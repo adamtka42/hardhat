@@ -235,11 +235,14 @@ Fix:
 - check whether the RPC endpoint is proxied or load-balanced incorrectly,
 - inspect node logs for receipt/indexing issues.
 
-### BDLR123: Local qrljs-monorepo unavailable
+### BDLR123: QRL runtime unavailable
 
-`qrlLocal` could not load the local QRL VM packages.
+`qrlLocal` could not load the QRL VM runtime — neither the bundle shipped in
+installed packages nor the development override was usable.
 
-Fix:
+Fix — with installed packages, unset the override (`QRLJS_MONOREPO_PATH` /
+`qrlJsMonorepoPath`) or point it at a BUILT checkout; when running Hardhat
+from its source tree, the override is required:
 
 ~~~sh
 cd /path/to/qrljs-monorepo

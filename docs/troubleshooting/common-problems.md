@@ -8,19 +8,24 @@ For debug output and stack traces, see
 [verbose-logging.md](verbose-logging.md). For a code-by-code reference, see
 [error-codes.md](error-codes.md).
 
-## qrlLocal cannot load qrljs-monorepo
+## qrlLocal cannot load the QRL runtime
 
 Typical error:
 
 ~~~text
-BDLR123: Cannot load local qrljs-monorepo from <path>: <message>.
-Build qrljs-monorepo first or set networks.<network>.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH.
+BDLR123: Cannot load the QRL runtime from <path>: <message>. Installed
+packages include a bundled runtime; when networks.<network>.qrlJsMonorepoPath
+/ QRLJS_MONOREPO_PATH is set it must point to a BUILT qrljs-monorepo checkout
+and is never silently ignored.
 ~~~
 
-`qrlLocal` needs a built `qrljs-monorepo` checkout because the local QRL VM
-packages are loaded from that repository.
+Installed packages ship the runtime bundled, so this error normally appears
+only when the development override is set but points at a missing or unbuilt
+checkout (a set override never falls back to the bundle), or when Hardhat
+runs from its source tree where no bundle exists.
 
-Fix:
+Fix — either unset `QRLJS_MONOREPO_PATH`/`qrlJsMonorepoPath` to use the
+bundled runtime, or build the override checkout:
 
 ~~~sh
 cd /path/to/qrljs-monorepo
@@ -203,8 +208,9 @@ Check these items:
 - run the script or test with `--network qrlLocal`,
 - make sure the contract imports `@theqrl/hardhat/console.hyp`,
 - check that `networks.qrlLocal.consoleLog` is not set to `false`,
-- rebuild `qrljs-monorepo` if Hardhat warns that the loaded local VM does not
-  support contract console logging.
+- if Hardhat warns that the loaded QRL runtime does not support contract
+  console logging: update the installed package (bundled runtime) or rebuild
+  the `qrljs-monorepo` checkout when a development override is active.
 
 See [Contract console logging](../guides/console-log.md).
 

@@ -157,11 +157,13 @@ The file is local development state and should not be committed.
 
 ## Troubleshooting
 
-If `qrlLocal` cannot start, build `qrljs-monorepo` and set
-`QRLJS_MONOREPO_PATH`:
+If `qrlLocal` cannot start, first check whether a development override
+(`QRLJS_MONOREPO_PATH` / `qrlJsMonorepoPath`) is set but invalid — unset it or
+build the checkout it points to. If no override is set, the bundled runtime in
+the installed package may be corrupted; reinstall the package:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
+npm install @theqrl/hardhat --force
 npx hardhat console --network qrlLocal
 ~~~
 

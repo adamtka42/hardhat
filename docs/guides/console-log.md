@@ -39,7 +39,7 @@ contract Sample {
 Run the contract on `qrlLocal`:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo npx hardhat test --network qrlLocal
+npx hardhat test --network qrlLocal
 ~~~
 
 Example output:
@@ -147,8 +147,9 @@ estimation loop. `qrl_call` and `callStatic` do print logs.
 - `console.log` functions are `view`, so they cannot be called from `pure`
   functions.
 - Only the signatures listed above are supported in the first version.
-- The feature requires a `qrljs-monorepo` build that exposes QRL console log
-  listener support. If `consoleLog: true` is set explicitly and the loaded build
-  is too old, Hardhat prints a warning.
+- The feature requires a QRL runtime with console log listener support. The
+  runtime bundled with installed packages supports it; a `qrljs-monorepo`
+  override must be a recent-enough build. If `consoleLog: true` is set
+  explicitly and the loaded runtime is too old, Hardhat prints a warning.
 - This is for development and testing. Do not rely on console logs as an on-chain
   event or production observability mechanism.

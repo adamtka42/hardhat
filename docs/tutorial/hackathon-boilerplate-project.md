@@ -50,14 +50,12 @@ npx hardhat compile
 Run the tests on qrlLocal:
 
 ```sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat test --network qrlLocal
 ```
 
 Deploy to qrlLocal:
 
 ```sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat run scripts/deploy.js --network qrlLocal
 ```
 

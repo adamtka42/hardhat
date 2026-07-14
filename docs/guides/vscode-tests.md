@@ -17,7 +17,8 @@ npx hardhat run scripts/deploy.js --network qrlLocal
 For TypeScript projects, also install `typescript` and `ts-node`; see
 [typescript.md](typescript.md).
 
-For `qrlLocal`, configure a built `qrljs-monorepo` checkout with either
+Installed packages run `qrlLocal` out of the box. To override the bundled
+runtime for development, configure a built `qrljs-monorepo` checkout with either
 `QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath`.
 
 ## Environment files
@@ -170,7 +171,8 @@ the project and confirm this file exists:
 node_modules/@theqrl/hardhat/internal/cli/cli.js
 ~~~
 
-If `qrlLocal` fails with `BDLR123`, build `qrljs-monorepo` and check
+If `qrlLocal` fails with `BDLR123`, the configured override is invalid —
+build the `qrljs-monorepo` checkout it points to (or unset it) and check
 `QRLJS_MONOREPO_PATH`.
 
 If an HTTP network fails with `BDLR109`, check that `QRL_RPC_URL` points at a

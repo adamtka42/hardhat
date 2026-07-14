@@ -114,14 +114,14 @@ module.exports = {
 };
 ~~~
 
-Build `qrljs-monorepo`, set `QRLJS_MONOREPO_PATH`, then run:
+Installed packages include the QRL VM runtime, so simply run:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat run scripts/deploy.js --network qrlLocal
 ~~~
 
-If `qrlLocal` cannot load the VM packages, build `qrljs-monorepo` first and make
+If `qrlLocal` cannot load the runtime, an override is set but invalid — build
+the `qrljs-monorepo` checkout it points to (or unset the override) and make
 sure `QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath` points at the
 checkout.
 

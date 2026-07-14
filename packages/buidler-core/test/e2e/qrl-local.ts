@@ -94,7 +94,7 @@ describe("QRL local e2e", function () {
       },
       ["accounts"]
     );
-    assert.include(badRuntimeResult.output, "Cannot load local qrljs-monorepo");
+    assert.include(badRuntimeResult.output, "Cannot load the QRL runtime");
     assert.include(badRuntimeResult.output, "/tmp/missing-qrljs-monorepo");
 
     const badCompilerResult = await expectHardhatFailure(

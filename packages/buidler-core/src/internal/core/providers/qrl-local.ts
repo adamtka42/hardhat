@@ -52,7 +52,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
     if (config.consoleLog === true && !consoleLogSupported) {
       // tslint:disable-next-line: no-console
       console.warn(
-        "The loaded qrljs-monorepo build does not support contract console logging. Rebuild qrljs-monorepo to enable it."
+        "The loaded QRL runtime does not support contract console logging. Update the bundled runtime or rebuild the qrljs-monorepo override to enable it."
       );
     }
 
@@ -61,7 +61,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
     if (config.initialDate !== undefined && !timeControlsSupported) {
       // tslint:disable-next-line: no-console
       console.warn(
-        "The loaded qrljs-monorepo build does not support time controls. Rebuild qrljs-monorepo to enable initialDate."
+        "The loaded QRL runtime does not support time controls. Update the bundled runtime or rebuild the qrljs-monorepo override to enable initialDate."
       );
     }
 
@@ -74,7 +74,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
     ) {
       // tslint:disable-next-line: no-console
       console.warn(
-        "The loaded qrljs-monorepo build does not support transaction failure flags. Rebuild qrljs-monorepo to enable them."
+        "The loaded QRL runtime does not support transaction failure flags. Update the bundled runtime or rebuild the qrljs-monorepo override to enable them."
       );
     }
 
@@ -87,7 +87,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
     ) {
       // tslint:disable-next-line: no-console
       console.warn(
-        "The loaded qrljs-monorepo build does not support allowUnlimitedContractSize. Rebuild qrljs-monorepo to enable it."
+        "The loaded QRL runtime does not support allowUnlimitedContractSize. Update the bundled runtime or rebuild the qrljs-monorepo override to enable it."
       );
     }
     const debugTraceSupported =
@@ -95,7 +95,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
     if (config.stackTraces === true && !debugTraceSupported) {
       // tslint:disable-next-line: no-console
       console.warn(
-        "The loaded qrljs-monorepo build does not support execution tracing. Rebuild qrljs-monorepo to enable stack traces."
+        "The loaded QRL runtime does not support execution tracing. Update the bundled runtime or rebuild the qrljs-monorepo override to enable stack traces."
       );
     }
     this._stackTracesEnabled =

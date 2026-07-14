@@ -27,7 +27,9 @@ conventional stack trace. The decoded revert reason and the raw revert data
 
 Stack traces need:
 
-1. a qrljs-monorepo build with execution tracing support, and
+1. a QRL runtime with execution tracing support (the runtime bundled with
+   installed packages supports it; a qrljs-monorepo override must be a
+   recent-enough build), and
 2. the compile cache produced by this project's compilation (`cache/`).
 
 When either is missing (e.g. artifacts copied from elsewhere, or after

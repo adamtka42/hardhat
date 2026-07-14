@@ -291,9 +291,9 @@ Please make sure your node is running, and check your internet connection and ne
     QRLJS_MONOREPO_UNAVAILABLE: {
       number: 123,
       message:
-        "Cannot load local qrljs-monorepo from %path%: %message%. Build qrljs-monorepo first or set networks.%network%.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH.",
-      title: "Local qrljs-monorepo is unavailable",
-      description: `The qrlLocal provider needs a locally built qrljs-monorepo because the QRL VM packages are not consumed as published Hardhat dependencies yet. Set QRLJS_MONOREPO_PATH or choose an HTTP network like qrl.`,
+        "Cannot load the QRL runtime from %path%: %message%. Installed packages include a bundled runtime; when networks.%network%.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH is set it must point to a BUILT qrljs-monorepo checkout and is never silently ignored. When running Hardhat from its source tree, either set the override or generate the bundle with scripts/bundle-qrljs-runtime.js.",
+      title: "QRL runtime is unavailable",
+      description: `The qrlLocal provider loads the QRL VM from the runtime bundled with the installed package, or from a locally built qrljs-monorepo checkout when the development override (QRLJS_MONOREPO_PATH / qrlJsMonorepoPath) is set. Fix the override, regenerate the bundle, or choose an HTTP network like qrl.`,
     },
     LEDGER_TRANSPORT_UNAVAILABLE: {
       number: 118,

@@ -99,14 +99,12 @@ processes), run it as a standalone endpoint with
 Run tests against the in-process network:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat test --network qrlLocal
 ~~~
 
 Run a script:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat run scripts/deploy.js --network qrlLocal
 ~~~
 
@@ -296,14 +294,11 @@ Chain id validation is applied to HTTP networks with configured `chainId`.
 
 ## Common errors
 
-If the VM packages cannot be loaded, Hardhat throws `BDLR123`:
-
-~~~text
-Cannot load local qrljs-monorepo from <path>: <message>.
-Build qrljs-monorepo first or set networks.<network>.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH.
-~~~
-
-Fix it by building `qrljs-monorepo` and setting the correct path.
+If the QRL runtime cannot be loaded, Hardhat throws `BDLR123`. With installed
+packages this normally means the development override (`QRLJS_MONOREPO_PATH`
+/ `qrlJsMonorepoPath`) points at a missing or unbuilt checkout — a set
+override never falls back to the bundled runtime. Unset the override or build
+the checkout it points to (see Requirements above).
 
 If a config includes `url` under a `qrl-local` network, config validation fails.
 `qrlLocal` is not an HTTP network.

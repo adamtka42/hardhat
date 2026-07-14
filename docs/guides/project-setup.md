@@ -129,7 +129,8 @@ The generated `hardhat.config.js` includes:
 - an `accounts` task that prints `qrl_accounts`,
 - a `qrlLocal` network for in-process tests,
 - a `qrl` HTTP network for go-qrl endpoints,
-- `QRLJS_MONOREPO_PATH` for loading qrlLocal VM packages,
+- `QRLJS_MONOREPO_PATH` — optional development override of the bundled
+  qrlLocal runtime,
 - `QRL_RPC_URL` and `QRL_ACCOUNT_SEED` for HTTP networks.
 
 `qrlLocal` is the default network in the sample project. The relevant config fragment looks like this:
@@ -158,17 +159,15 @@ For the full config reference, see [Configuration](../config/README.md).
 
 ## Running the sample project
 
-Build `qrljs-monorepo`, set `QRLJS_MONOREPO_PATH`, and run:
+Installed packages include the QRL VM runtime, so simply run:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat test --network qrlLocal
 ~~~
 
 Run the sample script on qrlLocal:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat run scripts/sample-script.js --network qrlLocal
 ~~~
 

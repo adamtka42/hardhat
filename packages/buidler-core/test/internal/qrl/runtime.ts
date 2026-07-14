@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import * as fs from "fs";
+import fsExtra from "fs-extra";
 import path from "path";
 
 import { ERRORS } from "../../../src/internal/core/errors-list";
@@ -7,6 +8,7 @@ import {
   loadQrlJsRuntime,
   loadQrlJsTxRuntime,
   readBundledRuntimeManifest,
+  resetQrlJsRuntimeCacheForTesting,
 } from "../../../src/internal/qrl/runtime";
 import { expectHardhatError } from "../../helpers/errors";
 import { useTmpDir } from "../../helpers/fs";
@@ -31,6 +33,7 @@ describe("qrljs runtime resolver", function () {
 
   beforeEach(function () {
     savedEnv = process.env[envVar];
+    resetQrlJsRuntimeCacheForTesting();
   });
 
   afterEach(function () {
@@ -39,6 +42,7 @@ describe("qrljs runtime resolver", function () {
     } else {
       process.env[envVar] = savedEnv;
     }
+    resetQrlJsRuntimeCacheForTesting();
   });
 
   it("a set override is authoritative: broken paths error instead of falling back", function () {
@@ -59,6 +63,33 @@ describe("qrljs runtime resolver", function () {
     );
   });
 
+  it("reports a Hardhat error, not a TypeError, for modules missing the qrl export", function () {
+    // The original TypeError only reproduced when a module export was
+    // MISSING ENTIRELY (module.exports = undefined) — `{}` was already
+    // handled by the old `vm.qrl?.` chain. The vm module therefore exports
+    // undefined here; the others export an empty object for coverage of
+    // both corruption shapes.
+    const checkout = path.join(this.tmpDir, "corrupted-checkout");
+    for (const [name, exportExpr] of [
+      ["vm", "undefined"],
+      ["util", "{}"],
+      ["tx", "{}"],
+    ]) {
+      const dir = path.join(checkout, "packages", name, "dist", "cjs");
+      fsExtra.ensureDirSync(dir);
+      fs.writeFileSync(
+        path.join(dir, "index.js"),
+        `module.exports = ${exportExpr};\n`
+      );
+    }
+
+    expectHardhatError(
+      () => loadQrlJsRuntime("qrlLocal", checkout),
+      ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
+      /does not export qrl\.QRLLocalProvider/
+    );
+  });
+
   it("resolves a valid override checkout with source kind override", function () {
     if (process.env[envVar] === undefined) {
       this.skip();
@@ -68,6 +99,25 @@ describe("qrljs runtime resolver", function () {
     assert.equal(runtime.source.kind, "override");
     assert.isDefined(runtime.vmQrl.QRLLocalProvider);
     assert.isDefined(runtime.utilQrl.QRLAddress);
+    assert.isDefined(runtime.txQrl.QRLDynamicFeeTransaction);
+  });
+
+  it("serves tx from the same source as a config-path resolution", function () {
+    if (process.env[envVar] === undefined) {
+      this.skip();
+    }
+
+    // Reviewer repro: the override passed through network CONFIG (not the
+    // env var) must also govern later tx lookups — vm and tx never mix
+    // sources.
+    const overridePath = process.env[envVar]!;
+    delete process.env[envVar];
+
+    const runtime = loadQrlJsRuntime("qrlLocal", overridePath);
+    assert.equal(runtime.source.kind, "override");
+
+    const txQrl = loadQrlJsTxRuntime();
+    assert.strictEqual(txQrl, runtime.txQrl);
   });
 
   it("falls back to the bundled runtime when no override is set", function () {
@@ -87,7 +137,10 @@ describe("qrljs runtime resolver", function () {
     const manifest = readBundledRuntimeManifest();
     assert.isDefined(manifest);
     assert.isString(manifest.qrlJsCommit);
-    assert.property(manifest.packageVersions, "@theqrl/vm");
+    assert.isString(manifest.runtimeSha256);
+    assert.isTrue(
+      manifest.packages.some((pkg: any) => pkg.name === "@theqrl/vm")
+    );
   });
 
   it("errors actionably when neither override nor bundle is available", function () {

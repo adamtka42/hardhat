@@ -88,17 +88,20 @@ for server-side rejection details.
 
 ## qrlLocal debugging
 
-`qrlLocal` loads VM packages from a built `qrljs-monorepo` checkout. If it fails
-before tests start, run with verbose logging and confirm the path:
+`qrlLocal` uses the QRL runtime bundled with the installed package, or a
+built `qrljs-monorepo` checkout when the development override is set. If it
+fails before tests start, run with verbose logging to see which runtime
+source was selected:
 
 ~~~sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
 npx hardhat --verbose --show-stack-traces test --network qrlLocal
 ~~~
 
 For `BDLR123`, verbose output can confirm that Hardhat is creating a `qrlLocal`
-provider, but the fix is still to build `qrljs-monorepo` or set the correct
-`QRLJS_MONOREPO_PATH` / `networks.<network>.qrlJsMonorepoPath`.
+provider. The fix depends on the runtime source: if a development override
+(`QRLJS_MONOREPO_PATH` / `networks.<network>.qrlJsMonorepoPath`) is set,
+unset it or build the checkout it points to; without an override, the bundled
+runtime in the installed package may be corrupted — reinstall the package.
 
 ## Capturing output
 

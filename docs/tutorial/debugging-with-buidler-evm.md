@@ -78,7 +78,8 @@ ready-to-use launch configuration examples.
 
 ## Common qrlLocal failures
 
-If qrlLocal cannot load the local VM packages, build `qrljs-monorepo` and set
+Installed packages ship the QRL runtime bundled. If qrlLocal still cannot
+load it, a development override is set but invalid — build the checkout and set
 `QRLJS_MONOREPO_PATH`:
 
 ```sh

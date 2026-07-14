@@ -36,7 +36,7 @@ describe("Token contract", function () {
 On your terminal run:
 
 ```sh
-QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo npx hardhat test --network qrlLocal
+npx hardhat test --network qrlLocal
 ```
 
 You should see output like this:

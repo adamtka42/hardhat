@@ -107,8 +107,9 @@ input.
 ## qrlLocal network
 
 `qrlLocal` is an in-process QRL VM network for fast local tests. It does not
-connect to a go-qrl node, but it currently needs a built `qrljs-monorepo`
-checkout so QRL VM packages can be loaded.
+connect to a go-qrl node. Installed packages ship the QRL VM runtime bundled,
+so no extra setup is needed; a built `qrljs-monorepo` checkout can optionally
+override the bundled runtime for development.
 
 ~~~js
 module.exports = {

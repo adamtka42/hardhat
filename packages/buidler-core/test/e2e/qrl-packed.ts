@@ -1,5 +1,6 @@
 import { assert } from "chai";
 import { execFile } from "child_process";
+import crypto from "crypto";
 import fsExtra from "fs-extra";
 import path from "path";
 import { promisify } from "util";
@@ -56,29 +57,42 @@ describe("QRL packed artifact e2e", function () {
       assert.include(fileList, "qrljs-runtime/manifest.json");
       assert.include(fileList, "qrljs-runtime/THIRD_PARTY_LICENSES");
 
-      // Extract the artifact and give it its npm dependency closure through
-      // NODE_PATH (registry installation is exercised by normal npm
-      // behavior; the assertion here is qrljs-checkout independence, not
-      // registry availability).
-      await execFileAsync("tar", ["-xzf", resolvedTarball, "-C", this.tmpDir]);
-      const packageDir = path.join(this.tmpDir, "package");
-
+      // Real consumer flow: npm install the tarball into a clean project so
+      // a missing dependency in the published manifest fails the test.
       const projectDir = path.join(this.tmpDir, "project");
       await prepareProject(projectDir);
 
-      // Scrub every path that could leak the developer's checkout.
+      await execFileAsync(
+        "npm",
+        [
+          "install",
+          resolvedTarball,
+          "--no-audit",
+          "--no-fund",
+          "--loglevel=error",
+        ],
+        { cwd: projectDir, maxBuffer: 1024 * 1024 * 20 }
+      );
+
+      // Scrub every path that could leak the developer's checkout. No
+      // NODE_PATH: the installed package must stand on its own manifest.
       const env = { ...process.env };
       delete env.QRLJS_MONOREPO_PATH;
       delete env.HARDHAT_NETWORK;
-      env.NODE_PATH = [
-        path.join(PACKAGE_ROOT, "node_modules"),
-        path.join(HARDHAT_ROOT, "node_modules"),
-      ].join(path.delimiter);
+      delete env.NODE_PATH;
 
       const result = await execFileAsync(
         process.execPath,
         [
-          path.join(packageDir, "internal", "cli", "cli.js"),
+          path.join(
+            projectDir,
+            "node_modules",
+            "@theqrl",
+            "hardhat",
+            "internal",
+            "cli",
+            "cli.js"
+          ),
           "run",
           "--no-compile",
           "scripts/transfer.js",
@@ -87,6 +101,45 @@ describe("QRL packed artifact e2e", function () {
       );
 
       assert.include(result.stdout, "TRANSFER-OK balance=0x64");
+
+      // The installed manifest must describe the bundle unambiguously: a
+      // well-formed package list, the exact artifact hash, and MPL-2.0
+      // license texts. Multi-version handling is covered by the synthetic
+      // bundler guard-rail tests — the real dependency graph may legally
+      // converge to a single version of everything.
+      const installedRuntimeDir = path.join(
+        projectDir,
+        "node_modules",
+        "@theqrl",
+        "hardhat",
+        "qrljs-runtime"
+      );
+      const manifest = await fsExtra.readJson(
+        path.join(installedRuntimeDir, "manifest.json")
+      );
+      assert.isArray(manifest.packages);
+      assert.isNotEmpty(manifest.packages);
+      for (const pkg of manifest.packages) {
+        assert.isString(pkg.name);
+        assert.isString(pkg.version);
+      }
+      assert.isTrue(
+        manifest.packages.some((pkg: any) => pkg.name === "@theqrl/vm")
+      );
+
+      const runtimeSha = crypto
+        .createHash("sha256")
+        .update(
+          await fsExtra.readFile(path.join(installedRuntimeDir, "runtime.cjs"))
+        )
+        .digest("hex");
+      assert.equal(manifest.runtimeSha256, runtimeSha);
+
+      const licenses = await fsExtra.readFile(
+        path.join(installedRuntimeDir, "THIRD_PARTY_LICENSES"),
+        "utf8"
+      );
+      assert.include(licenses, "MPL-2.0");
     } finally {
       await fsExtra.remove(resolvedTarball);
     }
@@ -95,6 +148,12 @@ describe("QRL packed artifact e2e", function () {
 
 async function prepareProject(projectDir: string) {
   await fsExtra.ensureDir(path.join(projectDir, "scripts"));
+
+  await fsExtra.writeJson(path.join(projectDir, "package.json"), {
+    name: "qrl-packed-e2e-consumer",
+    version: "1.0.0",
+    private: true,
+  });
 
   await fsExtra.writeFile(
     path.join(projectDir, "hardhat.config.js"),

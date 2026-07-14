@@ -252,7 +252,8 @@ Common environment variables for scripts:
 - `QRL_RPC_URL`: HTTP go-qrl endpoint.
 - `QRL_ACCOUNT_SEED`: local QRL extended seed used to sign HTTP network
   transactions.
-- `QRLJS_MONOREPO_PATH`: built `qrljs-monorepo` checkout used by `qrlLocal`.
+- `QRLJS_MONOREPO_PATH`: optional development override — a built
+  `qrljs-monorepo` checkout replacing the runtime bundled with the package.
 - `HYPERION_HYPC_PATH`: local Hyperion compiler binary.
 - `HYPERION_COMPILER_REPOSITORY_URL`: optional HTTP(S) Hyperion compiler
   repository.

@@ -65,7 +65,9 @@ Node.js should report version 20 or later.
 QRL Hardhat compiles Hyperion `.hyp` contracts. Make sure the Hyperion compiler
 required by your checkout is available before compiling a project.
 
-For local in-process tests you also need a built `qrljs-monorepo` checkout:
+Installed packages include the QRL VM runtime, so local in-process tests need
+no extra setup. Only when developing qrljs itself, build a checkout and expose
+it as an override:
 
 ```sh
 cd /path/to/qrljs-monorepo
