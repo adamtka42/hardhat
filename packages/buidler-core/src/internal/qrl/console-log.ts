@@ -1,6 +1,7 @@
 import { keccak_256 } from "js-sha3";
 
 import { decodeQrlFunctionResult, getFunctionSignature } from "./abi";
+import { CONSOLE_LOG_SIGNATURES } from "./console-log-signatures";
 
 /**
  * Address observed for contract console logging; must stay byte-identical to
@@ -12,26 +13,12 @@ export const QRL_CONSOLE_LOG_ADDRESS = `Q${"0".repeat(
   98
 )}71726c2e636f6e736f6c652e6c6f67`;
 
-const SINGLE_ARG_TYPES = [
-  "string",
-  "uint256",
-  "bool",
-  "address",
-  "bytes",
-  "bytes32",
-];
-const PAIR_ARG_TYPES = ["string", "uint256", "bool", "address"];
-
-const CONSOLE_LOG_TYPE_SETS: string[][] = [
-  [],
-  ...SINGLE_ARG_TYPES.map((type) => [type]),
-];
-
-for (const first of PAIR_ARG_TYPES) {
-  for (const second of PAIR_ARG_TYPES) {
-    CONSOLE_LOG_TYPE_SETS.push([first, second]);
-  }
-}
+// The selector map is GENERATED together with console.hyp from one type
+// matrix (scripts/console-library-generator.js), so the library and the
+// decoder cannot drift apart. A unit test regenerates and compares both.
+const CONSOLE_LOG_TYPE_SETS: string[][] = CONSOLE_LOG_SIGNATURES.map(
+  ([, types]) => types
+);
 
 // Synthetic ABI reusing the standard QRL ABI machinery: the log argument
 // types double as outputs so `decodeQrlFunctionResult` can decode the call
@@ -71,9 +58,10 @@ function formatConsoleLogValue(type: string, value: any): string {
     return value === true ? "true" : "false";
   }
 
-  // uint256 decodes to a BN-like value; address, bytes, and bytes32 decode
-  // to their canonical string forms (checksummed Q-address / 0x-hex).
-  if (type === "uint256") {
+  // Integers decode to BN-like values (int256 may be negative); address,
+  // bytes, and bytesN decode to their canonical string forms (checksummed
+  // Q-address / 0x-hex).
+  if (type.startsWith("uint") || type.startsWith("int")) {
     return value.toString(10);
   }
 

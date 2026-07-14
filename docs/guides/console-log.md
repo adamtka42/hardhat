@@ -56,33 +56,23 @@ revert are still emitted, which makes failed branches easier to inspect.
 
 ## Supported signatures
 
-The first version supports these signatures:
+The console library and its decoder are GENERATED from one type matrix
+(`scripts/console-library-generator.js`), matching the ETH baseline surface:
 
-~~~text
-log()
-log(string)
-log(uint256)
-log(bool)
-log(address)
-log(bytes)
-log(bytes32)
-log(string,string)
-log(string,uint256)
-log(string,bool)
-log(string,address)
-log(uint256,string)
-log(uint256,uint256)
-log(uint256,bool)
-log(uint256,address)
-log(bool,string)
-log(bool,uint256)
-log(bool,bool)
-log(bool,address)
-log(address,string)
-log(address,uint256)
-log(address,bool)
-log(address,address)
-~~~
+- `log()` with no arguments.
+- `log(<type>)` overloads for `uint256`, `string`, `bool`, and `address`.
+- `log(...)` with **2 to 4 arguments** in every combination of `uint256`,
+  `string`, `bool`, and `address` (336 overloads).
+- Named single-value helpers for every type: `logInt(int256)`,
+  `logUint(uint256)`, `logString`, `logBool`, `logAddress`, `logBytes`,
+  and `logBytes1` … `logBytes32`.
+
+Signed integers and ALL fixed/dynamic bytes values are reachable only
+through their named helpers: a `log(int256)` overload would make number
+literals ambiguous with `log(uint256)`, fixed-bytes values implicitly widen
+into each other, and string literals convert to `bytes`/`bytes32` — so
+`console.log("hello")` compiles only because those overloads do not exist
+(the same rule the ETH baseline followed).
 
 Use canonical ABI types in expectations and overload discussions: `uint256`,
 not `uint`.
@@ -93,9 +83,10 @@ Values are printed as follows:
 | --- | --- |
 | `string` | the string value |
 | `uint256` | decimal |
+| `int256` | decimal, with a leading `-` for negative values |
 | `bool` | `true` or `false` |
 | `address` | QRL address |
-| `bytes`, `bytes32` | `0x`-prefixed hex |
+| `bytes`, `bytes1` … `bytes32` | `0x`-prefixed hex |
 
 Multiple values are joined by one space. Each `console.log` call prints one
 line.
@@ -146,7 +137,8 @@ estimation loop. `qrl_call` and `callStatic` do print logs.
 
 - `console.log` functions are `view`, so they cannot be called from `pure`
   functions.
-- Only the signatures listed above are supported in the first version.
+- Only the generated signatures listed above are supported; regenerate the
+  library to extend the matrix.
 - The feature requires a QRL runtime with console log listener support. The
   runtime bundled with installed packages supports it; a `qrljs-monorepo`
   override must be a recent-enough build. If `consoleLog: true` is set

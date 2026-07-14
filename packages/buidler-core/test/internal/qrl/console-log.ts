@@ -1,11 +1,16 @@
 import { assert } from "chai";
+import * as fs from "fs";
+import { keccak_256 } from "js-sha3";
+import path from "path";
 
 import { encodeQrlFunctionData } from "../../../src/internal/qrl/abi";
+import { toQrlChecksumAddress } from "../../../src/internal/qrl/address";
 import {
   decodeQrlConsoleLog,
   getConsoleLogSelectors,
   QRL_CONSOLE_LOG_ADDRESS,
 } from "../../../src/internal/qrl/console-log";
+import { CONSOLE_LOG_SIGNATURES } from "../../../src/internal/qrl/console-log-signatures";
 
 function encodeConsoleCall(types: string[], args: any[]): Uint8Array {
   const abi = [
@@ -37,13 +42,103 @@ describe("QRL console log decoding", () => {
     );
   });
 
-  it("derives a unique selector for every MVP signature", () => {
+  it("derives a unique selector for every generated signature", () => {
     const selectors = getConsoleLogSelectors();
 
-    assert.equal(selectors.size, 23);
+    // 1 empty + 38 singles (int256, uint256, string, bool, address, bytes,
+    // bytes1..32) + 4^2 + 4^3 + 4^4 combinations = 375 unique signatures.
+    assert.equal(selectors.size, 375);
     for (const selector of selectors.keys()) {
       assert.match(selector, /^[0-9a-f]{8}$/);
     }
+  });
+
+  it("matches the artifacts committed by the console library generator", () => {
+    // Anti-drift guard: console.hyp and console-log-signatures.ts must be
+    // exactly what the current generator produces from its type matrix.
+    // tslint:disable-next-line: no-var-requires
+    const { generateConsoleLibrary } = require(path.join(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "scripts",
+      "console-library-generator.js"
+    ));
+    const generated = generateConsoleLibrary();
+
+    const packageRoot = path.join(__dirname, "..", "..", "..");
+    const committedHyp = fs.readFileSync(
+      path.join(packageRoot, "console.hyp"),
+      "utf8"
+    );
+    const committedSignatures = fs.readFileSync(
+      path.join(
+        packageRoot,
+        "src",
+        "internal",
+        "qrl",
+        "console-log-signatures.ts"
+      ),
+      "utf8"
+    );
+
+    assert.equal(committedHyp, generated.consoleHyp);
+    assert.equal(committedSignatures, generated.signaturesTs);
+  });
+
+  it("stores selectors that match their recomputed signatures", () => {
+    for (const [selector, types] of CONSOLE_LOG_SIGNATURES) {
+      const signature = `log(${types.join(",")})`;
+      assert.equal(
+        selector,
+        keccak_256(signature).slice(0, 8),
+        `selector mismatch for ${signature}`
+      );
+    }
+  });
+
+  it("decodes int256 logs including negative values", () => {
+    assert.equal(
+      decodeQrlConsoleLog(encodeConsoleCall(["int256"], [-42])),
+      "-42"
+    );
+  });
+
+  it("decodes fixed-bytes logs of arbitrary width", () => {
+    assert.equal(
+      decodeQrlConsoleLog(encodeConsoleCall(["bytes7"], ["0x01020304050607"])),
+      "0x01020304050607"
+    );
+  });
+
+  it("decodes three- and four-argument logs", () => {
+    assert.equal(
+      decodeQrlConsoleLog(
+        encodeConsoleCall(["string", "uint256", "bool"], ["total", 7, true])
+      ),
+      "total 7 true"
+    );
+
+    assert.equal(
+      decodeQrlConsoleLog(
+        encodeConsoleCall(
+          ["uint256", "uint256", "uint256", "uint256"],
+          [1, 2, 3, 4]
+        )
+      ),
+      "1 2 3 4"
+    );
+
+    assert.equal(
+      decodeQrlConsoleLog(
+        encodeConsoleCall(
+          ["string", "address", "uint256", "uint256"],
+          ["balance", senderAddress, 100, 250]
+        )
+      ),
+      `balance ${toQrlChecksumAddress(senderAddress)} 100 250`
+    );
   });
 
   it("decodes zero-argument logs to an empty line", () => {
