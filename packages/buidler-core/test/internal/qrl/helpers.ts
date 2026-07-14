@@ -777,28 +777,30 @@ describe("QRL runtime helpers", () => {
   it("treats tuple ABI arguments as arguments, not overrides", async () => {
     const contract = await helpers.getContractAt("Sample", contractAddress);
     provider.setReturnValue("qrl_accounts", [contractAddress]);
+    provider.setReturnValue("qrl_sendTransaction", txHash);
 
-    // Tuple VALUE encoding is not implemented yet in the QRL ABI codec, so
-    // both cases below fail during encoding. The assertions still pin the
-    // arity-based routing: if the tuple object had been misparsed as
-    // overrides, the errors would be an argument-count mismatch or an
-    // unknown-override error instead. Upgrade to success-path tests once
-    // tuple value encoding lands.
-    await expectHardhatErrorAsync(
-      () => contract.setConfig({ threshold: 5, active: true }),
-      ERRORS.NETWORK.INVALID_QRL_ABI,
-      "Unsupported QRL ABI type tuple"
-    );
+    // Arity-based routing: the tuple OBJECT is the ABI argument, not an
+    // overrides bag. keccak("setConfig((uint256,bool))") selector followed
+    // by the statically encoded components.
+    const expectedData = `0x6ebb5bea${"0".repeat(127)}5${"0".repeat(127)}1`;
 
-    await expectHardhatErrorAsync(
-      () =>
-        contract.setConfig(
-          { threshold: 5, active: true },
-          { from: contractAddress }
-        ),
-      ERRORS.NETWORK.INVALID_QRL_ABI,
-      "Unsupported QRL ABI type tuple"
+    const response = await contract.setConfig({ threshold: 5, active: true });
+    assert.equal(response.hash, txHash);
+    assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
+      {
+        data: expectedData,
+        from: contractAddress,
+        to: checksummedContractAddress,
+      },
+    ]);
+
+    // With an explicit overrides bag after the tuple argument, both are
+    // routed correctly.
+    const withOverrides = await contract.setConfig(
+      { threshold: 5, active: true },
+      { from: contractAddress }
     );
+    assert.equal(withOverrides.hash, txHash);
   });
 
   it("rejects unknown transaction override keys in direct aliases", async () => {

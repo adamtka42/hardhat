@@ -76,7 +76,11 @@ export function decodeQrlEventLog(
   const fragment = findEventFragment(abi, eventName);
   const topics = normalizeTopics(log);
 
-  assertEventTopic(fragment, topics[0]);
+  // Anonymous events carry no signature topic; the caller's explicit event
+  // name is the only association, per ABI rules.
+  if (fragment.anonymous !== true) {
+    assertEventTopic(fragment, topics[0]);
+  }
 
   return decodeEventLogWithFragment(fragment, log, topics);
 }
@@ -122,7 +126,7 @@ function encodeQrlParameters(
   const head: string[] = [];
   const tail: string[] = [];
   const headByteLength = inputs.reduce(
-    (length, input) => length + staticSlotByteLength(input.type),
+    (length, input) => length + staticSlotByteLength(input),
     0
   );
   let tailByteLength = 0;
@@ -130,14 +134,14 @@ function encodeQrlParameters(
   for (let index = 0; index < inputs.length; index++) {
     const input = inputs[index];
 
-    if (isDynamicType(input.type)) {
+    if (isDynamicParam(input)) {
       head.push(encodeWordNumber(headByteLength + tailByteLength));
 
-      const encodedTail = encodeDynamicValue(input.type, args[index]);
+      const encodedTail = encodeDynamicValue(input, args[index]);
       tail.push(encodedTail);
       tailByteLength += encodedTail.length / 2;
     } else {
-      head.push(encodeStaticValue(input.type, args[index]));
+      head.push(encodeStaticValue(input, args[index]));
     }
   }
 
@@ -150,7 +154,7 @@ function decodeQrlParameters(
   label: string
 ): any[] {
   const headByteLength = outputs.reduce(
-    (length, output) => length + staticSlotByteLength(output.type),
+    (length, output) => length + staticSlotByteLength(output),
     0
   );
 
@@ -170,17 +174,17 @@ function decodeQrlParameters(
   let headOffset = 0;
 
   for (const output of outputs) {
-    const slotByteLength = staticSlotByteLength(output.type);
+    const slotByteLength = staticSlotByteLength(output);
     const headValue = data.slice(
       headOffset * 2,
       (headOffset + slotByteLength) * 2
     );
 
-    if (isDynamicType(output.type)) {
+    if (isDynamicParam(output)) {
       const offset = decodeOffset(headValue, data.length, label);
-      decoded.push(decodeDynamicValue(output.type, data, offset));
+      decoded.push(decodeDynamicValue(output, data, offset));
     } else {
-      decoded.push(decodeStaticValue(output.type, headValue));
+      decoded.push(decodeStaticValue(output, headValue));
     }
 
     headOffset += slotByteLength;
@@ -263,10 +267,6 @@ function findEventFragment(abi: any, eventName: string): QrlAbiFunction {
     );
   }
 
-  if (matches[0].anonymous === true) {
-    throw qrlAbiError(`Anonymous event ${eventName} is not supported`);
-  }
-
   return matches[0];
 }
 
@@ -342,10 +342,14 @@ function decodeEventLogWithFragment(
   const dataInputs = inputs.filter((input) => input.indexed !== true);
   const normalizedData = normalizeHex(log.data ?? "0x");
 
-  if (topics.length !== indexedInputs.length + 1) {
+  // Anonymous events have no signature topic — every topic is an indexed
+  // value.
+  const signatureTopicCount = fragment.anonymous === true ? 0 : 1;
+
+  if (topics.length !== indexedInputs.length + signatureTopicCount) {
     throw qrlAbiError(
       `Event ${fragment.name} has ${
-        topics.length - 1
+        topics.length - signatureTopicCount
       } indexed topics, expected ${indexedInputs.length}`
     );
   }
@@ -357,14 +361,14 @@ function decodeEventLogWithFragment(
   );
 
   const args: { [name: string]: any } = {};
-  let topicIndex = 1;
+  let topicIndex = signatureTopicCount;
   let dataIndex = 0;
 
   for (let index = 0; index < inputs.length; index++) {
     const input = inputs[index];
     const value =
       input.indexed === true
-        ? decodeIndexedEventValue(input.type, topics[topicIndex++])
+        ? decodeIndexedEventValue(input, topics[topicIndex++])
         : decodedData[dataIndex];
 
     if (input.indexed !== true) {
@@ -556,38 +560,139 @@ function canonicalSignatureType(type: string): string {
   return canonicalType(normalized);
 }
 
-function isDynamicType(type: string): boolean {
-  const canonical = canonicalType(type);
+// Recursive ABI descriptors: every value-codec function below receives the
+// full QrlAbiParam so tuple components survive recursion. Array elements
+// inherit the parent's components (a tuple[] element is a tuple with the
+// same components); signature-derived params carry the components inside
+// the canonical type string instead and are parsed by tupleComponents.
+function elementParam(param: QrlAbiParam, elementType: string): QrlAbiParam {
+  return { type: elementType, components: param.components };
+}
+
+function tupleComponents(param: QrlAbiParam): QrlAbiParam[] | undefined {
+  if (param.type === "tuple") {
+    if (param.components === undefined) {
+      throw qrlAbiError("Tuple ABI parameter is missing components");
+    }
+
+    return param.components;
+  }
+
+  const canonical = canonicalType(param.type);
+  if (!canonical.startsWith("(")) {
+    return undefined;
+  }
+
+  if (!canonical.endsWith(")")) {
+    throw qrlAbiError(`Invalid ABI tuple type ${param.type}`);
+  }
+
+  const body = canonical.slice(1, -1);
+  if (body === "") {
+    return [];
+  }
+
+  // Signature-derived tuples carry no names — values must be positional.
+  return splitSignatureTypes(body).map((type) => ({ type }));
+}
+
+function normalizeTupleValue(
+  value: any,
+  components: QrlAbiParam[],
+  label: string
+): any[] {
+  if (Array.isArray(value)) {
+    if (value.length !== components.length) {
+      throw qrlAbiError(
+        `${label} value must have ${components.length} elements, got ${value.length}`
+      );
+    }
+
+    return value;
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return components.map((component, index) => {
+      const name = component.name;
+      if (name === undefined || name === "") {
+        throw qrlAbiError(
+          `${label} component ${index} has no name; pass tuple values as an array`
+        );
+      }
+
+      if (!(name in value)) {
+        throw qrlAbiError(`${label} value is missing the "${name}" component`);
+      }
+
+      return value[name];
+    });
+  }
+
+  throw qrlAbiError(`${label} value must be an array or an object`);
+}
+
+// Decoded tuples are arrays augmented with named properties, so both
+// result[0] and result.fieldName work. Names that collide with array
+// properties (e.g. "length") stay positional-only.
+function attachTupleNames(values: any[], components: QrlAbiParam[]): any[] {
+  for (let index = 0; index < components.length; index++) {
+    const name = components[index].name;
+    if (name !== undefined && name !== "" && !(name in values)) {
+      (values as any)[name] = values[index];
+    }
+  }
+
+  return values;
+}
+
+function isDynamicParam(param: QrlAbiParam): boolean {
+  const canonical = canonicalType(param.type);
 
   if (canonical === "string" || canonical === "bytes") {
     return true;
   }
 
   const array = parseArrayType(canonical);
-  if (array === undefined) {
-    return false;
+  if (array !== undefined) {
+    return (
+      array.length === undefined ||
+      isDynamicParam(elementParam(param, array.elementType))
+    );
   }
 
-  return array.length === undefined || isDynamicType(array.elementType);
+  const components = tupleComponents(param);
+  if (components !== undefined) {
+    return components.some((component) => isDynamicParam(component));
+  }
+
+  return false;
 }
 
-function encodeStaticValue(type: string, value: any): string {
-  const canonical = canonicalType(type);
+function encodeStaticValue(param: QrlAbiParam, value: any): string {
+  const canonical = canonicalType(param.type);
 
   const array = parseArrayType(canonical);
   if (array !== undefined) {
-    if (array.length === undefined || isDynamicType(array.elementType)) {
-      throw qrlAbiError(`Unsupported static QRL ABI type ${type}`);
+    const element = elementParam(param, array.elementType);
+    if (array.length === undefined || isDynamicParam(element)) {
+      throw qrlAbiError(`Unsupported static QRL ABI type ${param.type}`);
     }
 
     if (!Array.isArray(value) || value.length !== array.length) {
       throw qrlAbiError(
-        `${type} value must be an array with ${array.length} elements`
+        `${param.type} value must be an array with ${array.length} elements`
       );
     }
 
-    return value
-      .map((entry) => encodeStaticValue(array.elementType, entry))
+    return value.map((entry) => encodeStaticValue(element, entry)).join("");
+  }
+
+  const components = tupleComponents(param);
+  if (components !== undefined) {
+    const values = normalizeTupleValue(value, components, canonical);
+
+    return components
+      .map((component, index) => encodeStaticValue(component, values[index]))
       .join("");
   }
 
@@ -612,47 +717,77 @@ function encodeStaticValue(type: string, value: any): string {
     return encodeFixedBytes(value, fixedBytes);
   }
 
-  throw qrlAbiError(`Unsupported QRL ABI type ${type}`);
+  throw qrlAbiError(`Unsupported QRL ABI type ${param.type}`);
 }
 
-function decodeStaticValue(type: string, word: string): any {
-  const canonical = canonicalType(type);
+function decodeStaticValue(param: QrlAbiParam, data: string): any {
+  const canonical = canonicalType(param.type);
 
   const array = parseArrayType(canonical);
   if (array !== undefined) {
-    if (array.length === undefined || isDynamicType(array.elementType)) {
-      throw qrlAbiError(`Unsupported static QRL ABI type ${type}`);
+    const element = elementParam(param, array.elementType);
+    if (array.length === undefined || isDynamicParam(element)) {
+      throw qrlAbiError(`Unsupported static QRL ABI type ${param.type}`);
     }
 
-    return decodeStaticArray(array.elementType, word, array.length);
+    return decodeStaticArray(element, data, array.length);
+  }
+
+  const components = tupleComponents(param);
+  if (components !== undefined) {
+    return decodeStaticTuple(components, data);
   }
 
   if (isUintType(canonical)) {
-    return new BN(word, 16);
+    return new BN(data, 16);
   }
 
   if (isIntType(canonical)) {
-    return decodeSigned(canonical, word);
+    return decodeSigned(canonical, data);
   }
 
   if (canonical === "bool") {
-    return new BN(word, 16).eqn(1);
+    return new BN(data, 16).eqn(1);
   }
 
   if (canonical === "address") {
-    return toQrlChecksumAddress(`Q${word}`);
+    return toQrlChecksumAddress(`Q${data}`);
   }
 
   const fixedBytes = parseFixedBytesType(canonical);
   if (fixedBytes !== undefined) {
-    return `0x${word.slice(0, fixedBytes * 2)}`;
+    return `0x${data.slice(0, fixedBytes * 2)}`;
   }
 
-  throw qrlAbiError(`Unsupported QRL ABI type ${type}`);
+  throw qrlAbiError(`Unsupported QRL ABI type ${param.type}`);
 }
 
-function encodeDynamicValue(type: string, value: any): string {
-  const canonical = canonicalType(type);
+function decodeStaticTuple(components: QrlAbiParam[], data: string): any {
+  const decoded: any[] = [];
+  let offset = 0;
+
+  for (const component of components) {
+    const slotByteLength = staticSlotByteLength(component);
+    decoded.push(
+      decodeStaticValue(
+        component,
+        data.slice(offset * 2, (offset + slotByteLength) * 2)
+      )
+    );
+    offset += slotByteLength;
+  }
+
+  if (offset * 2 !== data.length) {
+    throw qrlAbiError(
+      `Static tuple has ${data.length / 2} bytes, expected ${offset}`
+    );
+  }
+
+  return attachTupleNames(decoded, components);
+}
+
+function encodeDynamicValue(param: QrlAbiParam, value: any): string {
+  const canonical = canonicalType(param.type);
 
   if (canonical === "string") {
     if (typeof value !== "string") {
@@ -672,22 +807,43 @@ function encodeDynamicValue(type: string, value: any): string {
 
   const array = parseArrayType(canonical);
   if (array !== undefined) {
+    const element = elementParam(param, array.elementType);
     if (array.length !== undefined) {
-      if (!isDynamicType(array.elementType)) {
-        throw qrlAbiError(`Unsupported dynamic QRL ABI type ${type}`);
+      if (!isDynamicParam(element)) {
+        throw qrlAbiError(`Unsupported dynamic QRL ABI type ${param.type}`);
       }
 
-      return encodeFixedArrayWithDynamicElements(array.elementType, value);
+      return encodeFixedArrayWithDynamicElements(
+        element,
+        value,
+        array.length,
+        param.type
+      );
     }
 
-    return encodeDynamicArray(array.elementType, value);
+    return encodeDynamicArray(element, value);
   }
 
-  throw qrlAbiError(`Unsupported dynamic QRL ABI type ${type}`);
+  const components = tupleComponents(param);
+  if (components !== undefined) {
+    // A dynamic tuple is encoded exactly like a parameter list: heads with
+    // offsets relative to the tuple start, then tails.
+    return encodeQrlParameters(
+      components,
+      normalizeTupleValue(value, components, canonical),
+      "Tuple"
+    );
+  }
+
+  throw qrlAbiError(`Unsupported dynamic QRL ABI type ${param.type}`);
 }
 
-function decodeDynamicValue(type: string, data: string, offset: number): any {
-  const canonical = canonicalType(type);
+function decodeDynamicValue(
+  param: QrlAbiParam,
+  data: string,
+  offset: number
+): any {
+  const canonical = canonicalType(param.type);
 
   if (canonical === "string") {
     return Buffer.from(decodeDynamicBytes(data, offset), "hex").toString(
@@ -701,23 +857,36 @@ function decodeDynamicValue(type: string, data: string, offset: number): any {
 
   const array = parseArrayType(canonical);
   if (array !== undefined) {
+    const element = elementParam(param, array.elementType);
     if (array.length !== undefined) {
-      if (!isDynamicType(array.elementType)) {
-        throw qrlAbiError(`Unsupported dynamic QRL ABI type ${type}`);
+      if (!isDynamicParam(element)) {
+        throw qrlAbiError(`Unsupported dynamic QRL ABI type ${param.type}`);
       }
 
       return decodeFixedArrayWithDynamicElements(
-        array.elementType,
+        element,
         data,
         offset,
         array.length
       );
     }
 
-    return decodeDynamicArray(array.elementType, data, offset);
+    return decodeDynamicArray(element, data, offset);
   }
 
-  throw qrlAbiError(`Unsupported dynamic QRL ABI type ${type}`);
+  const components = tupleComponents(param);
+  if (components !== undefined) {
+    // Offsets inside a dynamic tuple are relative to the tuple start.
+    const decoded = decodeQrlParameters(
+      components,
+      data.slice(offset * 2),
+      "Tuple"
+    );
+
+    return attachTupleNames(decoded, components);
+  }
+
+  throw qrlAbiError(`Unsupported dynamic QRL ABI type ${param.type}`);
 }
 
 function encodeDynamicBytes(hex: string): string {
@@ -734,66 +903,72 @@ function decodeDynamicBytes(data: string, offset: number): string {
   return data.slice(start * 2, end * 2);
 }
 
-function encodeDynamicArray(elementType: string, value: any): string {
+function encodeDynamicArray(element: QrlAbiParam, value: any): string {
   if (!Array.isArray(value)) {
     throw qrlAbiError("dynamic array value must be an array");
   }
 
-  if (isDynamicType(elementType)) {
+  if (isDynamicParam(element)) {
     return `${encodeWordNumber(value.length)}${encodeDynamicElementSequence(
-      elementType,
+      element,
       value
     )}`;
   }
 
   return `${encodeWordNumber(value.length)}${value
-    .map((entry) => encodeStaticValue(elementType, entry))
+    .map((entry) => encodeStaticValue(element, entry))
     .join("")}`;
 }
 
 function decodeDynamicArray(
-  elementType: string,
+  element: QrlAbiParam,
   data: string,
   offset: number
 ): any[] {
   const length = decodeWordNumber(readWord(data, offset));
   const bodyOffset = offset + WORD_BYTES;
 
-  if (isDynamicType(elementType)) {
-    return decodeDynamicElementSequence(elementType, data, bodyOffset, length);
+  if (isDynamicParam(element)) {
+    return decodeDynamicElementSequence(element, data, bodyOffset, length);
   }
 
-  assertDataRange(data, bodyOffset, length * WORD_BYTES);
+  // Static elements may span multiple words (e.g. static tuples).
+  const elementByteLength = staticSlotByteLength(element);
+  assertDataRange(data, bodyOffset, length * elementByteLength);
 
   return decodeStaticArray(
-    elementType,
-    data.slice(bodyOffset * 2, (bodyOffset + length * WORD_BYTES) * 2),
+    element,
+    data.slice(bodyOffset * 2, (bodyOffset + length * elementByteLength) * 2),
     length
   );
 }
 
 function encodeFixedArrayWithDynamicElements(
-  elementType: string,
-  value: any
+  element: QrlAbiParam,
+  value: any,
+  length: number,
+  arrayType: string
 ): string {
-  if (!Array.isArray(value)) {
-    throw qrlAbiError("fixed array value must be an array");
+  if (!Array.isArray(value) || value.length !== length) {
+    throw qrlAbiError(
+      `${arrayType} value must be an array with ${length} elements`
+    );
   }
 
-  return encodeDynamicElementSequence(elementType, value);
+  return encodeDynamicElementSequence(element, value);
 }
 
 function decodeFixedArrayWithDynamicElements(
-  elementType: string,
+  element: QrlAbiParam,
   data: string,
   offset: number,
   length: number
 ): any[] {
-  return decodeDynamicElementSequence(elementType, data, offset, length);
+  return decodeDynamicElementSequence(element, data, offset, length);
 }
 
 function encodeDynamicElementSequence(
-  elementType: string,
+  element: QrlAbiParam,
   value: any[]
 ): string {
   const head: string[] = [];
@@ -803,7 +978,7 @@ function encodeDynamicElementSequence(
   for (const entry of value) {
     head.push(encodeWordNumber(value.length * WORD_BYTES + tailByteLength));
 
-    const encodedTail = encodeDynamicValue(elementType, entry);
+    const encodedTail = encodeDynamicValue(element, entry);
     tail.push(encodedTail);
     tailByteLength += encodedTail.length / 2;
   }
@@ -812,7 +987,7 @@ function encodeDynamicElementSequence(
 }
 
 function decodeDynamicElementSequence(
-  elementType: string,
+  element: QrlAbiParam,
   data: string,
   offset: number,
   length: number
@@ -827,21 +1002,23 @@ function decodeDynamicElementSequence(
       data.length,
       "Dynamic array"
     );
-    decoded.push(decodeDynamicValue(elementType, data, offset + elementOffset));
+    decoded.push(decodeDynamicValue(element, data, offset + elementOffset));
   }
 
   return decoded;
 }
 
 function decodeStaticArray(
-  elementType: string,
+  element: QrlAbiParam,
   data: string,
   length: number
 ): any[] {
-  if (data.length !== length * WORD_HEX_LENGTH) {
+  const elementByteLength = staticSlotByteLength(element);
+
+  if (data.length !== length * elementByteLength * 2) {
     throw qrlAbiError(
       `Static array has ${data.length / 2} bytes, expected ${
-        length * WORD_BYTES
+        length * elementByteLength
       }`
     );
   }
@@ -850,8 +1027,11 @@ function decodeStaticArray(
   for (let index = 0; index < length; index++) {
     decoded.push(
       decodeStaticValue(
-        elementType,
-        data.slice(index * WORD_HEX_LENGTH, (index + 1) * WORD_HEX_LENGTH)
+        element,
+        data.slice(
+          index * elementByteLength * 2,
+          (index + 1) * elementByteLength * 2
+        )
       )
     );
   }
@@ -859,12 +1039,20 @@ function decodeStaticArray(
   return decoded;
 }
 
-function decodeIndexedEventValue(type: string, topic: string): any {
-  if (isDynamicType(type)) {
+function decodeIndexedEventValue(param: QrlAbiParam, topic: string): any {
+  const canonical = canonicalType(param.type);
+
+  // Indexed reference types (dynamic values, arrays, and tuples) are stored
+  // as their keccak hash — only the raw topic can be returned.
+  if (
+    isDynamicParam(param) ||
+    parseArrayType(canonical) !== undefined ||
+    tupleComponents(param) !== undefined
+  ) {
     return `0x${topic}`;
   }
 
-  return decodeStaticValue(type, topic);
+  return decodeStaticValue(param, topic);
 }
 
 function encodeUnsigned(type: string, value: any): string {
@@ -1042,18 +1230,29 @@ function parseArrayType(
   return { elementType: match[1], length: Number(match[2]) };
 }
 
-function staticSlotByteLength(type: string): number {
-  if (isDynamicType(type)) {
+function staticSlotByteLength(param: QrlAbiParam): number {
+  if (isDynamicParam(param)) {
     return WORD_BYTES;
   }
 
-  const array = parseArrayType(canonicalType(type));
+  const array = parseArrayType(canonicalType(param.type));
   if (array !== undefined) {
     if (array.length === undefined) {
-      throw qrlAbiError(`Unsupported static QRL ABI type ${type}`);
+      throw qrlAbiError(`Unsupported static QRL ABI type ${param.type}`);
     }
 
-    return array.length * staticSlotByteLength(array.elementType);
+    return (
+      array.length *
+      staticSlotByteLength(elementParam(param, array.elementType))
+    );
+  }
+
+  const components = tupleComponents(param);
+  if (components !== undefined) {
+    return components.reduce(
+      (length, component) => length + staticSlotByteLength(component),
+      0
+    );
   }
 
   return WORD_BYTES;
