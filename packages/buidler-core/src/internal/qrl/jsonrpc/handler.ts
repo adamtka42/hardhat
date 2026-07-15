@@ -41,6 +41,12 @@ class InternalError extends JsonRpcProtocolError {
   }
 }
 
+class MethodNotSupportedError extends JsonRpcProtocolError {
+  constructor(message: string) {
+    super(message, -32601);
+  }
+}
+
 export default class JsonRpcHandler {
   constructor(
     private readonly _provider: IQrlProvider,
@@ -67,7 +73,7 @@ export default class JsonRpcHandler {
       // entry never aborts the batch, and ids map 1:1.
       const responses = await Promise.all(
         jsonHttpRequest.map((singleReq: any) =>
-          this._handleSingleRequest(singleReq)
+          this._handleSingleHttpRequest(singleReq)
         )
       );
 
@@ -75,19 +81,19 @@ export default class JsonRpcHandler {
       return;
     }
 
-    const rpcResp = await this._handleSingleRequest(jsonHttpRequest);
+    const rpcResp = await this._handleSingleHttpRequest(jsonHttpRequest);
 
     this._sendResponse(res, rpcResp);
   };
 
   public handleWs = async (ws: WebSocket) => {
-    const subscriptions: string[] = [];
+    const subscriptions = new Set<string>();
     let isClosed = false;
 
     const listener = (payload: { subscription: string; result: any }) => {
       // Only forward notifications for subscriptions created through this
       // websocket connection, and never after it closed.
-      if (isClosed || !subscriptions.includes(payload.subscription)) {
+      if (isClosed || !subscriptions.has(payload.subscription)) {
         return;
       }
 
@@ -118,16 +124,58 @@ export default class JsonRpcHandler {
           throw new InvalidRequestError("Invalid request");
         }
 
-        rpcResp = await this._handleRequest(rpcReq);
+        // Subscriptions belong to the connection that created them: an
+        // unsubscribe for a foreign (or unknown) id answers false WITHOUT
+        // reaching the provider, so one client can never remove another
+        // client's subscription — ids are sequential and guessable. The
+        // shortcut applies ONLY to well-formed requests (exactly one string
+        // parameter); malformed ones fall through to standard validation.
+        if (
+          rpcReq.method === "qrl_unsubscribe" &&
+          Array.isArray(rpcReq.params) &&
+          rpcReq.params.length === 1 &&
+          typeof rpcReq.params[0] === "string" &&
+          !subscriptions.has(rpcReq.params[0])
+        ) {
+          rpcResp = {
+            jsonrpc: "2.0",
+            id: rpcReq.id,
+            result: false,
+          };
+        } else {
+          rpcResp = await this._handleRequest(rpcReq);
+        }
 
         // Track successful qrl_subscribe calls so notifications can be
-        // routed and cleaned up per connection.
+        // routed and cleaned up per connection. When the provider finishes
+        // AFTER the socket closed, the close handler has already run — the
+        // subscription must be released immediately instead of leaking.
         if (
           rpcReq.method === "qrl_subscribe" &&
           isValidJsonResponse(rpcResp) &&
           "result" in rpcResp
         ) {
-          subscriptions.push((rpcResp as any).result);
+          if (isClosed) {
+            try {
+              await this._provider.send("qrl_unsubscribe", [
+                (rpcResp as any).result,
+              ]);
+            } catch {
+              // Nothing to clean up if the provider dropped it already.
+            }
+          } else {
+            subscriptions.add((rpcResp as any).result);
+          }
+        }
+
+        // A successful own unsubscribe releases the id.
+        if (
+          rpcReq.method === "qrl_unsubscribe" &&
+          Array.isArray(rpcReq.params) &&
+          isValidJsonResponse(rpcResp) &&
+          (rpcResp as any).result === true
+        ) {
+          subscriptions.delete(rpcReq.params[0]);
         }
       } catch (error) {
         rpcResp = _handleError(error);
@@ -156,6 +204,27 @@ export default class JsonRpcHandler {
         }
       });
     });
+  };
+
+  // Subscriptions need a push channel; over plain HTTP they are rejected
+  // with a stable error (same behavior as go-qrl). Only WELL-FORMED
+  // requests take this shortcut — malformed ones go through the standard
+  // validation path and report invalid-request errors.
+  private _handleSingleHttpRequest = async (rpcReq: any) => {
+    if (
+      isValidJsonRequest(rpcReq) &&
+      (rpcReq.method === "qrl_subscribe" || rpcReq.method === "qrl_unsubscribe")
+    ) {
+      const rpcResp = _handleError(
+        new MethodNotSupportedError(
+          `${rpcReq.method} is only supported over WebSocket connections`
+        )
+      );
+      rpcResp.id = rpcReq.id;
+      return rpcResp;
+    }
+
+    return this._handleSingleRequest(rpcReq);
   };
 
   private _sendEmptyResponse(res: ServerResponse) {

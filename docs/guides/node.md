@@ -98,9 +98,24 @@ The seed must derive the configured address. Accounts without a seed continue
 to support normal local transactions, but cannot be used with `qrl_sign`.
 The node banner never prints the seed.
 
+## WebSocket subscriptions
+
+WebSocket clients can subscribe to push notifications with `qrl_subscribe`
+(go-qrl wire format; notifications arrive as `qrl_subscription` messages):
+
+- `newHeads` — every mined block header,
+- `newPendingTransactions` — pending pool admissions as hashes, or full
+  transaction objects when the optional second parameter is `true`,
+- `logs` — logs matching optional `address`/`topics` criteria.
+
+Subscriptions belong to the WebSocket connection that created them: other
+connections cannot observe or remove them, and closing the connection cleans
+them up. Over plain HTTP, `qrl_subscribe`/`qrl_unsubscribe` are rejected —
+push notifications need a live connection.
+
 ## Limitations
 
-- `qrl_subscribe` (WebSocket subscriptions) is not implemented by the local
-  provider yet; request/response over WebSocket works.
-- Installed filters do not expire automatically. Uninstall filters that are
-  no longer needed with `qrl_uninstallFilter`.
+- Installed polling filters expire after five minutes of inactivity (as in
+  go-qrl); each `qrl_getFilterChanges`/`qrl_getFilterLogs` call refreshes
+  the deadline. WebSocket subscriptions do not expire — they live until
+  unsubscribed or disconnected.

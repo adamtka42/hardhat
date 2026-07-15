@@ -137,6 +137,11 @@ export class QrlLocalHardhatProvider extends EventEmitter
         config.consoleLog === false || !consoleLogSupported
           ? undefined
           : (data: Uint8Array) => printQrlConsoleLog(data),
+      // qrl_subscribe push notifications surface as EIP-1193-style
+      // "notification" events; the standalone WebSocket server forwards
+      // them to the owning client connection.
+      onSubscriptionEvent: (event: { subscription: string; result: unknown }) =>
+        this.emit("notification", event),
     });
   }
 

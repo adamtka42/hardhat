@@ -165,6 +165,9 @@ VM provider. Hardhat handles these methods directly:
 - `qrl_newFilter`, `qrl_newBlockFilter`,
   `qrl_newPendingTransactionFilter`
 - `qrl_getFilterChanges`, `qrl_getFilterLogs`, `qrl_uninstallFilter`
+  (polling filters expire after five minutes of inactivity, as in go-qrl)
+- `qrl_subscribe`, `qrl_unsubscribe` (push notifications; served to
+  WebSocket clients by `hardhat node`)
 
 The provider mirrors the go-qrl node's compatibility surface, so tooling that
 probes the connection on startup works against `qrlLocal` too:

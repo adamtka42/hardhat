@@ -422,6 +422,273 @@ describe("QRL node e2e", function () {
       });
       assert.isTrue(uninstalled.result);
 
+      // WebSocket push (qrl_subscribe): a real WS client receives newHeads
+      // notifications without polling; unsubscribe stops them. Uses the
+      // go-qrl wire format (qrl_subscription notifications).
+      // tslint:disable-next-line: no-implicit-dependencies no-var-requires
+      const WebSocketClient = require("ws");
+      const ws = new WebSocketClient(`ws://127.0.0.1:${port}`);
+      const wsMessages: any[] = [];
+      ws.on("message", (raw: any) => wsMessages.push(JSON.parse(`${raw}`)));
+      await new Promise<void>((resolve, reject) => {
+        ws.once("open", resolve);
+        ws.once("error", reject);
+      });
+
+      const wsRequest = (body: any) =>
+        new Promise<any>((resolve, reject) => {
+          const handler = (raw: any) => {
+            const message = JSON.parse(`${raw}`);
+            if (message.id === body.id) {
+              ws.off("message", handler);
+              resolve(message);
+            }
+          };
+          ws.on("message", handler);
+          ws.once("error", reject);
+          ws.send(JSON.stringify(body));
+        });
+
+      const subscribeResponse = await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_subscribe",
+        params: ["newHeads"],
+        id: 40,
+      });
+      assert.match(subscribeResponse.result, /^0x[0-9a-f]+$/);
+      const subscriptionId = subscribeResponse.result;
+
+      // Mine over HTTP; the notification must arrive over the WS PUSH
+      // channel without any further WS request.
+      await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_mine",
+        params: [],
+        id: 41,
+      });
+      await waitFor(() =>
+        wsMessages.some(
+          (message) =>
+            message.method === "qrl_subscription" &&
+            message.params?.subscription === subscriptionId &&
+            typeof message.params?.result?.number === "string"
+        )
+      );
+
+      // Full transport coverage of the remaining subscription types over
+      // the REAL WebSocket envelope: pending transactions (hash and full
+      // object variants) and criteria-filtered logs.
+      const pendingHashesResponse = await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_subscribe",
+        params: ["newPendingTransactions"],
+        id: 50,
+      });
+      const pendingObjectsResponse = await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_subscribe",
+        params: ["newPendingTransactions", true],
+        id: 51,
+      });
+
+      const wsTransfer = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_sendTransaction",
+        params: [{ from: SENDER, to: RAW_TX_RECEIVER, value: "0x1" }],
+        id: 52,
+      });
+      await waitFor(() =>
+        wsMessages.some(
+          (message) =>
+            message.method === "qrl_subscription" &&
+            message.params?.subscription === pendingHashesResponse.result &&
+            message.params?.result === wsTransfer.result
+        )
+      );
+      await waitFor(() =>
+        wsMessages.some(
+          (message) =>
+            message.method === "qrl_subscription" &&
+            message.params?.subscription === pendingObjectsResponse.result &&
+            message.params?.result?.hash === wsTransfer.result &&
+            typeof message.params?.result?.from === "string"
+        )
+      );
+
+      // Logs subscription: deploy a minimal LOG1 emitter (topic 0x...7b)
+      // through raw calldata and observe the pushed, criteria-matched log.
+      const LOG_TOPIC = `0x${"00".repeat(63)}7b`;
+      const loggerDeploy = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_sendTransaction",
+        params: [
+          {
+            from: SENDER,
+            data: "0x600b600a5f39600b5ff3602a5f52607b60405fc100",
+            gas: "0x30d40",
+          },
+        ],
+        id: 53,
+      });
+      const loggerReceipt = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_getTransactionReceipt",
+        params: [loggerDeploy.result],
+        id: 54,
+      });
+      const logsResponse = await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_subscribe",
+        params: [
+          "logs",
+          {
+            address: loggerReceipt.result.contractAddress,
+            topics: [LOG_TOPIC],
+          },
+        ],
+        id: 55,
+      });
+      await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_sendTransaction",
+        params: [
+          {
+            from: SENDER,
+            to: loggerReceipt.result.contractAddress,
+            gas: "0x30d40",
+          },
+        ],
+        id: 56,
+      });
+      await waitFor(() =>
+        wsMessages.some(
+          (message) =>
+            message.method === "qrl_subscription" &&
+            message.params?.subscription === logsResponse.result &&
+            message.params?.result?.topics?.[0] === LOG_TOPIC
+        )
+      );
+      await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_unsubscribe",
+        params: [pendingHashesResponse.result],
+        id: 57,
+      });
+      await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_unsubscribe",
+        params: [pendingObjectsResponse.result],
+        id: 58,
+      });
+      await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_unsubscribe",
+        params: [logsResponse.result],
+        id: 59,
+      });
+
+      // A SECOND connection cannot remove the first client's subscription
+      // (ids are sequential and guessable) and never receives its events.
+      const ws2 = new WebSocketClient(`ws://127.0.0.1:${port}`);
+      const ws2Messages: any[] = [];
+      ws2.on("message", (raw: any) => ws2Messages.push(JSON.parse(`${raw}`)));
+      await new Promise<void>((resolve, reject) => {
+        ws2.once("open", resolve);
+        ws2.once("error", reject);
+      });
+      const foreignUnsubscribe = await new Promise<any>((resolve, reject) => {
+        ws2.once("message", (raw: any) => resolve(JSON.parse(`${raw}`)));
+        ws2.once("error", reject);
+        ws2.send(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            method: "qrl_unsubscribe",
+            params: [subscriptionId],
+            id: 60,
+          })
+        );
+      });
+      assert.isFalse(foreignUnsubscribe.result);
+
+      // The subscription survived the foreign unsubscribe attempt. ws2
+      // stays CONNECTED through this mine, so the isolation assertion below
+      // covers live notification routing, not just a closed socket.
+      const beforeSurvivalCount = wsMessages.filter(
+        (message) => message.method === "qrl_subscription"
+      ).length;
+      await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_mine",
+        params: [],
+        id: 61,
+      });
+      await waitFor(
+        () =>
+          wsMessages.filter((message) => message.method === "qrl_subscription")
+            .length > beforeSurvivalCount
+      );
+
+      // The second, still-open client received NONE of the first client's
+      // notifications. Frames on distinct sockets have no ordering
+      // guarantee, so give a misrouted delivery a real window to arrive
+      // (and fail fast the moment one does) before asserting the absence.
+      await Promise.race([
+        new Promise((resolve) => setTimeout(resolve, 300)),
+        new Promise((_resolve, reject) =>
+          ws2.on("message", (raw: any) => {
+            if (JSON.parse(`${raw}`).method === "qrl_subscription") {
+              reject(
+                new Error("ws2 received a foreign qrl_subscription frame")
+              );
+            }
+          })
+        ),
+      ]);
+      assert.lengthOf(
+        ws2Messages.filter((message) => message.method === "qrl_subscription"),
+        0
+      );
+      ws2.close();
+
+      const unsubscribeResponse = await wsRequest({
+        jsonrpc: "2.0",
+        method: "qrl_unsubscribe",
+        params: [subscriptionId],
+        id: 42,
+      });
+      assert.isTrue(unsubscribeResponse.result);
+
+      // After unsubscribing, further blocks produce no notifications.
+      const notificationCount = wsMessages.filter(
+        (message) => message.method === "qrl_subscription"
+      ).length;
+      await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_mine",
+        params: [],
+        id: 43,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      assert.equal(
+        wsMessages.filter((message) => message.method === "qrl_subscription")
+          .length,
+        notificationCount
+      );
+
+      // Subscriptions require a push transport: over HTTP the method is
+      // rejected (as in go-qrl).
+      const httpSubscribe = await rpcRequest(port, {
+        jsonrpc: "2.0",
+        method: "qrl_subscribe",
+        params: ["newHeads"],
+        id: 44,
+      });
+      assert.isDefined(httpSubscribe.error);
+      // -32601, aligned with go-qrl's no-notification-transport error.
+      assert.equal(httpSubscribe.error.code, -32601);
+
+      ws.close();
+
       // Contract console.log printed in the NODE process, not the client.
       assert.include(node.output(), "store 42");
       assert.notInclude(scriptResult.stdout.toString(), "store 42");
