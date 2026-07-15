@@ -3,6 +3,7 @@ import fsExtra from "fs-extra";
 import path from "path";
 
 import {
+  buildHyperionStandardJsonInput,
   compileHyperion,
   HyperionInput,
 } from "../../../src/internal/hyperion/compiler";
@@ -197,17 +198,13 @@ function createStandardJsonOutput(options: {
 }
 
 function createEmptyInput(): HyperionInput {
-  return {
-    language: "Hyperion",
-    sourcePaths: [],
-    sources: {},
-    settings: {
-      optimizer: {
-        enabled: false,
-        runs: 200,
-      },
-    },
-  };
+  return buildHyperionStandardJsonInput(
+    {},
+    {
+      enabled: false,
+      runs: 200,
+    }
+  );
 }
 
 async function writeHypcArgsScript(

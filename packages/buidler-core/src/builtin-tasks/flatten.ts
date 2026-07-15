@@ -2,6 +2,7 @@ import { internalTask, task } from "../internal/core/config/config-env";
 import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
 import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
+import { getImportDirectives } from "../internal/hyperion/imports";
 import { ResolvedFile, ResolvedFilesMap } from "../internal/hyperion/resolver";
 import { getPackageJson } from "../internal/util/packageInfo";
 
@@ -47,9 +48,21 @@ function getSortedFiles(dependenciesGraph: DependencyGraph) {
 }
 
 function getFileWithoutImports(resolvedFile: ResolvedFile) {
-  const IMPORT_HYPERION_REGEX = /^\s*import(\s+).*$/gm;
+  // Remove EXACTLY the import directive ranges reported by the shared
+  // lexer: multi-line imports disappear completely, and code sharing a
+  // line with an import (e.g. `import "./A.hyp"; contract B {}`) survives.
+  const content = resolvedFile.content;
+  const directives = getImportDirectives(content);
 
-  return resolvedFile.content.replace(IMPORT_HYPERION_REGEX, "").trim();
+  let withoutImports = "";
+  let previousEnd = 0;
+  for (const directive of directives) {
+    withoutImports += content.slice(previousEnd, directive.start);
+    previousEnd = directive.end;
+  }
+  withoutImports += content.slice(previousEnd);
+
+  return withoutImports.trim();
 }
 
 export default function () {

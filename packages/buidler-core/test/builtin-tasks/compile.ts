@@ -112,6 +112,70 @@ describe("Compile task", function () {
   });
 });
 
+describe("Compile task with comment/string phantom imports", function () {
+  useFixtureProject("tricky-imports-project");
+  useEnvironment();
+  useHypcEnvironment();
+
+  beforeEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  afterEach(async function () {
+    await fsExtra.remove("artifacts");
+    await fsExtra.remove("cache");
+  });
+
+  it("caches despite imports inside comments and string literals", async function () {
+    // Tricky.hyp spells nonexistent imports inside comments and string
+    // literals. hypc compiles it fine; the dependency EXTRACTOR must not
+    // hallucinate those files, or cache checking degrades to permanent
+    // recompilation.
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    const artifact = await readArtifact(
+      this.env.config.paths.artifacts,
+      "Tricky"
+    );
+    assert.equal(artifact.contractName, "Tricky");
+
+    assert.isTrue(
+      await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
+    );
+  });
+
+  it("stores deterministic contract metadata in the compiler output cache", async function () {
+    // F10.2: metadata (with useLiteralContent) is requested and preserved
+    // through the standard-JSON adapter and the compiler cache, and is
+    // byte-identical across rebuilds of identical sources.
+    await this.env.run(TASK_COMPILE, { force: true });
+    const firstOutput = await fsExtra.readJson(
+      path.join(this.env.config.paths.cache, "compiler-output.json")
+    );
+    const firstMetadata =
+      firstOutput.contracts["contracts/Tricky.hyp"].Tricky.metadata;
+    assert.isString(firstMetadata);
+    const parsed = JSON.parse(firstMetadata);
+    assert.isDefined(parsed.settings);
+    assert.equal(parsed.settings.metadata.useLiteralContent, true);
+    // Literal content: the metadata embeds the sources themselves.
+    assert.isDefined(
+      parsed.sources["contracts/Tricky.hyp"].content,
+      "metadata must embed literal source content"
+    );
+
+    await this.env.run(TASK_COMPILE, { force: true });
+    const secondOutput = await fsExtra.readJson(
+      path.join(this.env.config.paths.cache, "compiler-output.json")
+    );
+    assert.equal(
+      secondOutput.contracts["contracts/Tricky.hyp"].Tricky.metadata,
+      firstMetadata
+    );
+  });
+});
+
 describe("Compile task compiler version check", function () {
   useFixtureProject("compiler-version-project");
   useEnvironment();
@@ -253,6 +317,27 @@ describe("Compile task cache", function () {
     }
   }
 
+  it("caches the exact standard JSON given to hypc, dependencies included", async function () {
+    await this.env.run(TASK_COMPILE, { force: true });
+
+    const cachedInput = await fsExtra.readJson(
+      path.join(this.env.config.paths.cache, "compiler-input.json")
+    );
+
+    // The cached input is the REAL standard JSON: full settings and every
+    // dependency-graph file, including the node_modules import.
+    assert.equal(cachedInput.language, "Hyperion");
+    assert.equal(cachedInput.settings.metadata.useLiteralContent, true);
+    assert.isDefined(cachedInput.settings.outputSelection);
+    assert.include(
+      Object.keys(cachedInput.sources).join(","),
+      "dep-lib/Lib.hyp"
+    );
+    assert.property(cachedInput.sources, "contracts/Consumer.hyp");
+    assert.isString(cachedInput.sources["contracts/Consumer.hyp"].content);
+    assert.isUndefined(cachedInput.sourcePaths);
+  });
+
   it("reports a cache hit when nothing changed", async function () {
     await this.env.run(TASK_COMPILE, { force: true });
 
@@ -363,6 +448,15 @@ describe("Compile task cache", function () {
       assert.isFalse(
         await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
       );
+
+      // The FULL compilation must also survive: hypc resolves the import
+      // from disk through --include-path even when our resolver cannot.
+      await this.env.run(TASK_COMPILE, { force: true });
+      const artifact = await readArtifact(
+        this.env.config.paths.artifacts,
+        "Consumer"
+      );
+      assert.equal(artifact.contractName, "Consumer");
     } finally {
       await fsExtra.writeFile(libPackageJsonPath(), packageJsonContent);
     }

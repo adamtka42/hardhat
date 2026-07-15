@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+// The ONLY real dependency of this file, imported across THREE lines:
+import {
+    TrickyLib
+} from "./Lib.hyp"; // trailing comment with ; import "./PhantomTrail.hyp";
+
+// import "./PhantomLine.hyp";
+/* import "./PhantomBlock.hyp"; */
+/*
+import "./PhantomMultiline.hyp";
+*/
+
+contract Tricky {
+    // A string literal spelling an import must not create a dependency:
+    string public constant DOC = 'import "./PhantomString.hyp";';
+    string public constant DOC2 = "import './PhantomString2.hyp';";
+
+    function probe(uint256 value) public pure returns (uint256) {
+        return TrickyLib.id(value);
+    }
+}

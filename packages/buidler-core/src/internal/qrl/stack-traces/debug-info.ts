@@ -82,10 +82,10 @@ export function loadQrlDebugInfo(
         astBySourceName.set(sourceName, source.ast);
       }
 
-      // The compiler input only carries project-local roots; imported
-      // sources (node_modules, symlinked packages) were read from disk by
-      // hypc. Recover their content the same way so library frames get real
-      // line numbers.
+      // The compiler input normally carries the FULL dependency graph, but
+      // the resolver-failure fallback ships only project-local roots and
+      // lets hypc read imports from disk. Recover such content the same way
+      // so library frames still get real line numbers.
       if (!sourceContent.has(sourceName) && projectRoot !== undefined) {
         const candidates = [
           path.join(projectRoot, sourceName),

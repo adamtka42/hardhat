@@ -14,6 +14,11 @@ const execFileAsync = promisify(execFile);
 // Standard JSON gives access to linkReferences (external library
 // placeholders), which the legacy combined-json output does not carry.
 // Note the output namespace is `qrvm`, not `evm`.
+//
+// F10 owns this generic outputSelection/adapter/cache plumbing; features
+// needing more compiler output (e.g. F3's `qrvm.methodIdentifiers`)
+// register their fields HERE and read them from the cached compiler
+// output — no parallel preservation paths.
 const HYPERION_OUTPUT_SELECTION = [
   "abi",
   "qrvm.bytecode.object",
@@ -22,33 +27,44 @@ const HYPERION_OUTPUT_SELECTION = [
   "qrvm.deployedBytecode.object",
   "qrvm.deployedBytecode.linkReferences",
   "qrvm.deployedBytecode.sourceMap",
+  // Deterministic compilation metadata (embeds literal sources); the
+  // foundation for reproducible builds and future source verification.
+  "metadata",
 ];
 
+// The FULL Hyperion standard JSON input: exactly what hypc receives, and
+// exactly what lands in cache/compiler-input.json — so a cached input can
+// faithfully reproduce its compilation.
 export interface HyperionInput {
   language: "Hyperion";
-  sourcePaths: string[];
   sources: { [sourceName: string]: { content: string } };
   settings: {
-    optimizer: HyperionOptimizerConfig;
+    optimizer: { enabled: boolean; runs?: number };
+    metadata: { useLiteralContent: true };
+    outputSelection: { "*": { "*": string[]; "": string[] } };
   };
 }
 
-export async function compileHyperion(
-  input: HyperionInput,
-  projectRoot: string,
-  compilerPath?: string
-): Promise<any> {
-  const hypcPath = resolveHypcPath(compilerPath, projectRoot);
-  const standardJsonInput = {
+/**
+ * Builds the complete standard JSON input from the dependency graph's
+ * sources. Single construction point: the compile task passes the result
+ * UNMODIFIED to `compileHyperion` and to the compiler-input cache.
+ */
+export function buildHyperionStandardJsonInput(
+  sources: HyperionInput["sources"],
+  optimizer: HyperionOptimizerConfig
+): HyperionInput {
+  return {
     language: "Hyperion",
-    sources: input.sources,
+    sources,
     settings: {
-      optimizer: input.settings.optimizer.enabled
-        ? {
-            enabled: true,
-            runs: input.settings.optimizer.runs,
-          }
+      optimizer: optimizer.enabled
+        ? { enabled: true, runs: optimizer.runs }
         : { enabled: false },
+      // useLiteralContent makes the metadata self-contained and
+      // deterministic: sources are embedded verbatim instead of being
+      // referenced by URL.
+      metadata: { useLiteralContent: true },
       outputSelection: {
         "*": {
           "*": HYPERION_OUTPUT_SELECTION,
@@ -59,6 +75,16 @@ export async function compileHyperion(
       },
     },
   };
+}
+
+export async function compileHyperion(
+  input: HyperionInput,
+  projectRoot: string,
+  compilerPath?: string
+): Promise<any> {
+  const hypcPath = resolveHypcPath(compilerPath, projectRoot);
+  // The input IS the standard JSON — passed through verbatim.
+  const standardJsonInput = input;
 
   // The input is passed through a temporary file instead of stdin so the
   // exec call stays a simple argv invocation on every platform.
@@ -174,6 +200,7 @@ function adaptStandardJsonOutput(stdout: string, stderr: string): any {
 
       output.contracts[sourceName][contractName] = {
         abi: contractOutput.abi !== undefined ? contractOutput.abi : [],
+        metadata: contractOutput.metadata,
         bytecodeOutput: {
           bytecode: adaptBytecodeOutput(qrvm.bytecode),
           deployedBytecode: adaptBytecodeOutput(qrvm.deployedBytecode),

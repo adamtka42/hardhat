@@ -14,7 +14,11 @@ import {
 import { internalTask, task, types } from "../internal/core/config/config-env";
 import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
-import { compileHyperion, HyperionInput } from "../internal/hyperion/compiler";
+import {
+  buildHyperionStandardJsonInput,
+  compileHyperion,
+  HyperionInput,
+} from "../internal/hyperion/compiler";
 import { resolveHyperionCompiler } from "../internal/hyperion/compiler-resolver";
 import { ResolvedHyperionCompiler } from "../internal/hyperion/compiler-types";
 import { getVersionMismatchWarning } from "../internal/hyperion/compiler-version";
@@ -101,24 +105,38 @@ export default function () {
   );
 
   internalTask(TASK_COMPILE_GET_COMPILER_INPUT, async (_, { config, run }) => {
-    const sourcePaths: string[] = await run(TASK_COMPILE_GET_SOURCE_PATHS);
+    // The input is the REAL standard JSON given to hypc: every file of the
+    // dependency graph (node_modules imports included), plus the exact
+    // settings — so the cached compiler-input.json faithfully reproduces
+    // the compilation.
     const sources: HyperionInput["sources"] = {};
 
-    for (const sourcePath of sourcePaths) {
-      const sourceName = path.relative(config.paths.root, sourcePath);
-      sources[sourceName] = {
-        content: await fsExtra.readFile(sourcePath, { encoding: "utf8" }),
-      };
+    try {
+      const dependencyGraph: DependencyGraph = await run(
+        TASK_COMPILE_GET_DEPENDENCY_GRAPH
+      );
+      for (const file of dependencyGraph.getResolvedFiles()) {
+        sources[file.globalName] = { content: file.content };
+      }
+    } catch (error) {
+      // Same principle as the cache check: OUR resolver must never break a
+      // build that hypc itself can complete (it resolves imports from disk
+      // through --base-path/--include-path). Fall back to the project's
+      // local sources and let the compiler do the resolution.
+      log(
+        "Could not resolve Hyperion dependencies for the compiler input, falling back to local sources: %s",
+        (error as Error).message
+      );
+      const sourcePaths: string[] = await run(TASK_COMPILE_GET_SOURCE_PATHS);
+      for (const sourcePath of sourcePaths) {
+        const sourceName = path.relative(config.paths.root, sourcePath);
+        sources[sourceName] = {
+          content: await fsExtra.readFile(sourcePath, { encoding: "utf8" }),
+        };
+      }
     }
 
-    return {
-      language: "Hyperion",
-      sourcePaths,
-      sources,
-      settings: {
-        optimizer: config.hyperion.optimizer,
-      },
-    };
+    return buildHyperionStandardJsonInput(sources, config.hyperion.optimizer);
   });
 
   internalTask(TASK_COMPILE_RESOLVE_COMPILER, async (_, { config }) => {

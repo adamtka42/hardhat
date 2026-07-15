@@ -8,7 +8,10 @@ import path from "path";
 import { promisify } from "util";
 
 import { ERRORS } from "../../../src/internal/core/errors-list";
-import { compileHyperion } from "../../../src/internal/hyperion/compiler";
+import {
+  buildHyperionStandardJsonInput,
+  compileHyperion,
+} from "../../../src/internal/hyperion/compiler";
 import {
   HyperionCompilerBuild,
   HyperionCompilersManifest,
@@ -124,16 +127,10 @@ describe("Hyperion compiler resolver and downloader", function () {
     assert.include(execution.stdout.toString(), LONG_VERSION);
 
     const output = await compileHyperion(
-      {
-        language: "Hyperion",
-        sourcePaths: ["contracts/A.hyp"],
-        sources: {
-          "contracts/A.hyp": { content: "contract A {}" },
-        },
-        settings: {
-          optimizer: { enabled: false, runs: 200 },
-        },
-      },
+      buildHyperionStandardJsonInput(
+        { "contracts/A.hyp": { content: "contract A {}" } },
+        { enabled: false, runs: 200 }
+      ),
       this.tmpDir,
       first.path
     );
