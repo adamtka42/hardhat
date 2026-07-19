@@ -7,6 +7,7 @@ export interface QrlSourceLocation {
   offset: number;
   length: number;
   sourceIndex: number;
+  jumpType: string;
 }
 
 /**
@@ -18,6 +19,7 @@ export function decodeQrlSourceMap(sourceMap: string): QrlSourceLocation[] {
   let offset = 0;
   let length = 0;
   let sourceIndex = -1;
+  let jumpType = "-";
 
   for (const entry of sourceMap.split(";")) {
     const fields = entry.split(":");
@@ -30,7 +32,10 @@ export function decodeQrlSourceMap(sourceMap: string): QrlSourceLocation[] {
     if (fields[2] !== undefined && fields[2] !== "") {
       sourceIndex = parseInt(fields[2], 10);
     }
-    locations.push({ offset, length, sourceIndex });
+    if (fields[3] !== undefined && fields[3] !== "") {
+      jumpType = fields[3];
+    }
+    locations.push({ offset, length, sourceIndex, jumpType });
   }
 
   return locations;

@@ -9,13 +9,13 @@ import {
 describe("QRL source maps", function () {
   describe("decodeQrlSourceMap", function () {
     it("decodes full and inherited entries", function () {
-      const locations = decodeQrlSourceMap("10:5:0:-;;20:3;:2:1");
+      const locations = decodeQrlSourceMap("10:5:0:i;;20:3::o;:2:1");
 
       assert.deepEqual(locations, [
-        { offset: 10, length: 5, sourceIndex: 0 },
-        { offset: 10, length: 5, sourceIndex: 0 },
-        { offset: 20, length: 3, sourceIndex: 0 },
-        { offset: 20, length: 2, sourceIndex: 1 },
+        { offset: 10, length: 5, sourceIndex: 0, jumpType: "i" },
+        { offset: 10, length: 5, sourceIndex: 0, jumpType: "i" },
+        { offset: 20, length: 3, sourceIndex: 0, jumpType: "o" },
+        { offset: 20, length: 2, sourceIndex: 1, jumpType: "o" },
       ]);
     });
   });

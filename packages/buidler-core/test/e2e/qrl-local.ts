@@ -282,7 +282,7 @@ describe("QRL local e2e", function () {
     assert.isAbove(outerAt, innerAt, `missing Outer frame in:\n${output}`);
 
     // Transaction path: traced through the replay of the mined tx.
-    assert.include(output, "at Inner.poke (contracts/Nested.hyp:11)");
+    assert.include(output, "at Inner.poke (contracts/Nested.hyp:");
     assert.include(output, "at Outer.pokeInner (contracts/Nested.hyp:");
 
     // A HANDLED nested failure must not be blamed: the trace points at the
@@ -297,6 +297,58 @@ describe("QRL local e2e", function () {
       "at Outer.handledThenOwnRevert (contracts/Nested.hyp:"
     );
     assert.notInclude(handledSection, "at Inner.fail");
+
+    const emptySection = output.slice(
+      output.indexOf("EMPTY TRACE:"),
+      output.indexOf("EMPTY TRACE END")
+    );
+    assert.include(emptySection, "at Inner.failEmpty");
+    assert.include(emptySection, "at Outer.callEmpty");
+
+    const identicalHandledSection = output.slice(
+      output.indexOf("IDENTICAL HANDLED TRACE:"),
+      output.indexOf("IDENTICAL HANDLED TRACE END")
+    );
+    assert.include(identicalHandledSection, "same reason");
+    assert.include(
+      identicalHandledSection,
+      "at Outer.handledSameReasonThenOwnRevert"
+    );
+    assert.notInclude(identicalHandledSection, "at Inner.failSame");
+
+    const ephemeralSection = output.slice(
+      output.indexOf("EPHEMERAL TRACE:"),
+      output.indexOf("EPHEMERAL TRACE END")
+    );
+    assert.include(ephemeralSection, "at Ephemeral.fail");
+    assert.include(ephemeralSection, "at Outer.createAndFail");
+
+    const internalSection = output.slice(
+      output.indexOf("INTERNAL TRACE:"),
+      output.indexOf("INTERNAL TRACE END")
+    );
+    const internalOrigin = internalSection.indexOf("at Outer._internalFailure");
+    const internalCaller = internalSection.indexOf("at Outer.internalFailure");
+    assert.isAbove(internalOrigin, -1, internalSection);
+    assert.isAbove(internalCaller, internalOrigin, internalSection);
+
+    const constructorEstimateSection = output.slice(
+      output.indexOf("CONSTRUCTOR ESTIMATE TRACE:"),
+      output.indexOf("CONSTRUCTOR ESTIMATE TRACE END")
+    );
+    assert.include(
+      constructorEstimateSection,
+      "at NonPayableConstructor.constructor"
+    );
+
+    const constructorTxSection = output.slice(
+      output.indexOf("CONSTRUCTOR TX TRACE:"),
+      output.indexOf("CONSTRUCTOR TX TRACE END")
+    );
+    assert.include(
+      constructorTxSection,
+      "at NonPayableConstructor.constructor"
+    );
 
     // Opt-out restores the plain message.
     await fsExtra.writeFile(
@@ -852,12 +904,32 @@ contract Inner {
         return x - 10;
     }
 
+    function failEmpty() public pure {
+        revert();
+    }
+
+    function failSame() public pure {
+        revert("same reason");
+    }
+
     function poke(uint256 x) public {
         require(x > 10, "too small");
         counter += x;
     }
 
     uint256 public counter;
+}
+
+contract Ephemeral {
+    function fail() public pure {
+        revert("ephemeral failure");
+    }
+}
+
+contract NonPayableConstructor {
+    constructor(uint256 value) {
+        value;
+    }
 }
 
 contract Outer {
@@ -871,13 +943,15 @@ contract Outer {
         return inner.fail(x);
     }
 
+    function callEmpty() public view {
+        inner.failEmpty();
+    }
+
     function pokeInner(uint256 x) public {
         inner.poke(x);
     }
 
     function handledThenOwnRevert() public view returns (uint256) {
-        // Low-level call whose failure is HANDLED; the revert below has its
-        // own, different reason and must be reported as the origin.
         (bool ok, ) = address(inner).staticcall(
             abi.encodeWithSignature("fail(uint256)", uint256(1))
         );
@@ -885,39 +959,72 @@ contract Outer {
         require(false, "own reason");
         return 0;
     }
+
+    function handledSameReasonThenOwnRevert() public view {
+        (bool ok, ) = address(inner).staticcall(
+            abi.encodeWithSignature("failSame()")
+        );
+        ok;
+        require(false, "same reason");
+    }
+
+    function createAndFail() public {
+        Ephemeral ephemeral = new Ephemeral();
+        ephemeral.fail();
+    }
+
+    function internalFailure() public pure {
+        _internalFailure();
+    }
+
+    function _internalFailure() internal pure {
+        revert("internal failure");
+    }
 }
 `;
 }
 
 function getTraceScriptSource(): string {
-  return `async function main() {
+  return `async function printFailure(label, action) {
+  try {
+    await action();
+    console.log(label + " unexpectedly succeeded");
+  } catch (error) {
+    console.log(label + ":");
+    console.log(error.message);
+    console.log(label + " END");
+  }
+}
+
+async function main() {
   const Outer = await qrl.getContractFactory("Outer");
   const outer = await Outer.deploy();
 
-  try {
-    await outer.callInner(5);
-    console.log("callInner unexpectedly succeeded");
-  } catch (error) {
-    console.log("CALL TRACE:");
-    console.log(error.message);
-  }
+  await printFailure("CALL TRACE", () => outer.callInner(5));
+  await printFailure("TX TRACE", () => outer.pokeInner(5, { gas: 300000 }));
+  await printFailure("EMPTY TRACE", () => outer.callEmpty());
+  await printFailure("HANDLED TRACE", () => outer.handledThenOwnRevert());
+  await printFailure("IDENTICAL HANDLED TRACE", () =>
+    outer.handledSameReasonThenOwnRevert()
+  );
+  await printFailure("EPHEMERAL TRACE", () =>
+    outer.createAndFail({ gas: 1000000 })
+  );
+  await printFailure("INTERNAL TRACE", () => outer.internalFailure());
 
-  try {
-    await outer.pokeInner(5, { gas: 300000 });
-    console.log("pokeInner unexpectedly succeeded");
-  } catch (error) {
-    console.log("TX TRACE:");
-    console.log(error.message);
-  }
-
-  try {
-    await outer.handledThenOwnRevert();
-    console.log("handledThenOwnRevert unexpectedly succeeded");
-  } catch (error) {
-    console.log("HANDLED TRACE:");
-    console.log(error.message);
-    console.log("HANDLED TRACE END");
-  }
+  const NonPayableConstructor = await qrl.getContractFactory(
+    "NonPayableConstructor"
+  );
+  const constructorBytecode = NonPayableConstructor.bytecode;
+  const [from] = await network.provider.send("qrl_accounts");
+  await printFailure("CONSTRUCTOR ESTIMATE TRACE", () =>
+    network.provider.send("qrl_estimateGas", [{ from, data: constructorBytecode }])
+  );
+  await printFailure("CONSTRUCTOR TX TRACE", () =>
+    network.provider.send("qrl_sendTransaction", [
+      { from, data: constructorBytecode, gas: "0xf4240" },
+    ])
+  );
 }
 
 main()

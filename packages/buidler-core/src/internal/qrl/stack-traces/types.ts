@@ -1,0 +1,29 @@
+import { QrlStackTraceEntry } from "./decoder";
+
+export enum QrlStackTraceEntryType {
+  CALLSTACK_ENTRY,
+  UNRECOGNIZED_CREATE_CALLSTACK_ENTRY,
+  UNRECOGNIZED_CONTRACT_CALLSTACK_ENTRY,
+  PRECOMPILE_ERROR,
+  REVERT_ERROR,
+  FUNCTION_NOT_PAYABLE_ERROR,
+  INVALID_PARAMS_ERROR,
+  FALLBACK_NOT_PAYABLE_ERROR,
+  UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR,
+  RETURNDATA_SIZE_ERROR,
+  NONCONTRACT_ACCOUNT_CALLED_ERROR,
+  CALL_FAILED_ERROR,
+  DIRECT_LIBRARY_CALL_ERROR,
+  UNRECOGNIZED_CREATE_ERROR,
+  UNRECOGNIZED_CONTRACT_ERROR,
+  OTHER_EXECUTION_ERROR,
+}
+
+export interface QrlStackTraceDiagnostic {
+  type: QrlStackTraceEntryType;
+  sourceReference?: QrlStackTraceEntry;
+  message?: Uint8Array;
+  value?: any;
+  address?: string;
+  precompile?: string;
+}

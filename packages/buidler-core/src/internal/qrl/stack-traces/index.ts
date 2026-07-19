@@ -1,104 +1,91 @@
 import { loadQrlDebugInfo, QrlDebugInfo } from "./debug-info";
 import { QrlStackTraceDecoder, QrlStackTraceEntry } from "./decoder";
+import { inferQrlStackTrace } from "./error-inferrer";
+import { QrlStackTraceDiagnostic, QrlStackTraceEntryType } from "./types";
 
-export { loadQrlDebugInfo, QrlStackTraceDecoder };
-export { QrlDebugInfo, QrlStackTraceEntry };
+export { inferQrlStackTrace, loadQrlDebugInfo, QrlStackTraceDecoder };
+export {
+  QrlDebugInfo,
+  QrlStackTraceDiagnostic,
+  QrlStackTraceEntry,
+  QrlStackTraceEntryType,
+};
 
-/**
- * Builds the `  at Contract.function (source:line)` lines for a failed
- * execution from the call tree returned by the local provider's frame
- * tracer. Follows the failing spine (innermost frame first) and silently
- * skips frames that cannot be decoded.
- */
+/** Builds source-level Hyperion stack-trace lines for a failed frame tree. */
 export async function buildQrlStackTraceLines(
   rootFrame: any,
-  decoder: QrlStackTraceDecoder,
-  getCode: (address: string) => Promise<string>
+  decoder: QrlStackTraceDecoder
 ): Promise<string[]> {
-  if (rootFrame === undefined || rootFrame.errorMessage === undefined) {
-    return [];
-  }
-
-  // Failing spine: from the root, keep descending into the last child whose
-  // NON-EMPTY revert payload equals the parent's — Hyperion bubbles nested
-  // failures by re-reverting with the child's returndata, so equal payloads
-  // are TREATED AS propagation and the trace descends. A handled child with
-  // a DIFFERENT payload is correctly not blamed. Two undecidable cases
-  // (without instruction-level analysis), both documented in the guide:
-  // - empty payloads never match, so an empty-revert bubble stops at the
-  //   parent (whose own location is still correct);
-  // - a HANDLED child whose reason is byte-identical to the parent's own
-  //   later revert is misattributed to the child.
-  const spine: any[] = [];
-  let current: any = rootFrame;
-  while (current !== undefined) {
-    spine.push(current);
-    const failingChildren = (current.children ?? []).filter(
-      (child: any) =>
-        child.errorMessage !== undefined &&
-        bytesEqual(child.returnValue, current.returnValue)
-    );
-    current = failingChildren[failingChildren.length - 1];
-  }
-
-  const lines: string[] = [];
-  // Innermost frame first, like a conventional stack trace.
-  for (const frame of spine.reverse()) {
-    const isCreate = frame.kind === "create" || frame.kind === "create2";
-    if (typeof frame.lastPc !== "number") {
-      continue;
-    }
-
-    let code: string;
-    if (isCreate) {
-      code = bytesToHex(frame.input);
-    } else {
-      if (frame.target === undefined) {
-        continue;
-      }
-      code = await getCode(frame.target.toString());
-    }
-
-    const entry = decoder.decodeFrame(code, frame.lastPc, isCreate);
-    if (entry === undefined) {
-      continue;
-    }
-
-    lines.push(
-      `  at ${entry.contractName}.${entry.functionName} (${entry.sourceName}:${entry.line})`
-    );
-  }
-
-  return lines;
+  const diagnostics = inferQrlStackTrace(rootFrame, decoder);
+  const lines = diagnostics
+    .map(formatDiagnostic)
+    .filter((line): line is string => line !== undefined);
+  const cause = formatInferredCause(diagnostics[0]);
+  return cause === undefined
+    ? lines
+    : [["  Error: ", cause].join(""), ...lines];
 }
 
-function bytesToHex(bytes: Uint8Array | undefined): string {
-  if (bytes === undefined) {
-    return "";
+function formatInferredCause(
+  diagnostic: QrlStackTraceDiagnostic | undefined
+): string | undefined {
+  if (diagnostic === undefined) {
+    return undefined;
   }
-  let hex = "";
-  for (const byte of bytes) {
-    hex += byte.toString(16).padStart(2, "0");
+  switch (diagnostic.type) {
+    case QrlStackTraceEntryType.PRECOMPILE_ERROR:
+      return [
+        "call to precompile ",
+        diagnostic.precompile ?? "unknown",
+        " failed",
+      ].join("");
+    case QrlStackTraceEntryType.FUNCTION_NOT_PAYABLE_ERROR:
+      return [
+        "non-payable function was called with value ",
+        String(diagnostic.value),
+      ].join("");
+    case QrlStackTraceEntryType.INVALID_PARAMS_ERROR:
+      return "function was called with incorrect parameters";
+    case QrlStackTraceEntryType.FALLBACK_NOT_PAYABLE_ERROR:
+      return [
+        "fallback function is not payable and was called with value ",
+        String(diagnostic.value),
+      ].join("");
+    case QrlStackTraceEntryType.UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR:
+      return "function selector was not recognized and there is no fallback function";
+    case QrlStackTraceEntryType.RETURNDATA_SIZE_ERROR:
+      return "function returned an unexpected amount of data";
+    case QrlStackTraceEntryType.NONCONTRACT_ACCOUNT_CALLED_ERROR:
+      return "function call targeted a non-contract account";
+    case QrlStackTraceEntryType.CALL_FAILED_ERROR:
+      return "function call failed to execute";
+    case QrlStackTraceEntryType.DIRECT_LIBRARY_CALL_ERROR:
+      return "library was called directly";
+    case QrlStackTraceEntryType.OTHER_EXECUTION_ERROR:
+      return "execution failed for an unrecognized reason";
+    default:
+      return undefined;
   }
-  return hex;
 }
 
-function bytesEqual(
-  a: Uint8Array | undefined,
-  b: Uint8Array | undefined
-): boolean {
-  if (
-    a === undefined ||
-    b === undefined ||
-    a.length === 0 ||
-    a.length !== b.length
-  ) {
-    return false;
+function formatDiagnostic(
+  diagnostic: QrlStackTraceDiagnostic
+): string | undefined {
+  const source = diagnostic.sourceReference;
+  if (source !== undefined) {
+    return `  at ${source.contractName}.${source.functionName} (${source.sourceName}:${source.line})`;
   }
-  for (let index = 0; index < a.length; index++) {
-    if (a[index] !== b[index]) {
-      return false;
-    }
+
+  switch (diagnostic.type) {
+    case QrlStackTraceEntryType.PRECOMPILE_ERROR:
+      return `  at <precompile> (${diagnostic.precompile ?? "unknown"})`;
+    case QrlStackTraceEntryType.UNRECOGNIZED_CREATE_ERROR:
+    case QrlStackTraceEntryType.UNRECOGNIZED_CREATE_CALLSTACK_ENTRY:
+      return "  at <UnrecognizedContract>.constructor";
+    case QrlStackTraceEntryType.UNRECOGNIZED_CONTRACT_ERROR:
+    case QrlStackTraceEntryType.UNRECOGNIZED_CONTRACT_CALLSTACK_ENTRY:
+      return `  at <UnrecognizedContract> (${diagnostic.address ?? "unknown"})`;
+    default:
+      return undefined;
   }
-  return true;
 }

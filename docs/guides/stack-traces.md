@@ -4,11 +4,11 @@ When a transaction or call reverts on `qrlLocal`, QRL Hardhat appends a
 Hyperion stack trace to the error: the chain of contracts and functions that
 led to the revert, with source file and line for every frame.
 
-~~~text
+```text
 Error: QRL execution reverted (reason: 'too small', tx: 0x3f8a…)
   at Inner.fail (contracts/Nested.hyp:6)
   at Outer.callInner (contracts/Nested.hyp:19)
-~~~
+```
 
 The innermost frame (where the `require`/`revert` fired) comes first, like a
 conventional stack trace. The decoded revert reason and the raw revert data
@@ -16,12 +16,14 @@ conventional stack trace. The decoded revert reason and the raw revert data
 
 ## How it works
 
-- The local VM records the call tree of the failing execution (for
-  transactions this is a replay of the mined transaction on retained
-  pre-block state, so historical transactions are traceable too).
-- The compiler's instruction source maps and ASTs — cached in
-  `cache/compiler-output.json` during compilation — map each frame's failure
-  point back to a `.hyp` source location and enclosing function.
+- The local VM records executed bytecode, ordered opcode positions, native
+  precompile markers, and nested frames. For transactions this is a replay of
+  the mined transaction on retained pre-block state, so historical transactions
+  and contracts created inside reverted executions remain traceable.
+- The compiler instruction source maps, ASTs, method identifiers, immutable
+  references, and version metadata are cached during compilation. They identify
+  runtime/init bytecode, map instructions to `.hyp` locations, reconstruct
+  internal calls, and recognize compiler-generated dispatch failures.
 
 ## Requirements and degradation
 
@@ -40,20 +42,20 @@ decoded-reason message — nothing breaks.
 
 Stack traces are on by default for `qrl-local` networks. Disable per network:
 
-~~~js
+```js
 qrlLocal: {
   type: "qrl-local",
   qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
   stackTraces: false,
 },
-~~~
+```
 
 ## debug_traceCall and debug_traceTransaction
 
 The underlying tracer is also exposed as the go-qrl-compatible `debug`
 namespace on `qrlLocal`:
 
-~~~js
+```js
 const trace = await network.provider.send("debug_traceTransaction", [txHash]);
 // { gas, failed, returnValue, structLogs: [{ pc, op, gas, gasCost, depth, stack }] }
 
@@ -62,7 +64,7 @@ const callTrace = await network.provider.send("debug_traceCall", [
   "latest",
   { disableStack: true },
 ]);
-~~~
+```
 
 Notes:
 
@@ -83,17 +85,34 @@ Notes:
   without storage; explicitly requesting it (`disableStorage: false`) fails
   with a clear error. Custom tracers (`tracer` config) are rejected too.
 
+## Diagnostic failure accounting
+
+Stack-trace generation is isolated from contract execution. If the collector,
+decoder, or inference pipeline fails internally, Hardhat preserves the original
+contract error and increments a diagnostic counter. The `hardhat test` task
+prints a warning when that counter is non-zero.
+
+The current value is available on `qrlLocal` for tooling and regression tests:
+
+```js
+const failures = await network.provider.send("qrl_getStackTraceFailuresCount");
+```
+
+A non-zero value reports a Hardhat/qrljs diagnostic failure, not a contract
+revert and not an unrecognized third-party contract.
+
 ## Limitations
 
-- The trace shows the failing call path with source locations; it does not
-  infer error causes the way upstream Hardhat's heuristics did (wrong
-  argument counts, non-payable transfers, etc.).
-- Frames whose bytecode cannot be matched to a compiled contract (e.g.
-  contracts deployed from other projects) are silently skipped.
-- Failure attribution follows matching revert payloads: an empty-payload
-  bubble stops at the outer contract, and a HANDLED nested failure whose
-  reason is byte-identical to the outer contract's own revert is attributed
-  to the inner one — both are undecidable without instruction-level
-  analysis.
-- Gas estimation failures of reverting transactions are traced through the
-  call path (`qrl_estimateGas` uses the same decoding).
+- Bytecode that is not present in the current compilation cache is rendered as
+  `<UnrecognizedContract>` with its QRL address. Its nested failure chain and
+  revert data are retained, but source file/function information is unavailable.
+- Source-level inference depends on compiler source maps and AST output. Missing
+  cache data degrades to the original provider error without affecting
+  execution.
+- Unlike Solidity/EVM library runtime code, current Hyperion library runtime
+  code permits direct calls. The three upstream direct-library-call errors
+  therefore have no QRL failure equivalent and ordinary library reverts are
+  not mislabeled.
+- Exact go-qrl `debug_trace*` storage capture and CALL/CREATE opcode gas-cost
+  semantics remain outside source-level stack-trace diagnostics; the deliberate
+  differences are listed above.

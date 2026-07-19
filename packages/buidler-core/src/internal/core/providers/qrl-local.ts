@@ -1,3 +1,4 @@
+import debug from "debug";
 import { EventEmitter } from "events";
 import fsExtra from "fs-extra";
 import path from "path";
@@ -22,6 +23,8 @@ import { ERRORS } from "../errors-list";
 
 import { numberToRpcQuantity } from "./provider-utils";
 
+const log = debug("buidler:core:qrl:stack-traces");
+
 const DEFAULT_CHAIN_ID = 1;
 const DEFAULT_BLOCK_GAS_LIMIT = 30000000;
 
@@ -37,6 +40,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
   private readonly _projectRoot?: string;
   private _stackTraceDecoder?: QrlStackTraceDecoder | null;
   private _stackTraceCacheMtime?: number;
+  private _stackTraceFailures = 0;
 
   constructor(config: QrlLocalNetworkConfig, paths?: ProjectPaths) {
     super();
@@ -160,6 +164,8 @@ export class QrlLocalHardhatProvider extends EventEmitter
         return [...this._accounts];
       case "qrl_gasPrice":
         return "0x0";
+      case "qrl_getStackTraceFailuresCount":
+        return this._stackTraceFailures;
       case "qrl_sign":
         return this._signWithLocalSeed(params);
       default:
@@ -170,7 +176,9 @@ export class QrlLocalHardhatProvider extends EventEmitter
           if (this._stackTracesEnabled) {
             try {
               await this._appendStackTrace(enriched, method, params);
-            } catch {
+            } catch (stackTraceError) {
+              this._stackTraceFailures += 1;
+              log("Failed to generate a QRL stack trace: %O", stackTraceError);
               // Stack trace decoding must never mask the original error.
             }
           }
@@ -204,8 +212,17 @@ export class QrlLocalHardhatProvider extends EventEmitter
       (method === "qrl_call" || method === "qrl_estimateGas") &&
       params[0] !== undefined
     ) {
-      rootFrame = await this._provider.traceCallFrames(params[0]);
+      rootFrame =
+        method === "qrl_estimateGas"
+          ? await this._provider.traceEstimateGasFrames(params[0], params[1])
+          : await this._provider.traceCallFrames(params[0], params[1]);
     } else {
+      return;
+    }
+
+    if (typeof rootFrame?.traceError === "string") {
+      this._stackTraceFailures += 1;
+      log("QRL frame collector failed: %s", rootFrame.traceError);
       return;
     }
 
@@ -214,12 +231,7 @@ export class QrlLocalHardhatProvider extends EventEmitter
       return;
     }
 
-    const lines = await buildQrlStackTraceLines(rootFrame, decoder, (address) =>
-      this._provider.request({
-        method: "qrl_getCode",
-        params: [address, "latest"],
-      })
-    );
+    const lines = await buildQrlStackTraceLines(rootFrame, decoder);
     if (lines.length > 0) {
       error.message = `${error.message}\n${lines.join("\n")}`;
     }
@@ -337,6 +349,18 @@ function createRawTransactionSigner(utilQrl: any, chainId: number): any {
   };
 }
 const PANIC_SELECTOR = "0x4e487b71";
+const PANIC_DESCRIPTIONS: { [code: string]: string } = {
+  "0": "generic compiler panic",
+  "1": "assertion failed",
+  "17": "arithmetic underflow or overflow",
+  "18": "division or modulo by zero",
+  "33": "invalid enum conversion",
+  "34": "incorrectly encoded storage byte array",
+  "49": "pop on an empty array",
+  "50": "array index out of bounds",
+  "65": "too much memory allocated",
+  "81": "call to an uninitialized internal function",
+};
 
 /**
  * Adds the decoded revert reason and the failed transaction hash to local
@@ -389,7 +413,9 @@ function decodeQrlRevertReason(data: unknown): string | undefined {
         "Panic(uint256)",
         body
       );
-      return `panic code: 0x${code.toString(16)}`;
+      const description = PANIC_DESCRIPTIONS[code.toString(10)];
+      const suffix = description === undefined ? "" : ` (${description})`;
+      return `panic code: 0x${code.toString(16)}${suffix}`;
     }
   } catch {
     return undefined;

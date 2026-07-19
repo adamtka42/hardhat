@@ -13,6 +13,13 @@ export interface QrlStackTraceEntry {
   line: number;
 }
 
+export interface QrlResolvedSourceLocation {
+  sourceName: string;
+  offset: number;
+  length: number;
+  jumpType: string;
+}
+
 interface PreparedContract {
   info: QrlContractDebugInfo;
   deployedNormalized: string;
@@ -21,6 +28,13 @@ interface PreparedContract {
   bytecodeLocations?: QrlSourceLocation[];
   deployedPcMap?: number[];
   bytecodePcMap?: number[];
+  deployedRanges: CodeRange[];
+  bytecodeRanges: CodeRange[];
+}
+
+interface CodeRange {
+  start: number;
+  length: number;
 }
 
 const PLACEHOLDER_PATTERN = /__\$[0-9a-f]{122}\$__/g;
@@ -35,15 +49,23 @@ export class QrlStackTraceDecoder {
   private readonly _prepared: PreparedContract[];
 
   constructor(private readonly _debugInfo: QrlDebugInfo) {
-    this._prepared = _debugInfo.contracts.map((info) => ({
-      info,
-      deployedNormalized: normalizeCode(info.deployedBytecode, [
-        ...linkReferencePositions(info.deployedLinkReferences),
-      ]),
-      bytecodeNormalized: normalizeCode(info.bytecode, [
-        ...linkReferencePositions(info.linkReferences),
-      ]),
-    }));
+    this._prepared = _debugInfo.contracts.map((info) => {
+      const deployedRanges = [
+        ...linkReferenceRanges(info.deployedLinkReferences),
+        ...immutableReferenceRanges(info.immutableReferences),
+      ];
+      const bytecodeRanges = linkReferenceRanges(info.linkReferences);
+      return {
+        info,
+        deployedRanges,
+        bytecodeRanges,
+        deployedNormalized: normalizeCode(
+          info.deployedBytecode,
+          deployedRanges
+        ),
+        bytecodeNormalized: normalizeCode(info.bytecode, bytecodeRanges),
+      };
+    });
   }
 
   /**
@@ -51,6 +73,13 @@ export class QrlStackTraceDecoder {
    * executed in the frame (deployed code for calls, init code for creates);
    * `pc` is the frame's failure point.
    */
+  public identifyContract(
+    code: string,
+    isCreate: boolean
+  ): QrlContractDebugInfo | undefined {
+    return this._identify(code, isCreate)?.info;
+  }
+
   public decodeFrame(
     code: string,
     pc: number,
@@ -99,6 +128,101 @@ export class QrlStackTraceDecoder {
     };
   }
 
+  public getSourceLocation(
+    code: string,
+    pc: number,
+    isCreate: boolean
+  ): QrlResolvedSourceLocation | undefined {
+    const contract = this._identify(code, isCreate);
+    if (contract === undefined) {
+      return undefined;
+    }
+    const locations = this._locationsFor(contract, isCreate);
+    const pcMap = this._pcMapFor(contract, isCreate);
+    if (locations === undefined || pcMap === undefined) {
+      return undefined;
+    }
+    const instruction = pcMap[pc];
+    const location =
+      instruction === undefined ? undefined : locations[instruction];
+    if (location === undefined || location.sourceIndex < 0) {
+      return undefined;
+    }
+    const sourceName = this._debugInfo.sourceNamesByIndex.get(
+      location.sourceIndex
+    );
+    return sourceName === undefined
+      ? undefined
+      : {
+          sourceName,
+          offset: location.offset,
+          length: location.length,
+          jumpType: location.jumpType,
+        };
+  }
+
+  public decodeContractStart(
+    contract: QrlContractDebugInfo,
+    functionIdentifier?: string
+  ): QrlStackTraceEntry | undefined {
+    const ast = this._debugInfo.astBySourceName.get(contract.sourceName);
+    const content = this._debugInfo.sourceContent.get(contract.sourceName);
+    let contractNode: any;
+    visitAstNodes(ast, (node) => {
+      if (
+        contractNode === undefined &&
+        node.nodeType === "ContractDefinition" &&
+        node.name === contract.contractName
+      ) {
+        contractNode = node;
+      }
+    });
+    if (contractNode === undefined) {
+      return undefined;
+    }
+
+    let selected = contractNode;
+    if (functionIdentifier !== undefined) {
+      const normalized =
+        functionIdentifier === "<fallback>" ? "fallback" : functionIdentifier;
+      const functionName = identifierFunctionName(normalized);
+      const candidates = (contractNode.nodes ?? []).filter((node: any) => {
+        if (node.nodeType !== "FunctionDefinition") {
+          return false;
+        }
+        if (
+          functionName === "constructor" ||
+          functionName === "fallback" ||
+          functionName === "receive"
+        ) {
+          return node.kind === functionName;
+        }
+        return node.name === functionName;
+      });
+      const candidate =
+        candidates.find(
+          (node: any) => functionNodeSignature(node) === normalized
+        ) ?? candidates[0];
+      if (candidate !== undefined) {
+        selected = candidate;
+      }
+    }
+
+    const location = parseSrc(selected.src);
+    if (location === undefined) {
+      return undefined;
+    }
+    return {
+      contractName: contract.contractName,
+      functionName:
+        functionIdentifier === undefined
+          ? "<unknown>"
+          : identifierFunctionName(functionIdentifier),
+      sourceName: contract.sourceName,
+      line: content === undefined ? 0 : offsetToLine(content, location.offset),
+    };
+  }
+
   private _identify(
     code: string,
     isCreate: boolean
@@ -108,6 +232,7 @@ export class QrlStackTraceDecoder {
       return undefined;
     }
 
+    let match: PreparedContract | undefined;
     for (const candidate of this._prepared) {
       const reference = isCreate
         ? candidate.bytecodeNormalized
@@ -115,18 +240,20 @@ export class QrlStackTraceDecoder {
       if (reference === "") {
         continue;
       }
-      // Init code carries appended constructor arguments, so match creates
-      // by prefix; deployed code must match exactly.
-      const normalized = normalizeAgainst(stripped, reference);
+      const normalized = normalizeAgainst(
+        stripped,
+        isCreate ? candidate.bytecodeRanges : candidate.deployedRanges
+      );
       const matches = isCreate
         ? normalized.startsWith(reference)
         : normalized === reference;
       if (matches) {
-        return candidate;
+        // Keep the last match, matching the baseline collision policy.
+        match = candidate;
       }
     }
 
-    return undefined;
+    return match;
   }
 
   private _locationsFor(
@@ -215,50 +342,98 @@ export class QrlStackTraceDecoder {
   }
 }
 
-function linkReferencePositions(linkReferences: any): number[] {
-  const positions: number[] = [];
+function identifierFunctionName(identifier: string): string {
+  const open = identifier.indexOf("(");
+  return open === -1 ? identifier : identifier.slice(0, open);
+}
+
+function functionNodeSignature(node: any): string | undefined {
+  if (typeof node.name !== "string" || node.name === "") {
+    return undefined;
+  }
+  const parameters = node.parameters?.parameters;
+  if (!Array.isArray(parameters)) {
+    return undefined;
+  }
+  const types: string[] = [];
+  for (const parameter of parameters) {
+    const type = canonicalAstParameterType(parameter);
+    if (type === undefined) {
+      return undefined;
+    }
+    types.push(type);
+  }
+  return [node.name, "(", types.join(","), ")"].join("");
+}
+
+function canonicalAstParameterType(parameter: any): string | undefined {
+  const typeString = parameter?.typeDescriptions?.typeString;
+  if (typeof typeString !== "string") {
+    return undefined;
+  }
+  return typeString
+    .replace(/\s+(memory|calldata|storage)(\s+ref)?/g, "")
+    .replace(/^contract\s+[^\[]+/, "address")
+    .replace(/\s+/g, "");
+}
+
+function linkReferenceRanges(linkReferences: any): CodeRange[] {
+  const ranges: CodeRange[] = [];
   for (const sourceName of Object.keys(linkReferences ?? {})) {
     for (const libraryName of Object.keys(linkReferences[sourceName])) {
       for (const position of linkReferences[sourceName][libraryName]) {
-        positions.push(position.start);
+        ranges.push({ start: position.start, length: position.length ?? 64 });
       }
     }
   }
-  return positions;
+  return ranges;
 }
 
-/**
- * Zeroes both the `__$...$__` placeholders and the link-reference regions so
- * artifact code and on-chain (linked) code compare equal.
- */
-function normalizeCode(code: string, linkPositions: number[]): string {
+// Hyperion currently emits length 32 for immutable PUSH64 operands. Accept
+// that legacy metadata as a 64-byte QRL word while preserving explicit
+// non-legacy lengths for forward compatibility.
+function immutableReferenceRanges(immutableReferences: any): CodeRange[] {
+  const ranges: CodeRange[] = [];
+  for (const references of Object.values<any>(immutableReferences ?? {})) {
+    for (const reference of references) {
+      ranges.push({
+        start: reference.start,
+        length: reference.length === 32 ? 64 : reference.length,
+      });
+    }
+  }
+  return ranges;
+}
+
+/** Zeroes compiler-patched regions so compiled and executed code compare equal. */
+function normalizeCode(code: string, ranges: CodeRange[]): string {
   let normalized = stripHexPrefix(code)
     .toLowerCase()
     .replace(PLACEHOLDER_PATTERN, PLACEHOLDER_FILLER);
-  for (const start of linkPositions) {
-    const from = start * 2;
+  for (const range of ranges) {
+    const from = range.start * 2;
+    const length = range.length * 2;
     normalized =
       normalized.slice(0, from) +
-      PLACEHOLDER_FILLER +
-      normalized.slice(from + 128);
+      "0".repeat(length) +
+      normalized.slice(from + length);
   }
   return normalized;
 }
 
-/** Zeroes the reference's link regions inside on-chain code before comparing. */
-function normalizeAgainst(code: string, reference: string): string {
+/** Zeroes compiler-patched regions inside executed code before comparing. */
+function normalizeAgainst(code: string, ranges: CodeRange[]): string {
   let normalized = code;
-  let searchFrom = 0;
-  while (true) {
-    const zeroRun = reference.indexOf(PLACEHOLDER_FILLER, searchFrom);
-    if (zeroRun === -1 || zeroRun + 128 > normalized.length) {
-      break;
+  for (const range of ranges) {
+    const from = range.start * 2;
+    const length = range.length * 2;
+    if (from + length > normalized.length) {
+      continue;
     }
     normalized =
-      normalized.slice(0, zeroRun) +
-      PLACEHOLDER_FILLER +
-      normalized.slice(zeroRun + 128);
-    searchFrom = zeroRun + 128;
+      normalized.slice(0, from) +
+      "0".repeat(length) +
+      normalized.slice(from + length);
   }
   return normalized;
 }

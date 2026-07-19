@@ -161,6 +161,41 @@ describe("Hyperion compiler", function () {
       linkReferences
     );
   });
+
+  it("preserves stack-trace compiler output", async function () {
+    let hypcPath = path.join(this.tmpDir, "hypc");
+    const immutableReferences = {
+      "1": [{ start: 2, length: 64 }],
+    };
+    const methodIdentifiers = {
+      "transfer(address,uint256)": "a9059cbb",
+    };
+    const standardOutput = createStandardJsonOutput({
+      bytecodeObject: "0x6000",
+      immutableReferences,
+      methodIdentifiers,
+    });
+    hypcPath = await writeHypcScript(hypcPath, JSON.stringify(standardOutput));
+    process.env.HYPERION_HYPC_PATH = hypcPath;
+
+    const input = createEmptyInput();
+    assert.include(
+      input.settings.outputSelection["*"]["*"],
+      "qrvm.methodIdentifiers"
+    );
+    assert.include(
+      input.settings.outputSelection["*"]["*"],
+      "qrvm.deployedBytecode.immutableReferences"
+    );
+
+    const output = await compileHyperion(input, this.tmpDir);
+    const contract = output.contracts["contracts/Token.hyp"].Token;
+    assert.deepEqual(contract.methodIdentifiers, methodIdentifiers);
+    assert.deepEqual(
+      contract.bytecodeOutput.deployedBytecode.immutableReferences,
+      immutableReferences
+    );
+  });
 });
 
 interface CapturedHypcArgs {
@@ -172,6 +207,8 @@ interface CapturedHypcArgs {
 function createStandardJsonOutput(options: {
   bytecodeObject: string;
   linkReferences?: any;
+  immutableReferences?: any;
+  methodIdentifiers?: any;
 }): any {
   const linkReferences =
     options.linkReferences !== undefined ? options.linkReferences : {};
@@ -182,6 +219,7 @@ function createStandardJsonOutput(options: {
         Token: {
           abi: [],
           qrvm: {
+            methodIdentifiers: options.methodIdentifiers,
             bytecode: {
               object: options.bytecodeObject,
               linkReferences,
@@ -189,6 +227,7 @@ function createStandardJsonOutput(options: {
             deployedBytecode: {
               object: "0x00",
               linkReferences,
+              immutableReferences: options.immutableReferences,
             },
           },
         },

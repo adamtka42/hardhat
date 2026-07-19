@@ -27,6 +27,8 @@ const HYPERION_OUTPUT_SELECTION = [
   "qrvm.deployedBytecode.object",
   "qrvm.deployedBytecode.linkReferences",
   "qrvm.deployedBytecode.sourceMap",
+  "qrvm.deployedBytecode.immutableReferences",
+  "qrvm.methodIdentifiers",
   // Deterministic compilation metadata (embeds literal sources); the
   // foundation for reproducible builds and future source verification.
   "metadata",
@@ -201,6 +203,7 @@ function adaptStandardJsonOutput(stdout: string, stderr: string): any {
       output.contracts[sourceName][contractName] = {
         abi: contractOutput.abi !== undefined ? contractOutput.abi : [],
         metadata: contractOutput.metadata,
+        methodIdentifiers: qrvm.methodIdentifiers ?? {},
         bytecodeOutput: {
           bytecode: adaptBytecodeOutput(qrvm.bytecode),
           deployedBytecode: adaptBytecodeOutput(qrvm.deployedBytecode),
@@ -236,6 +239,7 @@ function adaptBytecodeOutput(
   object: string;
   linkReferences: any;
   sourceMap?: string;
+  immutableReferences: any;
 } {
   return {
     object: stripHexPrefix(
@@ -250,6 +254,11 @@ function adaptBytecodeOutput(
         : {},
     sourceMap:
       bytecodeOutput !== undefined ? bytecodeOutput.sourceMap : undefined,
+    immutableReferences:
+      bytecodeOutput !== undefined &&
+      bytecodeOutput.immutableReferences !== undefined
+        ? bytecodeOutput.immutableReferences
+        : {},
   };
 }
 

@@ -238,6 +238,36 @@ describe("QRL local Hardhat provider", function () {
     assert.equal(receipt.status, "0x0");
   });
 
+  it("counts collector failures without masking the contract error", async () => {
+    const provider = createLocalProviderWithReverter();
+    const contractAddress = await deployReverter(provider);
+    const runtimeProvider = (provider as any)._provider;
+    runtimeProvider.traceTransactionFrames = async () => ({
+      kind: "call",
+      depth: 0,
+      input: new Uint8Array(0),
+      value: (global as any).BigInt(0),
+      gasLimit: (global as any).BigInt(0),
+      steps: [],
+      children: [],
+      errorMessage: "revert",
+      traceError: "collector failed",
+    });
+
+    let caught: any;
+    try {
+      await provider.send("qrl_sendTransaction", [
+        { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      ]);
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.isDefined(caught);
+    assert.match(caught.message, /revert/i);
+    assert.equal(await provider.send("qrl_getStackTraceFailuresCount"), 1);
+  });
+
   it("returns silent status-0 receipts when throwOnTransactionFailures is false", async () => {
     const provider = createLocalProviderWithReverter({
       throwOnTransactionFailures: false,
@@ -276,6 +306,28 @@ describe("QRL local Hardhat provider", function () {
 
     assert.isDefined(caught);
     assert.include(caught.message, "reason: 'locked'");
+  });
+
+  it("decodes Panic codes with their standard names", async () => {
+    const provider = createLocalProviderWithReverter();
+    const panicData = `4e487b71${"11".padStart(128, "0")}`;
+    const contractAddress = await deployRuntime(
+      provider,
+      revertWithPayloadRuntime(panicData)
+    );
+
+    let caught: any;
+    try {
+      await provider.send("qrl_call", [
+        { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      ]);
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.isDefined(caught);
+    assert.include(caught.message, "panic code: 0x11");
+    assert.include(caught.message, "arithmetic underflow or overflow");
   });
 
   it("serves the RPC compatibility surface with go-qrl shapes", async () => {

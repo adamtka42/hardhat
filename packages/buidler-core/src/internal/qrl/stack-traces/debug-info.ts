@@ -9,12 +9,17 @@ import {
 export interface QrlContractDebugInfo {
   sourceName: string;
   contractName: string;
+  abi: any[];
+  contractKind?: string;
   bytecode: string;
   bytecodeSourceMap?: string;
   deployedBytecode: string;
   deployedSourceMap?: string;
   linkReferences: any;
   deployedLinkReferences: any;
+  immutableReferences: any;
+  methodIdentifiers: { [signature: string]: string };
+  compilerVersion?: string;
 }
 
 export interface QrlDebugInfo {
@@ -45,6 +50,7 @@ export function loadQrlDebugInfo(
     );
 
     const contracts: QrlContractDebugInfo[] = [];
+    const fallbackCompilerVersion = readCachedCompilerVersion(cachePath);
     for (const sourceName of Object.keys(output.contracts ?? {})) {
       for (const contractName of Object.keys(output.contracts[sourceName])) {
         const contractOutput = output.contracts[sourceName][contractName];
@@ -52,6 +58,11 @@ export function loadQrlDebugInfo(
         contracts.push({
           sourceName,
           contractName,
+          abi: contractOutput.abi ?? [],
+          contractKind: findContractKind(
+            output.sources?.[sourceName]?.ast,
+            contractName
+          ),
           bytecode: bytecodeOutput.bytecode?.object ?? "",
           bytecodeSourceMap: bytecodeOutput.bytecode?.sourceMap,
           deployedBytecode: bytecodeOutput.deployedBytecode?.object ?? "",
@@ -59,6 +70,12 @@ export function loadQrlDebugInfo(
           linkReferences: bytecodeOutput.bytecode?.linkReferences ?? {},
           deployedLinkReferences:
             bytecodeOutput.deployedBytecode?.linkReferences ?? {},
+          immutableReferences:
+            bytecodeOutput.deployedBytecode?.immutableReferences ?? {},
+          methodIdentifiers: contractOutput.methodIdentifiers ?? {},
+          compilerVersion:
+            readCompilerVersion(contractOutput.metadata) ??
+            fallbackCompilerVersion,
         });
       }
     }
@@ -106,6 +123,68 @@ export function loadQrlDebugInfo(
     }
 
     return { contracts, sourceContent, sourceNamesByIndex, astBySourceName };
+  } catch {
+    return undefined;
+  }
+}
+
+function findContractKind(ast: any, contractName: string): string | undefined {
+  let kind: string | undefined;
+  visitNodes(ast, (node) => {
+    if (
+      kind === undefined &&
+      node.nodeType === "ContractDefinition" &&
+      node.name === contractName &&
+      typeof node.contractKind === "string"
+    ) {
+      kind = node.contractKind;
+    }
+  });
+  return kind;
+}
+
+function visitNodes(node: any, visit: (node: any) => void): void {
+  if (node === null || typeof node !== "object") {
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      visitNodes(child, visit);
+    }
+    return;
+  }
+  visit(node);
+  for (const child of Object.values(node)) {
+    visitNodes(child, visit);
+  }
+}
+
+function readCachedCompilerVersion(cachePath: string): string | undefined {
+  try {
+    const config = fsExtra.readJsonSync(
+      path.join(cachePath, "last-compiler-config.json")
+    );
+    if (typeof config?.compiler?.longVersion === "string") {
+      return config.compiler.longVersion;
+    }
+    const configured = config?.hyperion?.version;
+    return typeof configured === "string" && configured !== "local"
+      ? configured
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readCompilerVersion(metadata: unknown): string | undefined {
+  if (typeof metadata !== "string") {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(metadata);
+    return typeof parsed?.compiler?.version === "string"
+      ? parsed.compiler.version
+      : undefined;
   } catch {
     return undefined;
   }
