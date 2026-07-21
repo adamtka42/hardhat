@@ -5,11 +5,93 @@ import * as os from "os";
 import * as path from "path";
 import { promisify } from "util";
 
-import { HyperionOptimizerConfig } from "../../types";
+import { HyperionConfig, HyperionOptimizerConfig } from "../../types";
+import { HardhatError } from "../core/errors";
+import { ERRORS } from "../core/errors-list";
 
-import { resolveHypcPath } from "./compiler-version";
+import { HyperionCompilerDownloader } from "./compiler-downloader";
+import {
+  LocalCompilerIdentity,
+  ResolvedHyperionCompiler,
+} from "./compiler-types";
+import { getCompilerFingerprint, resolveHypcPath } from "./compiler-version";
 
 const execFileAsync = promisify(execFile);
+
+export const HYPERION_COMPILER_REPOSITORY_ENV =
+  "HYPERION_COMPILER_REPOSITORY_URL";
+
+const DEFAULT_HYPERION_COMPILER_REPOSITORY_URL: string | undefined = undefined;
+
+export class Compiler {
+  private _resolvedCompiler?: Promise<ResolvedHyperionCompiler>;
+
+  constructor(
+    private readonly _config: HyperionConfig,
+    private readonly _projectRoot: string,
+    private readonly _cacheDir: string
+  ) {}
+
+  public async compile(input: HyperionInput): Promise<any> {
+    const compiler = await this.getCompiler();
+    return compileHyperion(input, this._projectRoot, compiler.path);
+  }
+
+  public async getCompiler(): Promise<ResolvedHyperionCompiler> {
+    if (this._resolvedCompiler === undefined) {
+      this._resolvedCompiler = this._resolveCompiler();
+    }
+
+    return this._resolvedCompiler;
+  }
+
+  private async _resolveCompiler(): Promise<ResolvedHyperionCompiler> {
+    const repositoryUrl =
+      this._config.compilerRepositoryUrl ??
+      process.env[HYPERION_COMPILER_REPOSITORY_ENV] ??
+      DEFAULT_HYPERION_COMPILER_REPOSITORY_URL;
+    const hasExplicitLocalCompiler =
+      this._config.compilerPath !== undefined ||
+      process.env.HYPERION_HYPC_PATH !== undefined ||
+      process.env.HYPC_PATH !== undefined;
+
+    if (
+      this._config.version !== "local" &&
+      repositoryUrl !== undefined &&
+      !hasExplicitLocalCompiler
+    ) {
+      const downloader = new HyperionCompilerDownloader(
+        repositoryUrl,
+        path.join(this._cacheDir, "hyperion-compilers")
+      );
+      return downloader.resolve(this._config.version);
+    }
+
+    const selectedPath = resolveHypcPath(
+      this._config.compilerPath,
+      this._projectRoot
+    );
+    const fingerprint = await getCompilerFingerprint(
+      selectedPath,
+      this._projectRoot
+    );
+    if (fingerprint === undefined) {
+      throw new HardhatError(ERRORS.BUILTIN_TASKS.HYPERION_COMPILER_NOT_FOUND, {
+        path: selectedPath,
+      });
+    }
+
+    const identity: LocalCompilerIdentity = fingerprint;
+    return {
+      path: fingerprint.resolvedPath,
+      source: "local",
+      version:
+        this._config.version === "local" ? undefined : this._config.version,
+      longVersion: fingerprint.longVersion,
+      identity,
+    };
+  }
+}
 
 // Standard JSON gives access to linkReferences (external library
 // placeholders), which the legacy combined-json output does not carry.

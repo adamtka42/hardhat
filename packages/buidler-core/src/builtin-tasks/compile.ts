@@ -16,11 +16,9 @@ import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
 import {
   buildHyperionStandardJsonInput,
-  compileHyperion,
+  Compiler,
   HyperionInput,
 } from "../internal/hyperion/compiler";
-import { resolveHyperionCompiler } from "../internal/hyperion/compiler-resolver";
-import { ResolvedHyperionCompiler } from "../internal/hyperion/compiler-types";
 import { getVersionMismatchWarning } from "../internal/hyperion/compiler-version";
 import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
 import { Resolver } from "../internal/hyperion/resolver";
@@ -37,12 +35,15 @@ import {
   TASK_COMPILE_GET_DEPENDENCY_GRAPH,
   TASK_COMPILE_GET_RESOLVED_SOURCES,
   TASK_COMPILE_GET_SOURCE_PATHS,
-  TASK_COMPILE_RESOLVE_COMPILER,
   TASK_COMPILE_RUN_COMPILER,
 } from "./task-names";
 import { areArtifactsCached, cacheHardhatConfig } from "./utils/cache";
 
 const log = debug("buidler:core:tasks:compile");
+
+function createCompiler(config: ResolvedHardhatConfig): Compiler {
+  return new Compiler(config.hyperion, config.paths.root, config.paths.cache);
+}
 
 async function cacheCompilerJsonFiles(
   config: ResolvedHardhatConfig,
@@ -139,14 +140,6 @@ export default function () {
     return buildHyperionStandardJsonInput(sources, config.hyperion.optimizer);
   });
 
-  internalTask(TASK_COMPILE_RESOLVE_COMPILER, async (_, { config }) => {
-    return resolveHyperionCompiler(
-      config.hyperion,
-      config.paths.root,
-      config.paths.cache
-    );
-  });
-
   internalTask(TASK_COMPILE_RUN_COMPILER)
     .addParam(
       "input",
@@ -154,39 +147,24 @@ export default function () {
       undefined,
       types.json
     )
-    .addOptionalParam("compilerPath", "The resolved hypc path")
     .setAction(
       async (
-        {
-          input,
-          compilerPath,
-        }: { input: HyperionInput; compilerPath?: string },
+        { input, compiler }: { input: HyperionInput; compiler?: Compiler },
         { config }
       ) => {
-        return compileHyperion(
-          input,
-          config.paths.root,
-          compilerPath ?? config.hyperion.compilerPath
-        );
+        return (compiler ?? createCompiler(config)).compile(input);
       }
     );
 
-  internalTask(TASK_COMPILE_COMPILE)
-    .addOptionalParam(
-      "compiler",
-      "The resolved Hyperion compiler",
-      undefined,
-      types.json
-    )
-    .setAction(async ({ compiler }: any, { config, run }) => {
-      const resolvedCompiler: ResolvedHyperionCompiler =
-        compiler ?? (await run(TASK_COMPILE_RESOLVE_COMPILER));
+  internalTask(TASK_COMPILE_COMPILE).setAction(
+    async ({ compiler }: { compiler?: Compiler }, { config, run }) => {
+      const selectedCompiler = compiler ?? createCompiler(config);
       const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
 
       console.log("Compiling Hyperion sources...");
       const output = await run(TASK_COMPILE_RUN_COMPILER, {
         input,
-        compilerPath: resolvedCompiler.path,
+        compiler: selectedCompiler,
       });
 
       let hasErrors = false;
@@ -227,26 +205,23 @@ export default function () {
       await cacheHardhatConfig(
         config.paths,
         config.hyperion,
-        resolvedCompiler.identity
+        (await selectedCompiler.getCompiler()).identity
       );
 
       return output;
-    });
+    }
+  );
 
-  internalTask(TASK_COMPILE_CHECK_CACHE)
-    .addOptionalParam(
-      "compiler",
-      "The resolved Hyperion compiler",
-      undefined,
-      types.json
-    )
-    .setAction(async ({ force, compiler }: any, { config, run }) => {
+  internalTask(TASK_COMPILE_CHECK_CACHE).setAction(
+    async (
+      { force, compiler }: { force: boolean; compiler?: Compiler },
+      { config, run }
+    ) => {
       if (force) {
         return false;
       }
 
-      const resolvedCompiler: ResolvedHyperionCompiler =
-        compiler ?? (await run(TASK_COMPILE_RESOLVE_COMPILER));
+      const selectedCompiler = compiler ?? createCompiler(config);
 
       // The dependency graph includes every transitively imported file, so
       // changes to imported libraries (e.g. under node_modules) also
@@ -276,9 +251,10 @@ export default function () {
         sourceTimestamps,
         config.hyperion,
         config.paths,
-        resolvedCompiler.identity
+        (await selectedCompiler.getCompiler()).identity
       );
-    });
+    }
+  );
 
   internalTask(TASK_BUILD_ARTIFACTS, async ({ force }, { config, run }) => {
     const sources = await run(TASK_COMPILE_GET_SOURCE_PATHS);
@@ -288,18 +264,17 @@ export default function () {
       return;
     }
 
-    const compiler: ResolvedHyperionCompiler = await run(
-      TASK_COMPILE_RESOLVE_COMPILER
-    );
+    const compiler = createCompiler(config);
+    const resolvedCompiler = await compiler.getCompiler();
     log(
       "Resolved %s hypc %s at %s",
-      compiler.source,
-      compiler.longVersion ?? "(version not detected)",
-      compiler.path
+      resolvedCompiler.source,
+      resolvedCompiler.longVersion ?? "(version not detected)",
+      resolvedCompiler.path
     );
     const versionWarning = getVersionMismatchWarning(
       config.hyperion.version,
-      compiler
+      resolvedCompiler
     );
     if (versionWarning !== undefined) {
       console.warn(chalk.yellow(versionWarning));

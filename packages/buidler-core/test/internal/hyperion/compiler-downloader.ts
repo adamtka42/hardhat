@@ -10,17 +10,17 @@ import { promisify } from "util";
 import { ERRORS } from "../../../src/internal/core/errors-list";
 import {
   buildHyperionStandardJsonInput,
-  compileHyperion,
+  Compiler,
+  HYPERION_COMPILER_REPOSITORY_ENV,
 } from "../../../src/internal/hyperion/compiler";
 import {
   HyperionCompilerBuild,
   HyperionCompilersManifest,
 } from "../../../src/internal/hyperion/compiler-downloader";
 import {
-  HYPERION_COMPILER_REPOSITORY_ENV,
-  resolveHyperionCompiler,
-} from "../../../src/internal/hyperion/compiler-resolver";
-import { DownloadedCompilerIdentity } from "../../../src/internal/hyperion/compiler-types";
+  DownloadedCompilerIdentity,
+  ResolvedHyperionCompiler,
+} from "../../../src/internal/hyperion/compiler-types";
 import { HyperionConfig } from "../../../src/types";
 import { expectHardhatErrorAsync } from "../../helpers/errors";
 import { useTmpDir } from "../../helpers/fs";
@@ -110,11 +110,12 @@ describe("Hyperion compiler resolver and downloader", function () {
     }
 
     const config = createConfig(repositoryUrl);
-    const first = await resolveHyperionCompiler(
+    const compiler = new Compiler(
       config,
       this.tmpDir,
       path.join(this.tmpDir, "cache")
     );
+    const first = await compiler.getCompiler();
 
     assert.equal(first.source, "downloaded");
     assert.equal(first.version, VERSION);
@@ -126,18 +127,17 @@ describe("Hyperion compiler resolver and downloader", function () {
     const execution = await execFileAsync(first.path, ["--version"]);
     assert.include(execution.stdout.toString(), LONG_VERSION);
 
-    const output = await compileHyperion(
+    const output = await compiler.compile(
       buildHyperionStandardJsonInput(
         { "contracts/A.hyp": { content: "contract A {}" } },
         { enabled: false, runs: 200 }
-      ),
-      this.tmpDir,
-      first.path
+      )
     );
     assert.equal(
       output.contracts["contracts/A.hyp"].A.bytecodeOutput.bytecode.object,
       "00"
     );
+    assert.strictEqual(await compiler.getCompiler(), first);
 
     const second = await resolveHyperionCompiler(
       config,
@@ -396,6 +396,14 @@ describe("Hyperion compiler resolver and downloader", function () {
     );
   });
 });
+
+function resolveHyperionCompiler(
+  config: HyperionConfig,
+  projectRoot: string,
+  cacheDir: string
+): Promise<ResolvedHyperionCompiler> {
+  return new Compiler(config, projectRoot, cacheDir).getCompiler();
+}
 
 function createConfig(repositoryUrl: string): HyperionConfig {
   return {
