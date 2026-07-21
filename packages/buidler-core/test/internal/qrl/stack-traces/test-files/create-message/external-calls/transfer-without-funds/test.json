@@ -1,0 +1,19 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "stackTrace": [
+        {
+          "type": "CALL_FAILED_ERROR",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "constructor",
+            "line": 9
+          }
+        }
+      ]
+    }
+  ]
+}

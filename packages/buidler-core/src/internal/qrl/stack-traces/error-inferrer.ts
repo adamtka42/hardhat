@@ -24,14 +24,62 @@ export function inferQrlStackTrace(
   for (let index = 0; index < reversed.length; index++) {
     const frame = reversed[index];
     const terminal = inferFrame(frame, decoder, index === 0);
-    diagnostics.push(terminal);
-    for (const caller of inferInternalCallstack(frame, decoder).reverse()) {
-      if (!sameSourceReference(caller, terminal.sourceReference)) {
-        diagnostics.push({
-          type: QrlStackTraceEntryType.CALLSTACK_ENTRY,
-          sourceReference: caller,
-        });
+    const internalCallstack = inferInternalCallstack(frame, decoder);
+    if (
+      (terminal.sourceReference === undefined ||
+        terminal.sourceReference.functionName === "<unknown>") &&
+      internalCallstack.length > 0
+    ) {
+      terminal.sourceReference = internalCallstack.pop();
+    }
+    if (frame.kind === "create" || frame.kind === "create2") {
+      if (terminal.sourceReference !== undefined) {
+        for (
+          let sourceIndex = internalCallstack.length - 1;
+          sourceIndex >= 0;
+          sourceIndex--
+        ) {
+          const source = internalCallstack[sourceIndex];
+          if (
+            source.functionName === "constructor" &&
+            source.sourceName !== terminal.sourceReference.sourceName
+          ) {
+            internalCallstack.splice(sourceIndex, 1);
+          }
+        }
       }
+      const code = bytesToHex(frame.code ?? frame.input);
+      const implicitConstructor = decoder.decodeImplicitCreationStart(code);
+      if (
+        implicitConstructor !== undefined &&
+        terminal.sourceReference?.functionName !== "constructor" &&
+        implicitConstructor.sourceName !==
+          terminal.sourceReference?.sourceName &&
+        !internalCallstack.some(
+          (source) =>
+            source.sourceName === implicitConstructor.sourceName &&
+            source.functionName === "constructor"
+        )
+      ) {
+        internalCallstack.unshift(implicitConstructor);
+      }
+    }
+    const remaining = allowedCallsiteCounts(
+      internalCallstack,
+      terminal.sourceReference
+    );
+    diagnostics.push(terminal);
+    for (const caller of internalCallstack.reverse()) {
+      const key = sourceReferenceKey(caller);
+      const allowed = remaining.get(key) ?? 0;
+      if (allowed === 0) {
+        continue;
+      }
+      remaining.set(key, allowed - 1);
+      diagnostics.push({
+        type: QrlStackTraceEntryType.CALLSTACK_ENTRY,
+        sourceReference: caller,
+      });
     }
   }
   return diagnostics;
@@ -44,32 +92,117 @@ function inferInternalCallstack(
   const isCreate = frame.kind === "create" || frame.kind === "create2";
   const code = bytesToHex(frame.code ?? (isCreate ? frame.input : undefined));
   const active: any[] = [];
+  const externalCallsites: any[] = [];
+  let previousPc: number | undefined;
   for (const step of frame.steps ?? []) {
     if (!isPcStep(step)) {
+      if (isFrameStep(step) && previousPc !== undefined) {
+        const callsite = decoder.decodeFrame(code, previousPc, isCreate);
+        if (callsite !== undefined) {
+          externalCallsites.push(callsite);
+        }
+      }
       continue;
     }
+    previousPc = step.pc;
     const location = decoder.getSourceLocation(code, step.pc, isCreate);
     if (location?.jumpType === "i") {
       const source = decoder.decodeFrame(code, step.pc, isCreate);
       if (source !== undefined && source.functionName !== "<unknown>") {
+        if (source.sourceName === "@theqrl/hardhat/console.hyp") {
+          continue;
+        }
         active.push(source);
+        const target = decoder.decodeInternalCallTarget(
+          location,
+          source.contractName
+        );
+        if (target !== undefined && !sameSourceReference(target, source)) {
+          if (sameFunctionReference(target, source)) {
+            Object.defineProperties(source, {
+              __qrlRecursiveCall: { value: true },
+              __qrlLocationKey: {
+                value: [location.offset, location.length].join(":"),
+              },
+            });
+          }
+          active.push(target);
+        }
       }
     } else if (location?.jumpType === "o" && active.length > 0) {
       active.pop();
     }
   }
-  return active;
+  return active.filter(
+    (source, index) =>
+      (!externalCallsites.some((callsite) =>
+        sameSourceReference(source, callsite)
+      ) &&
+        !decoder.isFunctionStartReference(source)) ||
+      !active
+        .slice(index + 1)
+        .some((next) => sameFunctionReference(source, next))
+  );
 }
 
-function sameSourceReference(left: any, right: any): boolean {
+function allowedCallsiteCounts(
+  sources: any[],
+  terminal: any
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const references = new Map<string, any>();
+  const recursiveLocations = new Map<string, Set<string>>();
+  for (const source of sources) {
+    const key = sourceReferenceKey(source);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    references.set(key, source);
+    if (source.__qrlRecursiveCall === true) {
+      const locations = recursiveLocations.get(key) ?? new Set<string>();
+      locations.add(source.__qrlLocationKey);
+      recursiveLocations.set(key, locations);
+    }
+  }
+  for (const [key, count] of counts) {
+    const reference = references.get(key);
+    const sameFunction = sameFunctionReference(reference, terminal);
+    const isRecursive = recursiveLocations.has(key);
+    counts.set(
+      key,
+      sameFunction && isRecursive
+        ? count > 2
+          ? Math.ceil(count / 2)
+          : count
+        : sameFunction
+        ? count <= 2
+          ? 0
+          : Math.floor(count / 2)
+        : Math.ceil(count / 2)
+    );
+  }
+  return counts;
+}
+
+function sameFunctionReference(left: any, right: any): boolean {
   return (
     left !== undefined &&
     right !== undefined &&
     left.contractName === right.contractName &&
     left.functionName === right.functionName &&
-    left.sourceName === right.sourceName &&
-    left.line === right.line
+    left.sourceName === right.sourceName
   );
+}
+
+function sourceReferenceKey(source: any): string {
+  return [
+    source?.contractName,
+    source?.functionName,
+    source?.sourceName,
+    source?.line,
+  ].join(":");
+}
+
+function sameSourceReference(left: any, right: any): boolean {
+  return sameFunctionReference(left, right) && left.line === right.line;
 }
 
 function inferFrame(
@@ -87,7 +220,7 @@ function inferFrame(
 
   const code = bytesToHex(frame.code ?? (isCreate ? frame.input : undefined));
   const contract = decoder.identifyContract(code, isCreate);
-  const sourceReference =
+  let sourceReference =
     typeof frame.lastPc === "number"
       ? decoder.decodeFrame(code, frame.lastPc, isCreate)
       : undefined;
@@ -106,10 +239,31 @@ function inferFrame(
     };
   }
 
+  if (
+    !isCreate &&
+    (sourceReference === undefined ||
+      sourceReference.functionName === "<unknown>")
+  ) {
+    const fragment = findCalledFunction(frame, contract);
+    const fallback =
+      contract.abi.find(
+        (candidate) =>
+          candidate.type ===
+          (bytes(frame.input).length === 0 ? "receive" : "fallback")
+      ) ?? contract.abi.find((candidate) => candidate.type === "fallback");
+    const identifier =
+      fragment !== undefined ? getFunctionSignature(fragment) : fallback?.type;
+    if (identifier !== undefined) {
+      sourceReference =
+        decoder.decodeContractStart(contract, identifier) ?? sourceReference;
+    }
+  }
+
   if (!isFailureOrigin) {
     return {
       type: QrlStackTraceEntryType.CALLSTACK_ENTRY,
-      sourceReference,
+      sourceReference:
+        decodeLastFailedChildCallsite(frame, decoder) ?? sourceReference,
     };
   }
 
@@ -124,6 +278,12 @@ function inferFrame(
   }
 
   const orderedSteps = Array.isArray(frame.steps) ? frame.steps : [];
+  const executionSourceReference =
+    sourceReference !== undefined &&
+    decoder.isFunctionStartReference(sourceReference)
+      ? decoder.decodeLastMappedStatement(code, orderedSteps, isCreate) ??
+        sourceReference
+      : sourceReference;
   const lastChildIndex = findLastChildIndex(orderedSteps);
   const lastChild =
     lastChildIndex === undefined ? undefined : orderedSteps[lastChildIndex];
@@ -135,21 +295,58 @@ function inferFrame(
     if (byteLength(lastChild.code) === 0) {
       return {
         type: QrlStackTraceEntryType.NONCONTRACT_ACCOUNT_CALLED_ERROR,
-        sourceReference,
+        sourceReference: executionSourceReference,
         address: lastChild.target?.toString(),
       };
     }
     return {
       type: QrlStackTraceEntryType.RETURNDATA_SIZE_ERROR,
-      sourceReference,
+      sourceReference: executionSourceReference,
+    };
+  }
+
+  if (
+    lastChild !== undefined &&
+    isCallSetupFailure(lastChild) &&
+    failsImmediatelyAfterChild(frame, orderedSteps, lastChildIndex!, decoder)
+  ) {
+    return {
+      type: QrlStackTraceEntryType.CALL_FAILED_ERROR,
+      sourceReference: executionSourceReference,
+    };
+  }
+
+  if (hasNonContractAccountGuardFailure(frame)) {
+    return {
+      type: QrlStackTraceEntryType.NONCONTRACT_ACCOUNT_CALLED_ERROR,
+      sourceReference: executionSourceReference,
     };
   }
 
   if (hasFailedCallWithoutSubtrace(frame, decoder)) {
     return {
       type: QrlStackTraceEntryType.CALL_FAILED_ERROR,
-      sourceReference,
+      sourceReference: executionSourceReference,
     };
+  }
+
+  let revertSourceReference = executionSourceReference;
+  if (
+    sourceReference !== undefined &&
+    decoder.isFunctionStartReference(sourceReference)
+  ) {
+    const fragment = !isCreate
+      ? findCalledFunction(frame, contract)
+      : undefined;
+    revertSourceReference =
+      decoder.decodeLastModifier(code, orderedSteps, isCreate) ??
+      (fragment !== undefined
+        ? decoder.decodeUnconditionalModifier(
+            contract,
+            getFunctionSignature(fragment)
+          )
+        : undefined) ??
+      executionSourceReference;
   }
 
   if (
@@ -159,7 +356,7 @@ function inferFrame(
   ) {
     return {
       type: QrlStackTraceEntryType.REVERT_ERROR,
-      sourceReference,
+      sourceReference: revertSourceReference,
       message: frame.returnValue,
     };
   }
@@ -167,7 +364,7 @@ function inferFrame(
   if (frame.children?.some((child: any) => child.errorMessage !== undefined)) {
     return {
       type: QrlStackTraceEntryType.CALL_FAILED_ERROR,
-      sourceReference,
+      sourceReference: executionSourceReference,
     };
   }
 
@@ -192,7 +389,6 @@ function inferDispatchError(
     const constructorValue = frame.value ?? (global as any).BigInt(0);
     const zeroValue = (global as any).BigInt(0);
     if (
-      byteLength(frame.returnValue) === 0 &&
       constructorValue > zeroValue &&
       constructor !== undefined &&
       constructor.stateMutability !== "payable"
@@ -228,11 +424,7 @@ function inferDispatchError(
   const zero = (global as any).BigInt(0);
 
   if (fragment !== undefined) {
-    if (
-      byteLength(frame.returnValue) === 0 &&
-      value > zero &&
-      fragment.stateMutability !== "payable"
-    ) {
+    if (value > zero && fragment.stateMutability !== "payable") {
       return {
         type: QrlStackTraceEntryType.FUNCTION_NOT_PAYABLE_ERROR,
         sourceReference:
@@ -264,7 +456,6 @@ function inferDispatchError(
   }
   if (
     fallback !== undefined &&
-    byteLength(frame.returnValue) === 0 &&
     value > zero &&
     fallback.stateMutability !== "payable"
   ) {
@@ -435,6 +626,9 @@ function propagatedFailureChild(
   decoder: QrlStackTraceDecoder
 ): any | undefined {
   const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  const code = bytesToHex(frame.code ?? (isCreate ? frame.input : undefined));
+  const recognized = decoder.identifyContract(code, isCreate) !== undefined;
   let hasOrderedChildren = false;
   for (let index = steps.length - 1; index >= 0; index--) {
     const child = steps[index];
@@ -444,8 +638,11 @@ function propagatedFailureChild(
     hasOrderedChildren = true;
     if (
       child.errorMessage !== undefined &&
+      !isCallSetupFailure(child) &&
       bytesEqual(child.returnValue, frame.returnValue) &&
-      failsImmediatelyAfterChild(frame, steps, index, decoder)
+      (forwardsReturnDataAfterChild(frame, steps, index) ||
+        ((byteLength(child.returnValue) === 0 || !recognized) &&
+          failsImmediatelyAfterChild(frame, steps, index, decoder)))
     ) {
       return child;
     }
@@ -477,6 +674,75 @@ function findLastChildIndex(steps: any[]): number | undefined {
     }
   }
   return undefined;
+}
+
+function decodeLastFailedChildCallsite(
+  frame: any,
+  decoder: QrlStackTraceDecoder
+): any | undefined {
+  const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  const code = bytesToHex(frame.code);
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  for (let childIndex = steps.length - 1; childIndex >= 0; childIndex--) {
+    const child = steps[childIndex];
+    if (!isFrameStep(child) || child.errorMessage === undefined) {
+      continue;
+    }
+    for (let pcIndex = childIndex - 1; pcIndex >= 0; pcIndex--) {
+      if (isPcStep(steps[pcIndex])) {
+        return decoder.decodeFrame(code, steps[pcIndex].pc, isCreate);
+      }
+    }
+  }
+  return undefined;
+}
+
+function isCallSetupFailure(frame: any): boolean {
+  return (
+    byteLength(frame.code) === 0 &&
+    typeof frame.errorMessage === "string" &&
+    /balance underflow|insufficient funds/i.test(frame.errorMessage)
+  );
+}
+
+function forwardsReturnDataAfterChild(
+  frame: any,
+  steps: any[],
+  childIndex: number
+): boolean {
+  const code = bytes(frame.code);
+  const after = steps.slice(childIndex + 1);
+  let lastCopyIndex = -1;
+  for (let index = 0; index < after.length; index++) {
+    const step = after[index];
+    if (isPcStep(step) && code[step.pc] === 0x3e) {
+      lastCopyIndex = index;
+    }
+  }
+  if (lastCopyIndex === -1) {
+    return false;
+  }
+  const tail = after.slice(lastCopyIndex + 1);
+  return (
+    tail.some((step) => isPcStep(step) && code[step.pc] === 0xfd) &&
+    !tail.some(
+      (step) =>
+        isPcStep(step) &&
+        (code[step.pc] === 0x52 ||
+          code[step.pc] === 0x53 ||
+          isCallOrCreateOpcode(code[step.pc]))
+    )
+  );
+}
+
+function hasNonContractAccountGuardFailure(frame: any): boolean {
+  const code = bytes(frame.code);
+  const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  return (
+    (frame.children ?? []).length === 0 &&
+    lastOpcode(frame) === 0xfd &&
+    steps.some((step: any) => isPcStep(step) && code[step.pc] === 0x3b)
+  );
 }
 
 function hasFailedCallWithoutSubtrace(

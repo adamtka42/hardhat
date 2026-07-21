@@ -1,0 +1,25 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C"
+    },
+    {
+      "to": 0,
+      "params": [],
+      "function": "test",
+      "stackTrace": [
+        {
+          "type": "REVERT_ERROR",
+          "message": "req",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "test",
+            "line": 12
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Should output console.log of other contracts in their constructor",
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "imports": ["@theqrl/hardhat/console.hyp"],
+      "consoleLogs": [["C1"], ["D"], ["C2"]]
+    }
+  ]
+}

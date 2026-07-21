@@ -1,0 +1,25 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C"
+    },
+    {
+      "to": 0,
+      "value": 1,
+      "data": "0xaabbccdd",
+      "stackTrace": [
+        {
+          "type": "FALLBACK_NOT_PAYABLE_ERROR",
+          "value": "1",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "<fallback>",
+            "line": 4
+          }
+        }
+      ]
+    }
+  ]
+}

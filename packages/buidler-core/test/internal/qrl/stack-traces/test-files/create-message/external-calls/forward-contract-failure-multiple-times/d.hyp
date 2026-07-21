@@ -1,0 +1,13 @@
+pragma hyperion >=0.0;
+
+import "./e.hyp";
+
+contract D {
+
+  function callE() public {
+    E e = new E();
+
+    e.fail();
+  }
+
+}

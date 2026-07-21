@@ -22,6 +22,7 @@ export interface QrlResolvedSourceLocation {
 
 interface PreparedContract {
   info: QrlContractDebugInfo;
+  hasLocalConstructor: boolean;
   deployedNormalized: string;
   bytecodeNormalized: string;
   deployedLocations?: QrlSourceLocation[];
@@ -54,9 +55,13 @@ export class QrlStackTraceDecoder {
         ...linkReferenceRanges(info.deployedLinkReferences),
         ...immutableReferenceRanges(info.immutableReferences),
       ];
+      if (info.contractKind === "library") {
+        deployedRanges.push({ start: 1, length: 64 });
+      }
       const bytecodeRanges = linkReferenceRanges(info.linkReferences);
       return {
         info,
+        hasLocalConstructor: contractHasLocalConstructor(info, _debugInfo),
         deployedRanges,
         bytecodeRanges,
         deployedNormalized: normalizeCode(
@@ -161,12 +166,268 @@ export class QrlStackTraceDecoder {
         };
   }
 
+  public isFunctionStartReference(source: QrlStackTraceEntry): boolean {
+    const ast = this._debugInfo.astBySourceName.get(source.sourceName);
+    const content = this._debugInfo.sourceContent.get(source.sourceName);
+    let matches = false;
+    visitAstNodes(ast, (node) => {
+      if (
+        matches ||
+        (node.nodeType !== "FunctionDefinition" &&
+          node.nodeType !== "ModifierDefinition")
+      ) {
+        return;
+      }
+      const name =
+        node.nodeType === "ModifierDefinition"
+          ? node.name
+          : node.kind === "constructor"
+          ? "constructor"
+          : node.kind === "fallback"
+          ? "<fallback>"
+          : node.kind === "receive"
+          ? "<receive>"
+          : node.name;
+      const location = parseSrc(node.src);
+      matches =
+        name === source.functionName &&
+        location !== undefined &&
+        content !== undefined &&
+        offsetToLine(content, location.offset) === source.line;
+    });
+    return matches;
+  }
+
+  public decodeInternalCallTarget(
+    location: QrlResolvedSourceLocation,
+    contractName: string
+  ): QrlStackTraceEntry | undefined {
+    const ast = this._debugInfo.astBySourceName.get(location.sourceName);
+    let referencedDeclaration: number | undefined;
+    let bestLength = Number.MAX_SAFE_INTEGER;
+    visitAstNodes(ast, (node) => {
+      if (node.nodeType !== "FunctionCall") {
+        return;
+      }
+      const callLocation = parseSrc(node.src);
+      const expression = node.expression;
+      const isInternalCall =
+        expression?.nodeType === "Identifier" ||
+        (expression?.nodeType === "MemberAccess" &&
+          expression.expression?.nodeType === "Identifier" &&
+          expression.expression.name === "super");
+      const reference = expression?.referencedDeclaration;
+      if (
+        callLocation === undefined ||
+        !isInternalCall ||
+        typeof reference !== "number" ||
+        location.offset < callLocation.offset ||
+        location.offset + location.length >
+          callLocation.offset + callLocation.length ||
+        callLocation.length >= bestLength
+      ) {
+        return;
+      }
+      referencedDeclaration = reference;
+      bestLength = callLocation.length;
+    });
+    if (referencedDeclaration === undefined) {
+      return undefined;
+    }
+
+    for (const [sourceName, sourceAst] of this._debugInfo.astBySourceName) {
+      let result: QrlStackTraceEntry | undefined;
+      visitAstNodes(sourceAst, (node) => {
+        if (
+          result !== undefined ||
+          node.nodeType !== "FunctionDefinition" ||
+          node.id !== referencedDeclaration
+        ) {
+          return;
+        }
+        const declaration = parseSrc(node.src);
+        const content = this._debugInfo.sourceContent.get(sourceName);
+        if (declaration === undefined || content === undefined) {
+          return;
+        }
+        result = {
+          contractName,
+          functionName:
+            node.kind === "constructor"
+              ? "constructor"
+              : node.kind === "fallback"
+              ? "<fallback>"
+              : node.kind === "receive"
+              ? "<receive>"
+              : node.name,
+          sourceName,
+          line: offsetToLine(content, declaration.offset),
+        };
+      });
+      if (result !== undefined) {
+        return result;
+      }
+    }
+    return undefined;
+  }
+
+  public decodeImplicitCreationStart(
+    code: string
+  ): QrlStackTraceEntry | undefined {
+    const contract = this.identifyContract(code, true);
+    if (contract === undefined) {
+      return undefined;
+    }
+    const explicit = this.decodeContractStart(contract, "constructor");
+    if (explicit !== undefined && explicit.sourceName === contract.sourceName) {
+      return undefined;
+    }
+    const ast = this._debugInfo.astBySourceName.get(contract.sourceName);
+    const content = this._debugInfo.sourceContent.get(contract.sourceName);
+    let contractNode: any;
+    visitAstNodes(ast, (node) => {
+      if (
+        contractNode === undefined &&
+        node.nodeType === "ContractDefinition" &&
+        node.name === contract.contractName
+      ) {
+        contractNode = node;
+      }
+    });
+    const location = parseSrc(contractNode?.src);
+    if (location === undefined || content === undefined) {
+      return undefined;
+    }
+    return {
+      contractName: contract.contractName,
+      functionName: "constructor",
+      sourceName: contract.sourceName,
+      line: offsetToLine(content, location.offset),
+    };
+  }
+
+  public decodeLastModifier(
+    code: string,
+    steps: any[],
+    isCreate: boolean
+  ): QrlStackTraceEntry | undefined {
+    for (let index = steps.length - 1; index >= 0; index--) {
+      const step = steps[index];
+      if (step === null || typeof step?.pc !== "number") {
+        continue;
+      }
+      const source = this.decodeFrame(code, step.pc, isCreate);
+      if (source !== undefined && this._isModifierReference(source)) {
+        return source;
+      }
+    }
+    return undefined;
+  }
+
+  public decodeLastMappedStatement(
+    code: string,
+    steps: any[],
+    isCreate: boolean
+  ): QrlStackTraceEntry | undefined {
+    for (let index = steps.length - 1; index >= 0; index--) {
+      const step = steps[index];
+      if (step === null || typeof step?.pc !== "number") {
+        continue;
+      }
+      const source = this.decodeFrame(code, step.pc, isCreate);
+      if (
+        source !== undefined &&
+        source.functionName !== "<unknown>" &&
+        source.sourceName !== "@theqrl/hardhat/console.hyp" &&
+        !this.isFunctionStartReference(source)
+      ) {
+        return source;
+      }
+    }
+    return undefined;
+  }
+
+  public decodeUnconditionalModifier(
+    contract: QrlContractDebugInfo,
+    functionIdentifier: string
+  ): QrlStackTraceEntry | undefined {
+    const ast = this._debugInfo.astBySourceName.get(contract.sourceName);
+    let contractNode: any;
+    visitAstNodes(ast, (node) => {
+      if (
+        contractNode === undefined &&
+        node.nodeType === "ContractDefinition" &&
+        node.name === contract.contractName
+      ) {
+        contractNode = node;
+      }
+    });
+    const declaration =
+      findContractDeclaration(
+        contractNode,
+        functionIdentifier,
+        contract.sourceName
+      ) ??
+      findInheritedDeclaration(
+        this._debugInfo,
+        contractNode,
+        functionIdentifier
+      );
+    for (const invocation of declaration?.node?.modifiers ?? []) {
+      const modifierId = invocation.modifierName?.referencedDeclaration;
+      if (typeof modifierId !== "number") {
+        continue;
+      }
+      for (const [sourceName, sourceAst] of this._debugInfo.astBySourceName) {
+        let result: QrlStackTraceEntry | undefined;
+        visitAstNodes(sourceAst, (node) => {
+          if (
+            result !== undefined ||
+            node.nodeType !== "ModifierDefinition" ||
+            node.id !== modifierId
+          ) {
+            return;
+          }
+          for (const statement of node.body?.statements ?? []) {
+            if (statement.nodeType === "PlaceholderStatement") {
+              break;
+            }
+            const expression = statement.expression;
+            const isRevert =
+              statement.nodeType === "RevertStatement" ||
+              (statement.nodeType === "ExpressionStatement" &&
+                expression?.nodeType === "FunctionCall" &&
+                expression.expression?.name === "revert");
+            if (!isRevert) {
+              continue;
+            }
+            const location = parseSrc(statement.src);
+            const content = this._debugInfo.sourceContent.get(sourceName);
+            if (location !== undefined && content !== undefined) {
+              result = {
+                contractName: contract.contractName,
+                functionName: node.name,
+                sourceName,
+                line: offsetToLine(content, location.offset),
+              };
+            }
+            break;
+          }
+        });
+        if (result !== undefined) {
+          return result;
+        }
+      }
+    }
+    return undefined;
+  }
+
   public decodeContractStart(
     contract: QrlContractDebugInfo,
     functionIdentifier?: string
   ): QrlStackTraceEntry | undefined {
     const ast = this._debugInfo.astBySourceName.get(contract.sourceName);
-    const content = this._debugInfo.sourceContent.get(contract.sourceName);
+    let selectedSourceName = contract.sourceName;
     let contractNode: any;
     visitAstNodes(ast, (node) => {
       if (
@@ -185,29 +446,21 @@ export class QrlStackTraceDecoder {
     if (functionIdentifier !== undefined) {
       const normalized =
         functionIdentifier === "<fallback>" ? "fallback" : functionIdentifier;
-      const functionName = identifierFunctionName(normalized);
-      const candidates = (contractNode.nodes ?? []).filter((node: any) => {
-        if (node.nodeType !== "FunctionDefinition") {
-          return false;
-        }
-        if (
-          functionName === "constructor" ||
-          functionName === "fallback" ||
-          functionName === "receive"
-        ) {
-          return node.kind === functionName;
-        }
-        return node.name === functionName;
-      });
-      const candidate =
-        candidates.find(
-          (node: any) => functionNodeSignature(node) === normalized
-        ) ?? candidates[0];
-      if (candidate !== undefined) {
-        selected = candidate;
+      const declaration =
+        findContractDeclaration(
+          contractNode,
+          normalized,
+          contract.sourceName
+        ) ??
+        findInheritedDeclaration(this._debugInfo, contractNode, normalized);
+      if (declaration === undefined) {
+        return undefined;
       }
+      selected = declaration.node;
+      selectedSourceName = declaration.sourceName;
     }
 
+    const content = this._debugInfo.sourceContent.get(selectedSourceName);
     const location = parseSrc(selected.src);
     if (location === undefined) {
       return undefined;
@@ -217,10 +470,29 @@ export class QrlStackTraceDecoder {
       functionName:
         functionIdentifier === undefined
           ? "<unknown>"
+          : identifierFunctionName(functionIdentifier) === "fallback"
+          ? "<fallback>"
+          : identifierFunctionName(functionIdentifier) === "receive"
+          ? "<receive>"
           : identifierFunctionName(functionIdentifier),
-      sourceName: contract.sourceName,
+      sourceName: selectedSourceName,
       line: content === undefined ? 0 : offsetToLine(content, location.offset),
     };
+  }
+
+  private _isModifierReference(source: QrlStackTraceEntry): boolean {
+    const ast = this._debugInfo.astBySourceName.get(source.sourceName);
+    let matches = false;
+    visitAstNodes(ast, (node) => {
+      if (
+        !matches &&
+        node.nodeType === "ModifierDefinition" &&
+        node.name === source.functionName
+      ) {
+        matches = true;
+      }
+    });
+    return matches;
   }
 
   private _identify(
@@ -233,6 +505,7 @@ export class QrlStackTraceDecoder {
     }
 
     let match: PreparedContract | undefined;
+    let matchLength = -1;
     for (const candidate of this._prepared) {
       const reference = isCreate
         ? candidate.bytecodeNormalized
@@ -247,10 +520,22 @@ export class QrlStackTraceDecoder {
       const matches = isCreate
         ? normalized.startsWith(reference)
         : normalized === reference;
-      if (matches) {
-        // Keep the last match, matching the baseline collision policy.
-        match = candidate;
+      if (!matches || reference.length < matchLength) {
+        continue;
       }
+      if (
+        isCreate &&
+        reference.length === matchLength &&
+        match !== undefined &&
+        !match.hasLocalConstructor &&
+        candidate.hasLocalConstructor
+      ) {
+        continue;
+      }
+      // Prefer the most specific init-code prefix and keep the last exact tie.
+      // An implicitly derived constructor wins a tie with its explicit base.
+      match = candidate;
+      matchLength = reference.length;
     }
 
     return match;
@@ -313,7 +598,10 @@ export class QrlStackTraceDecoder {
 
     let best: { name: string; length: number } | undefined;
     visitAstNodes(ast, (node) => {
-      if (node.nodeType !== "FunctionDefinition") {
+      if (
+        node.nodeType !== "FunctionDefinition" &&
+        node.nodeType !== "ModifierDefinition"
+      ) {
         return;
       }
       const src = parseSrc(node.src);
@@ -325,12 +613,14 @@ export class QrlStackTraceDecoder {
       }
       if (best === undefined || src.length < best.length) {
         const name =
-          node.kind === "constructor"
+          node.nodeType === "ModifierDefinition"
+            ? node.name
+            : node.kind === "constructor"
             ? "constructor"
             : node.kind === "fallback"
-            ? "fallback"
+            ? "<fallback>"
             : node.kind === "receive"
-            ? "receive"
+            ? "<receive>"
             : node.name;
         if (typeof name === "string" && name !== "") {
           best = { name, length: src.length };
@@ -340,6 +630,93 @@ export class QrlStackTraceDecoder {
 
     return best?.name;
   }
+}
+
+function contractHasLocalConstructor(
+  contract: QrlContractDebugInfo,
+  debugInfo: QrlDebugInfo
+): boolean {
+  const ast = debugInfo.astBySourceName.get(contract.sourceName);
+  let result = false;
+  visitAstNodes(ast, (node) => {
+    if (
+      node.nodeType === "ContractDefinition" &&
+      node.name === contract.contractName
+    ) {
+      result = (node.nodes ?? []).some(
+        (child: any) =>
+          child.nodeType === "FunctionDefinition" &&
+          child.kind === "constructor"
+      );
+    }
+  });
+  return result;
+}
+
+interface ContractDeclaration {
+  node: any;
+  sourceName: string;
+}
+
+function findContractDeclaration(
+  contractNode: any,
+  normalized: string,
+  sourceName: string
+): ContractDeclaration | undefined {
+  const functionName = identifierFunctionName(normalized);
+  const candidates = (contractNode?.nodes ?? []).filter((candidate: any) => {
+    if (candidate.nodeType === "VariableDeclaration") {
+      return (
+        candidate.stateVariable === true &&
+        candidate.visibility === "public" &&
+        candidate.name === functionName
+      );
+    }
+    if (candidate.nodeType !== "FunctionDefinition") {
+      return false;
+    }
+    if (
+      functionName === "constructor" ||
+      functionName === "fallback" ||
+      functionName === "receive"
+    ) {
+      return candidate.kind === functionName;
+    }
+    return candidate.name === functionName;
+  });
+  const node =
+    candidates.find(
+      (candidate: any) => functionNodeSignature(candidate) === normalized
+    ) ?? candidates[0];
+  return node === undefined ? undefined : { node, sourceName };
+}
+
+function findInheritedDeclaration(
+  debugInfo: QrlDebugInfo,
+  contractNode: any,
+  normalized: string
+): ContractDeclaration | undefined {
+  const baseIds = Array.isArray(contractNode?.linearizedBaseContracts)
+    ? contractNode.linearizedBaseContracts.slice(1)
+    : [];
+  for (const baseId of baseIds) {
+    for (const [sourceName, ast] of debugInfo.astBySourceName) {
+      let declaration: ContractDeclaration | undefined;
+      visitAstNodes(ast, (node) => {
+        if (
+          declaration === undefined &&
+          node.nodeType === "ContractDefinition" &&
+          node.id === baseId
+        ) {
+          declaration = findContractDeclaration(node, normalized, sourceName);
+        }
+      });
+      if (declaration !== undefined) {
+        return declaration;
+      }
+    }
+  }
+  return undefined;
 }
 
 function identifierFunctionName(identifier: string): string {
@@ -413,6 +790,9 @@ function normalizeCode(code: string, ranges: CodeRange[]): string {
   for (const range of ranges) {
     const from = range.start * 2;
     const length = range.length * 2;
+    if (from + length > normalized.length) {
+      continue;
+    }
     normalized =
       normalized.slice(0, from) +
       "0".repeat(length) +

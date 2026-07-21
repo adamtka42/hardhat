@@ -1,0 +1,11 @@
+pragma hyperion >=0.0;
+
+import "@theqrl/hardhat/console.hyp";
+
+contract C {
+
+	constructor() public {
+		console.log("C");
+    revert();
+	}
+}

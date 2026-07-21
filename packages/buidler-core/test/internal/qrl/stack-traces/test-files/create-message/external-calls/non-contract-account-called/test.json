@@ -1,0 +1,19 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "stackTrace": [
+        {
+          "type": "NONCONTRACT_ACCOUNT_CALLED_ERROR",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "constructor",
+            "line": 11
+          }
+        }
+      ]
+    }
+  ]
+}

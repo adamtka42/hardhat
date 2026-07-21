@@ -33,6 +33,44 @@ describe("QRL stack trace fixture manifest", function () {
     );
   });
 
+  it("keeps sources only for the 120 executable QRL fixtures", function () {
+    const fixtureRoot = path.join(__dirname, "test-files");
+    const executable = fixtures.filter(
+      (fixture) =>
+        fixture.classification === "qrl-applicable" ||
+        fixture.classification === "qrl-specific-replacement"
+    );
+    assert.lengthOf(executable, 120);
+    for (const fixture of executable) {
+      const directory = path.join(fixtureRoot, fixture.id);
+      assert.isTrue(fsExtra.pathExistsSync(directory), fixture.id);
+      assert.isTrue(
+        fsExtra.pathExistsSync(path.join(directory, "test.json")),
+        fixture.id
+      );
+      assert.isAbove(
+        fsExtra.readdirSync(directory).filter((name) => name.endsWith(".hyp"))
+          .length,
+        0,
+        fixture.id
+      );
+      assert.deepEqual(fixture.coverage, [
+        `test/internal/qrl/stack-traces/fixtures.ts :: ${fixture.id}`,
+      ]);
+    }
+
+    const excluded = fixtures.filter(
+      (fixture) => !executable.includes(fixture)
+    );
+    assert.lengthOf(excluded, 22);
+    for (const fixture of excluded) {
+      assert.isFalse(
+        fsExtra.pathExistsSync(path.join(fixtureRoot, fixture.id)),
+        fixture.id
+      );
+    }
+  });
+
   it("records a reason and concrete regression reference for every fixture", function () {
     for (const fixture of fixtures) {
       assert.include(

@@ -1,0 +1,21 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "params": [false],
+      "stackTrace": [
+        {
+          "type": "REVERT_ERROR",
+          "message": "a",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "constructor",
+            "line": 6
+          }
+        }
+      ]
+    }
+  ]
+}

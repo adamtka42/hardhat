@@ -1,0 +1,37 @@
+{
+  "transactions": [
+    {
+      "file": "l.hyp",
+      "contract": "IgnoredL"
+    },
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "libraries": {
+        "l.hyp": {
+          "IgnoredL": 0
+        }
+      }
+    },
+    {
+      "to": 1,
+      "function": "test",
+      "params": [false],
+      "stackTrace": [
+        {
+          "type": "CALLSTACK_ENTRY",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "test",
+            "line": 8
+          }
+        },
+        {
+          "type": "UNRECOGNIZED_CONTRACT_ERROR",
+          "message": "check"
+        }
+      ]
+    }
+  ]
+}

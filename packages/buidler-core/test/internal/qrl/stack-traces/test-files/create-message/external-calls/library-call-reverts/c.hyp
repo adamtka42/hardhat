@@ -1,0 +1,11 @@
+pragma hyperion >=0.0;
+
+import "./l.hyp";
+
+contract C {
+
+  constructor(bool b) public {
+    L.check(b);
+  }
+
+}

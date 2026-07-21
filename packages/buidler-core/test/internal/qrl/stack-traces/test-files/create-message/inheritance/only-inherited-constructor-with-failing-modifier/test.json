@@ -1,0 +1,29 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "stackTrace": [
+        {
+          "type": "CALLSTACK_ENTRY",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "constructor",
+            "line": 5
+          }
+        },
+        {
+          "type": "REVERT_ERROR",
+          "message": "D.m failed",
+          "sourceReference": {
+            "contract": "C",
+            "file": "d.hyp",
+            "function": "m",
+            "line": 9
+          }
+        }
+      ]
+    }
+  ]
+}

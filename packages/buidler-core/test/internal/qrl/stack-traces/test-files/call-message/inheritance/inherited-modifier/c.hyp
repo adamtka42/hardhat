@@ -1,0 +1,9 @@
+pragma hyperion >=0.0;
+
+import "./d.hyp";
+
+contract C is D {
+
+    function test() fail external {
+    }
+}

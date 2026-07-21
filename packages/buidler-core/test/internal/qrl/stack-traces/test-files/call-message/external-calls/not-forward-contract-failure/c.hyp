@@ -1,0 +1,14 @@
+pragma hyperion >=0.0;
+
+import "./d.hyp";
+
+contract C {
+
+  function test() payable public {
+    D d = new D();
+    payable(address(d)).send(1);
+
+    revert("failed here");
+  }
+
+}

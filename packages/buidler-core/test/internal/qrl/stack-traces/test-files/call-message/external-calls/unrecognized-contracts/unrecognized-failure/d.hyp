@@ -1,0 +1,9 @@
+pragma hyperion >=0.0;
+
+contract IgnoredD {
+
+  function fail() public returns (uint) {
+    revert("IngoredD failed");
+  }
+
+}

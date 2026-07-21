@@ -1,0 +1,43 @@
+{
+  "transactions": [
+    {
+      "file": "l.hyp",
+      "contract": "L"
+    },
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "libraries": {
+        "l.hyp": {
+          "L": 0
+        }
+      }
+    },
+    {
+      "to": 1,
+      "function": "test",
+      "params": [false],
+      "stackTrace": [
+        {
+          "type": "CALLSTACK_ENTRY",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "test",
+            "line": 8
+          }
+        },
+        {
+          "type": "REVERT_ERROR",
+          "message": "check",
+          "sourceReference": {
+            "contract": "L",
+            "file": "l.hyp",
+            "function": "check",
+            "line": 6
+          }
+        }
+      ]
+    }
+  ]
+}

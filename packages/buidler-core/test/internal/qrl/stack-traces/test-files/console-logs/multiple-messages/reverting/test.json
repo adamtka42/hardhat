@@ -1,0 +1,36 @@
+{
+  "description": "Should output console.log of other contracts if they revert",
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "imports": ["@theqrl/hardhat/console.hyp"]
+    },
+    {
+      "to": 0,
+      "function": "f",
+      "params": [],
+      "consoleLogs": [["C1"], ["D"]],
+      "stackTrace": [
+        {
+          "type": "CALLSTACK_ENTRY",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "f",
+            "line": 17
+          }
+        },
+        {
+          "type": "REVERT_ERROR",
+          "sourceReference": {
+            "contract": "D",
+            "file": "c.hyp",
+            "function": "f",
+            "line": 8
+          }
+        }
+      ]
+    }
+  ]
+}

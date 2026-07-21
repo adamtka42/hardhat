@@ -1,0 +1,31 @@
+{
+  "description": "Should output right parameters into console",
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C",
+      "imports": [
+        "@theqrl/hardhat/console.hyp"
+      ]
+    },
+    {
+      "to": 0,
+      "function": "test",
+      "params": [false],
+      "stackTrace": [
+        {
+          "type": "REVERT_ERROR",
+          "sourceReference": {
+            "contract": "C",
+            "file": "c.hyp",
+            "function": "test",
+            "line": 9
+          }
+        }
+      ],
+      "consoleLogs": [
+        ["string1"]
+      ]
+    }
+  ]
+}

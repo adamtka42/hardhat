@@ -1,0 +1,23 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C"
+    },
+    {
+      "to": 0,
+      "stackTrace": [
+        {
+          "type": "REVERT_ERROR",
+          "message": "inherited fallback",
+          "sourceReference": {
+            "contract": "C",
+            "file": "d.hyp",
+            "function": "<fallback>",
+            "line": 6
+          }
+        }
+      ]
+    }
+  ]
+}

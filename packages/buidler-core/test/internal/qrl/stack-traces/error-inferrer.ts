@@ -195,6 +195,52 @@ describe("QRL stack trace inference", function () {
     assert.equal(handled[0].sourceReference!.contractName, "Outer");
   });
 
+  it("distinguishes copied-and-handled returndata from forwarding", function () {
+    const input = [0x12, 0x34, 0x56, 0x78, ...new Array(64).fill(0)];
+    const child = frame(input);
+    const handledOuter = debugInfo({
+      contractName: "Outer",
+      deployedBytecode: "f13e52fd",
+      deployedSourceMap: "0:50:0;0:50:0;0:50:0;0:50:0",
+    }).contracts[0];
+    const inner = debugInfo({ contractName: "Inner" }).contracts[0];
+    const handledInfo = debugInfo();
+    handledInfo.contracts = [handledOuter, inner];
+    const handledRoot = {
+      ...frame(input),
+      code: new Uint8Array([0xf1, 0x3e, 0x52, 0xfd]),
+      steps: [{ pc: 0 }, child, { pc: 1 }, { pc: 2 }, { pc: 3 }],
+      children: [child],
+    };
+
+    const handled = inferQrlStackTrace(
+      handledRoot,
+      new QrlStackTraceDecoder(handledInfo)
+    );
+    assert.lengthOf(handled, 1);
+    assert.equal(handled[0].sourceReference!.contractName, "Outer");
+
+    const forwardingOuter = {
+      ...handledOuter,
+      deployedBytecode: "f13efd",
+      deployedSourceMap: "0:50:0;0:50:0;0:50:0",
+    };
+    const forwardingRoot = {
+      ...handledRoot,
+      code: new Uint8Array([0xf1, 0x3e, 0xfd]),
+      steps: [{ pc: 0 }, child, { pc: 1 }, { pc: 2 }],
+    };
+    const forwarded = inferQrlStackTrace(
+      forwardingRoot,
+      new QrlStackTraceDecoder({
+        ...handledInfo,
+        contracts: [forwardingOuter, inner],
+      })
+    );
+    assert.lengthOf(forwarded, 2);
+    assert.equal(forwarded[0].sourceReference!.contractName, "Inner");
+  });
+
   it("infers constructor argument and value prelude failures", function () {
     const abi = [
       {

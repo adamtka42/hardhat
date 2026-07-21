@@ -1,0 +1,9 @@
+pragma hyperion >=0.0;
+
+contract IgnoredC  {
+
+  constructor() public {
+    assert(false);
+  }
+
+}

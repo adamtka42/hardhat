@@ -1,0 +1,12 @@
+{
+  "transactions": [
+    {
+      "file": "c.hyp",
+      "contract": "C"
+    },
+    {
+      "to": 0,
+      "function": "test"
+    }
+  ]
+}

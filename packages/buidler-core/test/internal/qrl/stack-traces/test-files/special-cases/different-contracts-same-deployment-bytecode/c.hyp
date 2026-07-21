@@ -1,0 +1,17 @@
+pragma hyperion >=0.0;
+
+import "./d.hyp";
+
+contract E {
+    constructor() public {
+        revert("E");
+    }
+}
+
+
+contract C is D, E {
+    constructor() public {
+        revert("C and D have the same deployment bytecode because they always fail and get recognized as D");
+    }
+
+}
