@@ -9,7 +9,6 @@ import { promisify } from "util";
 
 import { ERRORS } from "../../../src/internal/core/errors-list";
 import {
-  buildHyperionStandardJsonInput,
   Compiler,
   HYPERION_COMPILER_REPOSITORY_ENV,
 } from "../../../src/internal/hyperion/compiler";
@@ -17,6 +16,7 @@ import {
   HyperionCompilerBuild,
   HyperionCompilersManifest,
 } from "../../../src/internal/hyperion/compiler-downloader";
+import { buildHyperionStandardJsonInput } from "../../../src/internal/hyperion/compiler-input";
 import {
   DownloadedCompilerIdentity,
   ResolvedHyperionCompiler,

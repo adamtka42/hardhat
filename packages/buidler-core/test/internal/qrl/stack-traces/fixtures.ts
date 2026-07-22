@@ -4,10 +4,8 @@ import os from "os";
 import path from "path";
 
 import { QrlLocalHardhatProvider } from "../../../../src/internal/core/providers/qrl-local";
-import {
-  buildHyperionStandardJsonInput,
-  compileHyperion,
-} from "../../../../src/internal/hyperion/compiler";
+import { compileHyperion } from "../../../../src/internal/hyperion/compiler";
+import { buildHyperionStandardJsonInput } from "../../../../src/internal/hyperion/compiler-input";
 import {
   encodeQrlConstructorArgs,
   encodeQrlFunctionData,

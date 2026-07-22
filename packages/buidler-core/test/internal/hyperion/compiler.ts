@@ -2,11 +2,11 @@ import { assert } from "chai";
 import fsExtra from "fs-extra";
 import path from "path";
 
+import { compileHyperion } from "../../../src/internal/hyperion/compiler";
 import {
   buildHyperionStandardJsonInput,
-  compileHyperion,
   HyperionInput,
-} from "../../../src/internal/hyperion/compiler";
+} from "../../../src/internal/hyperion/compiler-input";
 import { useTmpDir } from "../../helpers/fs";
 
 describe("Hyperion compiler", function () {

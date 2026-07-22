@@ -99,10 +99,9 @@ export function loadQrlDebugInfo(
         astBySourceName.set(sourceName, source.ast);
       }
 
-      // The compiler input normally carries the FULL dependency graph, but
-      // the resolver-failure fallback ships only project-local roots and
-      // lets hypc read imports from disk. Recover such content the same way
-      // so library frames still get real line numbers.
+      // Older or externally generated compiler caches may omit source
+      // content. Recover it from disk so library frames still get real line
+      // numbers.
       if (!sourceContent.has(sourceName) && projectRoot !== undefined) {
         const candidates = [
           path.join(projectRoot, sourceName),
