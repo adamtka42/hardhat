@@ -28,9 +28,8 @@ export interface JsonRpcTransactionData {
   chainId?: string | number;
 }
 
-// QRL ML-DSA-87 transaction signature descriptor used by local and Ledger signing.
-export const ML_DSA_87_DESCRIPTOR = new Uint8Array([0x01, 0x00, 0x00]);
-export const EMPTY_EXTRA_PARAMS = new Uint8Array();
+const ML_DSA_87_DESCRIPTOR = new Uint8Array([0x01, 0x00, 0x00]);
+const EMPTY_EXTRA_PARAMS = new Uint8Array();
 const HEX_DATA_REGEX = /^(0x)?[0-9a-fA-F]*$/;
 
 export function createLocalAccountsProvider(
@@ -215,7 +214,7 @@ async function getSignedTransaction(
   return signed.rawTransaction;
 }
 
-export function createQrlDynamicFeeTransaction(
+function createQrlDynamicFeeTransaction(
   tx: JsonRpcTransactionData,
   chainId: number
 ): any {
@@ -243,25 +242,6 @@ export function createQrlDynamicFeeTransaction(
     data,
     accessList: [],
   });
-}
-
-export function encodeQrlSignedTransaction(
-  transaction: any,
-  signature: Uint8Array,
-  publicKey: Uint8Array
-): string {
-  if (isQrlJsTransaction(transaction)) {
-    return serializeQrlJsSignedTransaction(transaction, signature, publicKey);
-  }
-
-  const signed = transaction._processAuthValues(
-    ML_DSA_87_DESCRIPTOR,
-    EMPTY_EXTRA_PARAMS,
-    signature,
-    publicKey
-  );
-
-  return `0x${Buffer.from(signed.serialize()).toString("hex")}`;
 }
 
 function createQrlJsDynamicFeeTransaction(

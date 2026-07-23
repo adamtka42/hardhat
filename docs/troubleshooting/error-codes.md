@@ -319,38 +319,6 @@ hypc build. Recompile the project.
 The same library was provided twice — through its bare and fully qualified
 names — with different addresses. Remove one entry or make them identical.
 
-## Ledger errors
-
-### BDLR118: QRL Ledger transport unavailable
-
-Hardhat could not load the Node HID transport for Ledger access.
-
-Fix:
-
-- install the required Ledger/HID dependencies,
-- check USB permissions,
-- run in an environment with HID access.
-
-### BDLR119: Invalid QRL Ledger response
-
-The Ledger app returned data Hardhat could not decode.
-
-Fix:
-
-- check that the correct QRL Ledger app is open,
-- reconnect the device,
-- verify the Ledger app and plugin versions.
-
-### BDLR120: QRL Ledger account not found
-
-Hardhat could not derive a Ledger path matching the configured QRL account.
-
-Fix:
-
-- check the configured account list,
-- check the derivation function or derivation limit,
-- verify the expected account on the device.
-
 ## Compile, artifacts, and imports
 
 ### BDLR400-BDLR407: Source or import resolution errors

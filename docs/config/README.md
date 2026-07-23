@@ -266,27 +266,6 @@ module.exports = {
 
 With this mode, signing is delegated to the node.
 
-### QRL Ledger accounts
-
-Ledger-backed accounts are configured with `type: "ledger"` and a list of QRL
-addresses:
-
-~~~js
-module.exports = {
-  networks: {
-    qrl: {
-      url: process.env.QRL_RPC_URL,
-      accounts: {
-        type: "ledger",
-        accounts: ["Q..."],
-      },
-    },
-  },
-};
-~~~
-
-QRL Hardhat asks the Ledger app to sign transactions for those addresses.
-
 ## Project paths
 
 The `paths` config can override the default project directories:

@@ -353,7 +353,7 @@ describe("Config validation", function () {
         it("Should reject non-local account config forms", function () {
           for (const accounts of [
             "remote",
-            { type: "ledger", accounts: [localAddress] },
+            { type: "custom", accounts: [localAddress] },
           ]) {
             expectHardhatError(
               () =>
@@ -630,82 +630,6 @@ describe("Config validation", function () {
               );
             });
           });
-
-          describe("QRL Ledger accounts", function () {
-            it("Should work with valid QRL Ledger accounts", function () {
-              assert.isEmpty(
-                getValidationErrors({
-                  networks: {
-                    asd: {
-                      accounts: {
-                        type: "ledger",
-                        accounts: [`Q${"a".repeat(128)}`],
-                      },
-                      url: "",
-                    },
-                  },
-                })
-              );
-            });
-
-            it("Shouldn't work without an accounts array", function () {
-              expectHardhatError(
-                () =>
-                  validateConfig({
-                    networks: {
-                      asd: {
-                        accounts: {
-                          type: "ledger",
-                        },
-                        url: "",
-                      },
-                    },
-                  }),
-                ERRORS.GENERAL.INVALID_CONFIG,
-                "64-byte QRL address array"
-              );
-            });
-
-            it("Shouldn't work with invalid QRL Ledger addresses", function () {
-              expectHardhatError(
-                () =>
-                  validateConfig({
-                    networks: {
-                      asd: {
-                        accounts: {
-                          type: "ledger",
-                          accounts: ["0x1234"],
-                        },
-                        url: "",
-                      },
-                    },
-                  }),
-                ERRORS.GENERAL.INVALID_CONFIG,
-                "64-byte QRL address"
-              );
-            });
-
-            it("Shouldn't work with invalid mixed-case QRL Ledger addresses", function () {
-              expectHardhatError(
-                () =>
-                  validateConfig({
-                    networks: {
-                      asd: {
-                        accounts: {
-                          type: "ledger",
-                          accounts: [
-                            "QA73C065F7018CC0cFFf98028D8Ef1Ff746f5Cb425bC8840A4CDC2A6Eb717faa121A2e959A6A0Dac2D7C38252d70E4541397b0967880f00b9bD0c4C5d0FC46b2d",
-                          ],
-                        },
-                        url: "",
-                      },
-                    },
-                  }),
-                ERRORS.GENERAL.INVALID_CONFIG,
-                "64-byte QRL address"
-              );
-            });
-          });
         });
 
         describe("Other fields", function () {
@@ -848,10 +772,10 @@ describe("Config validation", function () {
             ],
             url: "",
           },
-          withLedgerAccounts: {
+          withOtherTypeOfAccounts: {
             accounts: {
-              type: "ledger",
-              accounts: [`Q${"a".repeat(128)}`],
+              type: "custom",
+              customOption: 12,
             },
             url: "",
           },

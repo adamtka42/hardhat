@@ -67,9 +67,6 @@ export function wrapQrlProvider(
     const accounts = httpNetConfig.accounts;
     if (Array.isArray(accounts)) {
       provider = createLocalAccountsProvider(provider, accounts);
-    } else if (isLedgerAccountsConfig(accounts)) {
-      const { createLedgerAccountsProvider } = require("./ledger");
-      provider = createLedgerAccountsProvider(provider, accounts);
     }
   }
 
@@ -101,13 +98,4 @@ function isQrlLocalNetworkConfig(
   netConfig: Partial<NetworkConfig>
 ): netConfig is QrlLocalNetworkConfig {
   return (netConfig as any).type === "qrl-local";
-}
-
-function isLedgerAccountsConfig(accounts: any): boolean {
-  return (
-    accounts !== undefined &&
-    accounts !== null &&
-    typeof accounts === "object" &&
-    accounts.type === "ledger"
-  );
 }
