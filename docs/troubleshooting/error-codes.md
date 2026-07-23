@@ -160,19 +160,6 @@ Fix:
 
 ## QRL-specific validation
 
-### BDLR114: Legacy in-memory network unsupported
-
-The legacy `buidlerevm` network name from the Ethereum fork is not supported.
-(Historical note: early fork versions also threw this from `hardhat node`;
-the standalone server is now fully supported — see the
-[node guide](../guides/node.md).)
-
-Fix:
-
-- use `qrlLocal` for in-process tests or `hardhat node` for a standalone
-  endpoint,
-- or configure an HTTP network that points at go-qrl.
-
 ### BDLR115: Invalid QRL address
 
 A QRL address must be `Q` followed by 128 hexadecimal characters.
@@ -407,4 +394,3 @@ Fix:
 - load QRL-compatible plugins with `usePlugin()`.
 
 See [QRL Hardhat plugins](../plugins/README.md).
-

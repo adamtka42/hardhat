@@ -1,6 +1,5 @@
 import { assert } from "chai";
 
-import { LEGACY_IN_MEMORY_NETWORK_NAME } from "../../../../src/internal/constants";
 import {
   getValidationErrors,
   validateConfig,
@@ -264,21 +263,6 @@ describe("Config validation", function () {
                 },
               }),
             ERRORS.GENERAL.INVALID_CONFIG
-          );
-        });
-      });
-
-      describe("Legacy in-memory network config", function () {
-        it("Should fail if the legacy in-memory network is configured", function () {
-          expectHardhatError(
-            () =>
-              validateConfig({
-                networks: {
-                  [LEGACY_IN_MEMORY_NETWORK_NAME]: {},
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG,
-            "Use qrlLocal for in-process tests or configure a live go-qrl HTTP network instead."
           );
         });
       });

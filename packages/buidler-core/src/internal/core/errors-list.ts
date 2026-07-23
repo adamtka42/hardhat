@@ -257,13 +257,6 @@ Please make sure your node is running, and check your internet connection and ne
       title: "Missing contract address",
       description: `A contract deployment transaction was mined, but its receipt didn't include a contract address.`,
     },
-    QRL_IN_MEMORY_NODE_UNSUPPORTED: {
-      number: 114,
-      message:
-        "The legacy in-memory development network/server is not supported by the QRL-only fork.",
-      title: "Unsupported legacy QRL node mode",
-      description: `Use qrlLocal for in-process tests, or configure a network with an HTTP URL that points to a running go-qrl node. The legacy buidlerevm/hardhat node server mode is not supported.`,
-    },
     INVALID_QRL_ADDRESS: {
       number: 115,
       message: "Invalid QRL address %address%.",

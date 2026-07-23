@@ -6,9 +6,6 @@ import {
   QrlLocalNetworkConfig,
   QrlProvider,
 } from "../../../types";
-import { LEGACY_IN_MEMORY_NETWORK_NAME } from "../../constants";
-import { HardhatError } from "../errors";
-import { ERRORS } from "../errors-list";
 
 import { HttpProvider } from "./http";
 import { QrlLocalHardhatProvider } from "./qrl-local";
@@ -19,10 +16,6 @@ export function createProvider(
   paths?: ProjectPaths
 ): IQrlProvider {
   let provider: QrlProvider;
-
-  if (networkName === LEGACY_IN_MEMORY_NETWORK_NAME) {
-    throw new HardhatError(ERRORS.NETWORK.QRL_IN_MEMORY_NODE_UNSUPPORTED);
-  }
 
   if (isQrlLocalNetworkConfig(networkConfig)) {
     provider = new QrlLocalHardhatProvider(networkConfig, paths);

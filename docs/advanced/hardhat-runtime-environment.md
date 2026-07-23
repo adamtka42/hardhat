@@ -358,7 +358,7 @@ Use these QRL-specific surfaces instead:
 - `@theqrl/hardhat` instead of `@nomiclabs/buidler`.
 - `hardhat.config.js` instead of `buidler.config.js`.
 - Hyperion `.hyp` contracts instead of Solidity `.sol` contracts.
-- `qrlLocal` instead of `buidlerevm` or the old Ethereum `hardhat` network.
+- `qrlLocal` for in-process QRL contract execution.
 - QRL addresses and QRL extended seeds instead of Ethereum addresses and private
   keys.
 - `hre.qrl` and `qrl_*` JSON-RPC methods instead of Ethers/Web3 helpers.

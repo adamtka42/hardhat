@@ -2,7 +2,6 @@ import * as t from "io-ts";
 import { Context, getFunctionName, ValidationError } from "io-ts/lib";
 import { Reporter } from "io-ts/lib/Reporter";
 
-import { LEGACY_IN_MEMORY_NETWORK_NAME } from "../../constants";
 import { isValidQrlAddress } from "../../qrl/address";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
@@ -182,20 +181,9 @@ export function getValidationErrors(config: any): string[] {
 
   // These can't be validated with io-ts
   if (config !== undefined && typeof config.networks === "object") {
-    const inMemoryNetwork = config.networks[LEGACY_IN_MEMORY_NETWORK_NAME];
-    if (inMemoryNetwork !== undefined) {
-      errors.push(
-        `HardhatConfig.networks.${LEGACY_IN_MEMORY_NETWORK_NAME} is not supported by the QRL-only fork. Use qrlLocal for in-process tests or configure a live go-qrl HTTP network instead.`
-      );
-    }
-
     for (const [networkName, netConfig] of Object.entries<any>(
       config.networks
     )) {
-      if (networkName === LEGACY_IN_MEMORY_NETWORK_NAME) {
-        continue;
-      }
-
       if (netConfig.type === "qrl-local") {
         if (netConfig.url !== undefined) {
           errors.push(

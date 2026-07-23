@@ -61,8 +61,8 @@ in-process `qrlLocal` network.
 
 `mocha` passes options to Mocha when running `hardhat test`.
 
-Legacy Ethereum-only config such as `solc`, `buidlerevm`, Ethereum private keys,
-and HD wallet mnemonics is not part of the QRL-only configuration surface.
+Ethereum-only config such as `solc`, Ethereum private keys, and HD wallet
+mnemonics is not part of the QRL-only configuration surface.
 
 ## Hyperion compiler
 
@@ -341,10 +341,7 @@ repository.
 
 `HARDHAT_DEFAULT_NETWORK` can override `defaultNetwork` if your config uses it.
 
-## Unsupported legacy config
-
-The QRL fork intentionally rejects the old in-memory Ethereum networks named
-`hardhat` or `buidlerevm`. Use `qrlLocal` instead.
+## QRL-only configuration
 
 Ethereum HD wallet config, raw Ethereum private keys, `eth_*` network assumptions,
 Solidity `solc` config, and EVM hardfork settings are not valid QRL Hardhat
