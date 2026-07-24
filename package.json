@@ -29,7 +29,7 @@
     "postinstall": "node scripts/install.js",
     "build": "lerna exec -- npm run build",
     "build-test": "lerna exec -- npm run build-test",
-    "watch": "tsc --build --watch packages/buidler-core/src",
+    "watch": "tsc --build --watch packages/*/src",
     "clean": "lerna exec -- npm run clean",
     "test": "node scripts/run-tests.js",
     "lint": "lerna exec --no-bail -- npm run lint",

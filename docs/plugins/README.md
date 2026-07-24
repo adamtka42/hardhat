@@ -9,9 +9,9 @@ QRL Hardhat still supports the core Hardhat/Buidler plugin mechanism:
 - Plugins can export helpers, lazy objects, and plugin-specific errors.
 
 This fork does not include the old Ethereum plugin set. The removed upstream
-plugins for Ethers.js, Web3.js, Waffle, Truffle, Ganache, Etherscan, Solidity
-linting, Solidity preprocessing, Vyper, and Docker Solidity compilation were
-specific to Ethereum/Solidity workflows and are not part of QRL Hardhat.
+plugins for Ethers.js, Ethereum Web3.js, Waffle, Truffle, Ganache, Etherscan,
+Solidity linting, Solidity preprocessing, Vyper, and Docker Solidity compilation
+were specific to Ethereum/Solidity workflows and are not part of QRL Hardhat.
 
 ## Loading a plugin
 
@@ -28,6 +28,23 @@ module.exports = {
 `usePlugin()` validates the plugin package and peer dependencies before loading
 the plugin entrypoint. If the package exports a function, QRL Hardhat calls it
 while loading the config.
+
+## Official QRL Web3 plugin
+
+`@theqrl/hardhat-web3` is the official QRL-compatible Web3 plugin. It adds the
+`Web3` constructor and a `web3` instance connected to the selected Hardhat
+network. Use the QRL namespace:
+
+~~~js
+usePlugin("@theqrl/hardhat-web3");
+
+task("accounts", "Prints QRL accounts", async (_, { web3 }) => {
+  console.log(await web3.qrl.getAccounts());
+});
+~~~
+
+The plugin uses `@theqrl/web3`; it does not provide Ethereum `web3.eth`
+compatibility.
 
 ## What plugins can do
 
@@ -78,11 +95,10 @@ QRL plugins should use QRL-native surfaces:
 - hardhatqrlvm or HTTP go-qrl networks.
 
 Avoid assuming Ethereum-only behavior such as `eth_*` RPC, Ethereum private
-keys, HD wallets, Solidity-only source paths, Ethers.js signers, Web3.js
-providers, Ganache, or Buidler EVM.
+keys, HD wallets, Solidity-only source paths, Ethers.js signers, Ethereum Web3
+providers, Ganache, or Buidler EVM. Use `@theqrl/web3` when a Web3 API is needed.
 
 ## Building a plugin
 
 For the current plugin API and QRL-specific examples, see
 [Building plugins](../advanced/building-plugins.md).
-

@@ -150,6 +150,20 @@ Run it with:
 npx hardhat qrl-balance --account Q... --network qrl
 ~~~
 
+## Official environment extension example
+
+`@theqrl/hardhat-web3` is an official plugin that extends the HRE with the
+`Web3` constructor and a connected `web3` instance. Its network API is available
+under `web3.qrl`.
+
+~~~js
+usePlugin("@theqrl/hardhat-web3");
+
+task("web3-accounts", "Prints QRL accounts", async (_, { web3 }) => {
+  console.log(await web3.qrl.getAccounts());
+});
+~~~
+
 ## Keep it QRL-compatible
 
 QRL-compatible plugins should prefer:
@@ -160,7 +174,7 @@ QRL-compatible plugins should prefer:
 - QRL addresses,
 - hardhatqrlvm and HTTP go-qrl networks.
 
-Avoid assuming Ethereum private keys, Ethers.js signers, Web3.js providers,
-Ganache, Truffle, Waffle, Buidler EVM, or Solidity-only compiler behavior unless
+Avoid assuming Ethereum private keys, Ethers.js signers, or Ethereum Web3
+providers, Ganache, Truffle, Waffle, Buidler EVM, or Solidity-only compiler behavior unless
 your plugin explicitly implements and documents a compatibility layer.
 

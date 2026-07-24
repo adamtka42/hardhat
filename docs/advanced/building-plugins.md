@@ -237,7 +237,9 @@ QRL Hardhat plugins should not assume Ethereum-only APIs. Prefer:
 - hardhatqrlvm or HTTP go-qrl networks.
 
 Avoid depending on `eth_*` RPC methods, Ethereum private keys, Ethers.js
-signers, Web3.js providers, Ganache, Truffle, Waffle, Solidity-only compiler
-options, or Buidler EVM internals unless your plugin explicitly provides a
-compatibility layer and documents its limits.
+signers, upstream Ethereum `web3` providers, Ganache, Truffle, Waffle,
+Solidity-only compiler options, or Buidler EVM internals unless your plugin
+explicitly provides a compatibility layer and documents its limits.
+`@theqrl/web3` is the QRL-native Web3 implementation and can be exposed through
+`@theqrl/hardhat-web3`.
 

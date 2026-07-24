@@ -6,7 +6,9 @@ provider, task runner, and QRL-specific runtime helpers.
 
 In this fork, the HRE is QRL-only. It does not expose Ethereum convenience
 libraries such as Ethers.js, Web3.js, Waffle, or Truffle by default. Contract
-interaction goes through `hre.qrl` and direct `qrl_*` JSON-RPC calls.
+interaction goes through `hre.qrl` and direct `qrl_*` JSON-RPC calls. The optional
+`@theqrl/hardhat-web3` plugin extends the HRE with `Web3` and a connected
+`web3` instance; these are not core HRE fields.
 
 ## What the HRE contains
 
@@ -361,4 +363,5 @@ Use these QRL-specific surfaces instead:
 - `hardhatqrlvm` for in-process QRL contract execution.
 - QRL addresses and QRL extended seeds instead of Ethereum addresses and private
   keys.
-- `hre.qrl` and `qrl_*` JSON-RPC methods instead of Ethers/Web3 helpers.
+- `hre.qrl` and `qrl_*` JSON-RPC methods for the core runtime; use the optional
+  `@theqrl/hardhat-web3` plugin when a QRL Web3 API is preferred.

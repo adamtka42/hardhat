@@ -136,14 +136,43 @@ export function readPackageJson(
   packageName: string,
   from?: string
 ): PackageJson | undefined {
+  const options = from !== undefined ? { paths: [from] } : undefined;
+
   try {
-    const options = from !== undefined ? { paths: [from] } : undefined;
     const packageJsonPath = require.resolve(
       path.join(packageName, "package.json"),
       options
     );
 
     return require(packageJsonPath);
+  } catch (error) {
+    // Packages using the exports field may not expose package.json. Resolve
+    // their public entrypoint and walk up to the owning manifest instead.
+  }
+
+  try {
+    const packageEntryPoint = require.resolve(packageName, options);
+    let currentDirectory = path.dirname(packageEntryPoint);
+
+    while (true) {
+      try {
+        const packageJson: PackageJson = require(path.join(
+          currentDirectory,
+          "package.json"
+        ));
+        if (packageJson.name === packageName) {
+          return packageJson;
+        }
+      } catch (error) {
+        // Keep looking for the package's root manifest.
+      }
+
+      const parentDirectory = path.dirname(currentDirectory);
+      if (parentDirectory === currentDirectory) {
+        return undefined;
+      }
+      currentDirectory = parentDirectory;
+    }
   } catch (error) {
     return undefined;
   }

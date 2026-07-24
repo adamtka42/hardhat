@@ -30,21 +30,27 @@ const spawnOptions = {
   stdio: "inherit",
 };
 
-const result = spawnSync(
-  "npm",
-  [
-    "--prefix",
-    "packages/buidler-core",
-    "run",
-    "test",
-    "--",
-    ...getTestArgsOrDefaults(),
-  ],
-  spawnOptions
-);
+function runPackageTests(packageDirectory, testArgs) {
+  const result = spawnSync(
+    "npm",
+    ["--prefix", packageDirectory, "run", "test", "--", ...testArgs],
+    spawnOptions
+  );
 
-if (result.error !== undefined) {
-  console.error(result.error);
+  if (result.error !== undefined) {
+    console.error(result.error);
+  }
+
+  return result.status === null ? 1 : result.status;
 }
 
-process.exit(result.status === null ? 1 : result.status);
+const testArgs = getTestArgsOrDefaults();
+for (const packageDirectory of [
+  "packages/buidler-core",
+  "packages/buidler-web3",
+]) {
+  const status = runPackageTests(packageDirectory, testArgs);
+  if (status !== 0) {
+    process.exit(status);
+  }
+}
