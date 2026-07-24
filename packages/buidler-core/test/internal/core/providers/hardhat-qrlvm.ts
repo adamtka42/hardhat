@@ -180,6 +180,24 @@ describe("Hardhat QRLVM provider", function () {
     assert.equal(receipt.blockNumber, "0x1");
   });
 
+  it("keeps direct provider quantities strict", async () => {
+    const provider = createProvider("hardhatqrlvm", {
+      chainId: 1337,
+      blockGasLimit: 30000,
+      qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+      accounts: [{ address: SENDER, balance: "1000" }],
+    });
+
+    try {
+      await provider.send("qrl_call", [
+        { from: SENDER, to: RECEIVER, value: 1 },
+      ]);
+      assert.fail("numeric JSON-RPC quantity should be rejected");
+    } catch (error) {
+      assert.equal((error as any).code, -32602);
+    }
+  });
+
   it("supports snapshots and reverts", async () => {
     const provider = createLocalProvider();
     const snapshot = await provider.send("qrl_snapshot");

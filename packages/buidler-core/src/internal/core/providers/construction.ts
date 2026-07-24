@@ -55,10 +55,6 @@ export function wrapQrlProvider(
   } = require("./gas-providers");
 
   const { createChainIdValidationProvider } = require("./chainId");
-  const {
-    createQrlTransactionNormalizationProvider,
-  } = require("./transactions");
-
   const isHttpNetworkConfig = "url" in netConfig;
 
   if (isHttpNetworkConfig) {
@@ -71,7 +67,6 @@ export function wrapQrlProvider(
   }
 
   provider = createSenderProvider(provider, netConfig.from);
-  provider = createQrlTransactionNormalizationProvider(provider);
 
   if (netConfig.gas === undefined || netConfig.gas === "auto") {
     provider = createAutomaticGasProvider(provider, netConfig.gasMultiplier);

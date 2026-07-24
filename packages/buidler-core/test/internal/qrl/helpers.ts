@@ -696,7 +696,7 @@ describe("QRL runtime helpers", () => {
 
     assert.equal(response.hash, txHash);
     assert.deepEqual(provider.getLatestParams("qrl_sendTransaction"), [
-      { from: contractAddress, to: contractAddress, value: 1 },
+      { from: contractAddress, to: contractAddress, value: "0x1" },
     ]);
 
     const receipt = await response.wait(1000, 1);

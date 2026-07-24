@@ -17,6 +17,7 @@ import {
 import { readArtifact } from "../artifacts";
 import { HardhatError } from "../core/errors";
 import { ERRORS } from "../core/errors-list";
+import { normalizeQrlTransactionQuantities } from "../core/providers/provider-utils";
 
 import {
   decodeQrlEventLog,
@@ -169,7 +170,9 @@ export function createQrlRuntimeHelpers(
   }
 
   async function sendTransaction(tx: QrlTransactionRequest): Promise<string> {
-    return bre.network.provider.send("qrl_sendTransaction", [tx]);
+    const rpcTransaction = { ...tx };
+    normalizeQrlTransactionQuantities(rpcTransaction);
+    return bre.network.provider.send("qrl_sendTransaction", [rpcTransaction]);
   }
 
   /**
@@ -212,7 +215,9 @@ export function createQrlRuntimeHelpers(
     tx: QrlTransactionRequest,
     blockTag: string = "latest"
   ): Promise<string> {
-    return bre.network.provider.send("qrl_call", [tx, blockTag]);
+    const rpcTransaction = { ...tx };
+    normalizeQrlTransactionQuantities(rpcTransaction);
+    return bre.network.provider.send("qrl_call", [rpcTransaction, blockTag]);
   }
 
   async function waitForTransaction(
