@@ -1,6 +1,6 @@
 # Hyperion stack traces
 
-When a transaction or call reverts on `qrlLocal`, QRL Hardhat appends a
+When a transaction or call reverts on `hardhatqrlvm`, QRL Hardhat appends a
 Hyperion stack trace to the error: the chain of contracts and functions that
 led to the revert, with source file and line for every frame.
 
@@ -40,11 +40,10 @@ decoded-reason message — nothing breaks.
 
 ## Configuration
 
-Stack traces are on by default for `qrl-local` networks. Disable per network:
+Stack traces are on by default for `hardhatqrlvm` networks. Disable per network:
 
 ```js
-qrlLocal: {
-  type: "qrl-local",
+hardhatqrlvm: {
   qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
   stackTraces: false,
 },
@@ -53,7 +52,7 @@ qrlLocal: {
 ## debug_traceCall and debug_traceTransaction
 
 The underlying tracer is also exposed as the go-qrl-compatible `debug`
-namespace on `qrlLocal`:
+namespace on `hardhatqrlvm`:
 
 ```js
 const trace = await network.provider.send("debug_traceTransaction", [txHash]);
@@ -92,7 +91,7 @@ decoder, or inference pipeline fails internally, Hardhat preserves the original
 contract error and increments a diagnostic counter. The `hardhat test` task
 prints a warning when that counter is non-zero.
 
-The current value is available on `qrlLocal` for tooling and regression tests:
+The current value is available on `hardhatqrlvm` for tooling and regression tests:
 
 ```js
 const failures = await network.provider.send("qrl_getStackTraceFailuresCount");

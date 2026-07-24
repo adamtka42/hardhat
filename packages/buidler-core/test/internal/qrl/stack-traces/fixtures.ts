@@ -3,7 +3,7 @@ import fsExtra from "fs-extra";
 import os from "os";
 import path from "path";
 
-import { QrlLocalHardhatProvider } from "../../../../src/internal/core/providers/qrl-local";
+import { HardhatQrlvmProvider } from "../../../../src/internal/core/providers/hardhat-qrlvm";
 import { compileHyperion } from "../../../../src/internal/hyperion/compiler";
 import { buildHyperionStandardJsonInput } from "../../../../src/internal/hyperion/compiler-input";
 import {
@@ -163,8 +163,7 @@ async function runFixture(
       (contract) => !contract.contractName.startsWith("Ignored")
     );
     const decoder = new QrlStackTraceDecoder(debugInfo!);
-    const provider = new QrlLocalHardhatProvider({
-      type: "qrl-local",
+    const provider = new HardhatQrlvmProvider({
       chainId: 1337,
       blockGasLimit: 50000000,
       qrlJsMonorepoPath,

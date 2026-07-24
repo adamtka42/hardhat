@@ -17,7 +17,7 @@ project structure, configuration, compile, test, and scripts.
 - For local in-process tests: nothing extra — installed packages ship the QRL
   VM runtime bundled. (Working from this repository's source tree instead
   still needs a built `qrljs-monorepo` checkout exposed with
-  `QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath`.)
+  `QRLJS_MONOREPO_PATH` or `networks.hardhatqrlvm.qrlJsMonorepoPath`.)
 - For live/private networks: a running go-qrl HTTP JSON-RPC node.
 - For locally signed live transactions: a QRL extended seed in
   `QRL_ACCOUNT_SEED`, or use `accounts: "remote"` with a node-managed account.
@@ -77,10 +77,9 @@ const accounts =
 const localAccountAddress = "Q" + "01".repeat(64);
 
 module.exports = {
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -95,16 +94,16 @@ module.exports = {
 };
 ~~~
 
-Use `qrlLocal` for fast in-process tests. Use `qrl` or another HTTP network for
+Use `hardhatqrlvm` for fast in-process tests. Use `qrl` or another HTTP network for
 a running go-qrl node.
 
-### qrlLocal
+### hardhatqrlvm
 
-`qrlLocal` runs a local QRL VM in-process. It does not require a go-qrl node;
+`hardhatqrlvm` runs a local QRL VM in-process. It does not require a go-qrl node;
 installed packages include the QRL VM runtime, so it works directly:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 For qrljs/Hardhat development you can point at a built `qrljs-monorepo`
@@ -184,11 +183,11 @@ describe("Sample", function () {
 });
 ~~~
 
-Run the test on `qrlLocal`:
+Run the test on `hardhatqrlvm`:
 
 ~~~sh
 export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 Run it against an HTTP node:
@@ -201,7 +200,7 @@ npx hardhat test --network qrl
 
 ## Debug contract code with console.log
 
-When running on `qrlLocal`, contracts can import
+When running on `hardhatqrlvm`, contracts can import
 `@theqrl/hardhat/console.hyp` and print temporary debug values from inside
 Hyperion code:
 
@@ -245,7 +244,7 @@ main()
 Run it:
 
 ~~~sh
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ~~~
 
 or:
@@ -315,7 +314,7 @@ Legacy `eth_*` compatibility is intentionally not the primary interface.
 
 ## Troubleshooting
 
-### qrlLocal cannot load the QRL runtime
+### hardhatqrlvm cannot load the QRL runtime
 
 Installed packages ship the runtime bundled; this error normally appears only
 when `QRLJS_MONOREPO_PATH` (or `qrlJsMonorepoPath`) points at a missing or
@@ -329,7 +328,7 @@ npm run build
 
 cd /path/to/qrl-hardhat-example
 export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 When running Hardhat from this repository's source tree (not a packed
@@ -353,8 +352,8 @@ Use a full function signature in helpers and ABI utilities, for example
 
 For TypeScript project setup, see
 [guides/typescript.md](guides/typescript.md). For VS Code debugging, see
-[guides/vscode-tests.md](guides/vscode-tests.md). For qrlLocal details, see
-[qrl-local/README.md](qrl-local/README.md).
+[guides/vscode-tests.md](guides/vscode-tests.md). For hardhatqrlvm details, see
+[hardhat-qrlvm/README.md](hardhat-qrlvm/README.md).
 
 For more troubleshooting cases, see
 [troubleshooting/common-problems.md](troubleshooting/common-problems.md). For

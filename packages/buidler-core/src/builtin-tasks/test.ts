@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import path from "path";
 
+import { HARDHAT_QRLVM_NETWORK_NAME } from "../internal/constants";
 import { internalTask, task } from "../internal/core/config/config-env";
 import { isTypescriptSupported } from "../internal/core/typescript-support";
 import { glob } from "../internal/util/glob";
@@ -83,10 +84,7 @@ export default function () {
         await run(TASK_TEST_SETUP_TEST_ENVIRONMENT);
         await run(TASK_TEST_RUN_MOCHA_TESTS, { testFiles: files });
 
-        if (
-          !("type" in network.config) ||
-          network.config.type !== "qrl-local"
-        ) {
+        if (network.name !== HARDHAT_QRLVM_NETWORK_NAME) {
           return;
         }
 

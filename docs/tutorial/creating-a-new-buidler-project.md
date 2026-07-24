@@ -39,10 +39,9 @@ const localAccounts = [
 ];
 
 module.exports = {
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccounts[0].address,

@@ -4,7 +4,7 @@ import path from "path";
 
 import { ERRORS } from "../../../../src/internal/core/errors-list";
 import { createProvider } from "../../../../src/internal/core/providers/construction";
-import { QrlLocalHardhatProvider } from "../../../../src/internal/core/providers/qrl-local";
+import { HardhatQrlvmProvider } from "../../../../src/internal/core/providers/hardhat-qrlvm";
 import {
   expectHardhatError,
   expectHardhatErrorAsync,
@@ -29,8 +29,7 @@ function hasQrlJsMonorepoDist(): boolean {
 }
 
 function createLocalProvider() {
-  return new QrlLocalHardhatProvider({
-    type: "qrl-local",
+  return new HardhatQrlvmProvider({
     chainId: 1337,
     blockGasLimit: 30000,
     qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
@@ -50,8 +49,7 @@ function createLocalProviderWithReverter(
     allowUnlimitedContractSize: boolean;
   }> = {}
 ) {
-  return new QrlLocalHardhatProvider({
-    type: "qrl-local",
+  return new HardhatQrlvmProvider({
     chainId: 1337,
     blockGasLimit: 30000000,
     qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
@@ -88,7 +86,7 @@ function revertWithPayloadRuntime(payloadHex: string): number[] {
 
 // Init code: CODECOPY the trailing runtime into memory and RETURN it.
 async function deployRuntime(
-  provider: QrlLocalHardhatProvider,
+  provider: HardhatQrlvmProvider,
   runtime: number[]
 ): Promise<string> {
   const lengthHi = Math.floor(runtime.length / 256);
@@ -119,13 +117,11 @@ async function deployRuntime(
   return receipt.contractAddress;
 }
 
-async function deployReverter(
-  provider: QrlLocalHardhatProvider
-): Promise<string> {
+async function deployReverter(provider: HardhatQrlvmProvider): Promise<string> {
   return deployRuntime(provider, REVERTER_RUNTIME);
 }
 
-describe("QRL local Hardhat provider", function () {
+describe("Hardhat QRLVM provider", function () {
   beforeEach(function () {
     const testTitle =
       this.currentTest === undefined ? "" : this.currentTest.title;
@@ -412,8 +408,7 @@ describe("QRL local Hardhat provider", function () {
     ));
     const signerAddress = seedToAccount(seed).address;
 
-    const provider = new QrlLocalHardhatProvider({
-      type: "qrl-local",
+    const provider = new HardhatQrlvmProvider({
       chainId: 1337,
       blockGasLimit: 30000000,
       qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
@@ -502,8 +497,7 @@ describe("QRL local Hardhat provider", function () {
     const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
     const account = seedToAccount(seed);
 
-    const provider = new QrlLocalHardhatProvider({
-      type: "qrl-local",
+    const provider = new HardhatQrlvmProvider({
       chainId: 1337,
       qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
       accounts: [
@@ -543,8 +537,7 @@ describe("QRL local Hardhat provider", function () {
 
   it("validates qrl_sign data and seed/address consistency", async () => {
     const seed = `0x010000${"04".repeat(48)}`;
-    const provider = new QrlLocalHardhatProvider({
-      type: "qrl-local",
+    const provider = new HardhatQrlvmProvider({
       chainId: 1337,
       qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
       accounts: [{ address: SENDER, balance: "1000", seed }],
@@ -577,8 +570,7 @@ describe("QRL local Hardhat provider", function () {
   });
 
   it("applies initialDate to the genesis block and supports time controls", async () => {
-    const provider = new QrlLocalHardhatProvider({
-      type: "qrl-local",
+    const provider = new HardhatQrlvmProvider({
       chainId: 1337,
       qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
       initialDate: "2026-01-01T00:00:00Z",
@@ -624,8 +616,7 @@ describe("QRL local Hardhat provider", function () {
 
     expectHardhatError(
       () =>
-        new QrlLocalHardhatProvider({
-          type: "qrl-local",
+        new HardhatQrlvmProvider({
           qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
           initialDate: "not-a-date",
         }),
@@ -634,8 +625,7 @@ describe("QRL local Hardhat provider", function () {
   });
 
   it("uses an explicit qrljs-monorepo path from the network config", async () => {
-    const provider = new QrlLocalHardhatProvider({
-      type: "qrl-local",
+    const provider = new HardhatQrlvmProvider({
       qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
       chainId: 1337,
       accounts: [{ address: SENDER, balance: "1000" }],
@@ -651,8 +641,7 @@ describe("QRL local Hardhat provider", function () {
     const missingQrlJsMonorepoPath = path.resolve("missing-qrljs-monorepo");
     expectHardhatError(
       () =>
-        new QrlLocalHardhatProvider({
-          type: "qrl-local",
+        new HardhatQrlvmProvider({
           qrlJsMonorepoPath: missingQrlJsMonorepoPath,
         }),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
@@ -679,18 +668,13 @@ describe("QRL local Hardhat provider", function () {
     try {
       if (bundlePresent) {
         // With a bundled runtime present, no override is required at all.
-        const provider = new QrlLocalHardhatProvider({
-          type: "qrl-local",
-        });
-        assert.instanceOf(provider, QrlLocalHardhatProvider);
+        const provider = new HardhatQrlvmProvider({});
+        assert.instanceOf(provider, HardhatQrlvmProvider);
         return;
       }
 
       expectHardhatError(
-        () =>
-          new QrlLocalHardhatProvider({
-            type: "qrl-local",
-          }),
+        () => new HardhatQrlvmProvider({}),
         ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
         /QRLJS_MONOREPO_PATH/s
       );
@@ -704,8 +688,7 @@ describe("QRL local Hardhat provider", function () {
   });
 
   it("can be created through the standard provider factory", async () => {
-    const provider = createProvider("qrlLocal", {
-      type: "qrl-local",
+    const provider = createProvider("hardhatqrlvm", {
       chainId: 1,
       from: SENDER,
       qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,

@@ -25,14 +25,14 @@ task("qrl-accounts", "Prints QRL accounts").setAction(async (_, { network }) => 
 });
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
 };
 ~~~
 
 Run it with:
 
 ~~~sh
-npx hardhat qrl-accounts --network qrlLocal
+npx hardhat qrl-accounts --network hardhatqrlvm
 ~~~
 
 If the behavior is useful in more than one project, move it into a plugin.
@@ -102,10 +102,9 @@ Install the plugin in a QRL Hardhat project and load it from
 usePlugin("qrl-hardhat-example-plugin");
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       accounts: [{ address: "Q" + "01".repeat(64), balance: "1000000000000" }],
     },
@@ -116,7 +115,7 @@ module.exports = {
 Run the plugin task:
 
 ~~~sh
-npx hardhat qrl-accounts --network qrlLocal
+npx hardhat qrl-accounts --network hardhatqrlvm
 ~~~
 
 Use the runtime helper from a task, script, test, or console:
@@ -159,7 +158,7 @@ QRL-compatible plugins should prefer:
 - `hre.qrl` helpers,
 - Hyperion `.hyp` artifacts,
 - QRL addresses,
-- qrlLocal and HTTP go-qrl networks.
+- hardhatqrlvm and HTTP go-qrl networks.
 
 Avoid assuming Ethereum private keys, Ethers.js signers, Web3.js providers,
 Ganache, Truffle, Waffle, Buidler EVM, or Solidity-only compiler behavior unless

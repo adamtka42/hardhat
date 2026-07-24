@@ -27,8 +27,8 @@ Fix:
 
 - check the full validation message,
 - verify `networks`, `paths`, and `hyperion` fields,
-- use QRL network fields such as `type: "qrl-local"`, `url`, `accounts`,
-  `qrlJsMonorepoPath`, `gas`, and `gasPrice`.
+- use the reserved `hardhatqrlvm` name for the in-process network and HTTP
+  fields such as `url`, `accounts`, `gas`, and `gasPrice` for remote networks.
 
 See [Configuration](../config/README.md).
 
@@ -86,7 +86,7 @@ Fix:
 - use an address returned by `qrl_accounts`,
 - set `QRL_ACCOUNT_SEED` for local HTTP signing,
 - configure `accounts: "remote"` and unlock/manage the account in go-qrl,
-- or add the account to `qrlLocal.accounts`.
+- or add the account to `hardhatqrlvm.accounts`.
 
 Recipient addresses do not need to be managed. Sender addresses do.
 
@@ -224,7 +224,7 @@ Fix:
 
 ### BDLR123: QRL runtime unavailable
 
-`qrlLocal` could not load the QRL VM runtime — neither the bundle shipped in
+`hardhatqrlvm` could not load the QRL VM runtime — neither the bundle shipped in
 installed packages nor the development override was usable.
 
 Fix — with installed packages, unset the override (`QRLJS_MONOREPO_PATH` /
@@ -239,7 +239,7 @@ npm run tsc
 
 cd /path/to/qrl-hardhat-project
 QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 You can also set `networks.<name>.qrlJsMonorepoPath` in
@@ -311,7 +311,7 @@ hypc build. Recompile the project.
 
 ### BDLR130: Invalid initialDate network config value
 
-`initialDate` on a qrl-local network must be an ISO 8601 date string, e.g.
+`initialDate` on a `hardhatqrlvm` network must be an ISO 8601 date string, e.g.
 `"2026-01-01T00:00:00Z"`.
 
 ### BDLR131: Conflicting library addresses for linking

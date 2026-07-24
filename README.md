@@ -10,9 +10,9 @@ on top as focused commits.
 ## Getting Started
 
 Start with [docs/README.md](docs/README.md) for the documentation index, [docs/tutorial/README.md](docs/tutorial/README.md) for a step-by-step walkthrough, or [docs/getting-started.md](docs/getting-started.md) for the compact setup guide. The getting-started guide covers
-installation, `qrlLocal`, HTTP go-qrl networks, Hyperion `.hyp` contracts, tests,
-scripts, and the `hre.qrl` runtime helpers. For the qrlLocal guide, see
-[docs/qrl-local/README.md](docs/qrl-local/README.md). For the full configuration reference,
+installation, `hardhatqrlvm`, HTTP go-qrl networks, Hyperion `.hyp` contracts, tests,
+scripts, and the `hre.qrl` runtime helpers. For the hardhatqrlvm guide, see
+[docs/hardhat-qrlvm/README.md](docs/hardhat-qrlvm/README.md). For the full configuration reference,
 see [docs/config/README.md](docs/config/README.md). For project setup, see
 [docs/guides/project-setup.md](docs/guides/project-setup.md). For compile details, see
 [docs/guides/compile-contracts.md](docs/guides/compile-contracts.md). For deployment, see
@@ -42,7 +42,7 @@ For runtime details, see [docs/advanced/hardhat-runtime-environment.md](docs/adv
 ## Current State
 
 This branch contains the QRL-specific runtime, Hyperion compilation flow,
-QRL address handling, ML-DSA-87 signing, `qrlLocal` in-process testing, and live
+QRL address handling, ML-DSA-87 signing, `hardhatqrlvm` in-process testing, and live
 go-qrl HTTP provider support. Legacy Ethereum/EVM/Solidity surfaces have been
 removed where they are not needed, or rejected explicitly where preserving the
 old input boundary makes configuration errors clearer.

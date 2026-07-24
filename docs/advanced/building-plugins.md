@@ -234,7 +234,7 @@ QRL Hardhat plugins should not assume Ethereum-only APIs. Prefer:
 - `hre.qrl` contract helpers,
 - QRL addresses,
 - Hyperion artifacts,
-- qrlLocal or HTTP go-qrl networks.
+- hardhatqrlvm or HTTP go-qrl networks.
 
 Avoid depending on `eth_*` RPC methods, Ethereum private keys, Ethers.js
 signers, Web3.js providers, Ganache, Truffle, Waffle, Solidity-only compiler

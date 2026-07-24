@@ -14,17 +14,16 @@ const accounts =
 const localAccountAddress = `Q${"01".repeat(64)}`;
 
 module.exports = {
-  // qrlLocal is the default because it runs tests in-process using the QRL VM
+  // hardhatqrlvm is the default because it runs tests in-process using the QRL VM
   // runtime bundled with this package. Use --network qrl /
   // HARDHAT_DEFAULT_NETWORK=qrl to connect to a running HTTP node instead.
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   networks: {
     qrl: {
       url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
       accounts,
     },
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       // Optional development override: point at a built qrljs-monorepo
       // checkout to replace the runtime bundled with the package.

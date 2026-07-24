@@ -5,7 +5,7 @@ Congratulations on finishing the tutorial.
 You now have a QRL Hardhat project that can:
 
 - Compile Hyperion `.hyp` contracts
-- Test contracts on qrlLocal
+- Test contracts on hardhatqrlvm
 - Send state-changing transactions through direct contract method aliases and
   wait for receipts with `tx.wait()`
 - Call read-only contract functions directly on contract wrappers
@@ -19,7 +19,7 @@ Here are some links you might find useful:
 - [Deploying contracts](../guides/deploying.md)
 - [Scripts](../guides/scripts.md)
 - [Creating tasks](../guides/create-task.md)
-- [qrlLocal](../qrl-local/README.md)
+- [hardhatqrlvm](../hardhat-qrlvm/README.md)
 - [Common problems](../troubleshooting/common-problems.md)
 - [Mocha documentation](https://mochajs.org/)
 

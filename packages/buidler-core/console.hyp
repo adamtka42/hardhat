@@ -7,7 +7,7 @@
 //
 // Usage: import "@theqrl/hardhat/console.hyp"; then call console.log(...)
 // inside contract functions (view or state-changing; not pure). On
-// qrlLocal the logs are decoded and printed by Hardhat. On real networks
+// hardhatqrlvm the logs are decoded and printed by Hardhat. On real networks
 // the calls silently succeed (the console address has no code), so
 // contracts behave identically everywhere; only local output differs.
 pragma hyperion >=0.0;

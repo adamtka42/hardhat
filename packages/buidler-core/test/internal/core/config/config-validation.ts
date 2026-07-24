@@ -267,14 +267,13 @@ describe("Config validation", function () {
         });
       });
 
-      describe("QRL local network config", function () {
+      describe("Hardhat QRLVM network config", function () {
         const localAddress = `Q${"01".repeat(64)}`;
 
-        it("Should accept a valid qrl-local network", function () {
+        it("Should accept a valid `hardhatqrlvm` network", function () {
           const errors = getValidationErrors({
             networks: {
-              qrlLocal: {
-                type: "qrl-local",
+              hardhatqrlvm: {
                 chainId: 1,
                 from: localAddress,
                 accounts: [
@@ -295,19 +294,33 @@ describe("Config validation", function () {
           assert.isEmpty(errors);
         });
 
-        it("Should reject url on qrl-local networks", function () {
+        it("Should only recognize the reserved local network name", function () {
+          const errors = getValidationErrors({
+            networks: {
+              localAlias: {
+                accounts: [{ address: localAddress }],
+              },
+            },
+          });
+
+          assert.include(
+            errors.join("\n"),
+            "HardhatConfig.networks.localAlias.url"
+          );
+        });
+
+        it("Should reject url on `hardhatqrlvm` networks", function () {
           expectHardhatError(
             () =>
               validateConfig({
                 networks: {
-                  qrlLocal: {
-                    type: "qrl-local",
+                  hardhatqrlvm: {
                     url: "http://localhost",
                   },
                 },
               }),
             ERRORS.GENERAL.INVALID_CONFIG,
-            "HardhatConfig.networks.qrlLocal.url"
+            "HardhatConfig.networks.hardhatqrlvm.url"
           );
         });
 
@@ -316,8 +329,7 @@ describe("Config validation", function () {
             () =>
               validateConfig({
                 networks: {
-                  qrlLocal: {
-                    type: "qrl-local",
+                  hardhatqrlvm: {
                     accounts: [{ address: `Q${"01".repeat(20)}` }],
                   },
                 },
@@ -338,8 +350,7 @@ describe("Config validation", function () {
               () =>
                 validateConfig({
                   networks: {
-                    qrlLocal: {
-                      type: "qrl-local",
+                    hardhatqrlvm: {
                       accounts: [{ address: localAddress, seed }],
                     },
                   },
@@ -359,14 +370,13 @@ describe("Config validation", function () {
               () =>
                 validateConfig({
                   networks: {
-                    qrlLocal: {
-                      type: "qrl-local",
+                    hardhatqrlvm: {
                       accounts,
                     },
                   },
                 }),
               ERRORS.GENERAL.INVALID_CONFIG,
-              "QRL local account array"
+              "Hardhat QRLVM account array"
             );
           }
         });

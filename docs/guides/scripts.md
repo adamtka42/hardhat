@@ -7,7 +7,7 @@ deployments, admin actions, migrations, smoke tests, and one-off network checks.
 The recommended way to run a script is through QRL Hardhat:
 
 ~~~sh
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ~~~
 
 or against an HTTP go-qrl network:
@@ -84,10 +84,10 @@ main()
 contract wrapper. The sender defaults to the network's `from` config or the
 first `qrl_accounts` account.
 
-Run it on `qrlLocal`:
+Run it on `hardhatqrlvm`:
 
 ~~~sh
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ~~~
 
 Run it on an HTTP network:
@@ -282,7 +282,7 @@ Unambiguous functions are also available by name.
 
 ## Timeouts
 
-HTTP/private QRL networks can be slower than `qrlLocal`. Pass a larger timeout
+HTTP/private QRL networks can be slower than `hardhatqrlvm`. Pass a larger timeout
 when waiting for deployment or transaction receipts:
 
 ~~~js

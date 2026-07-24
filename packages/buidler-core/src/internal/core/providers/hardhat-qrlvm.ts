@@ -4,10 +4,10 @@ import fsExtra from "fs-extra";
 import path from "path";
 
 import {
+  HardhatQrlvmAccountConfig,
+  HardhatQrlvmNetworkConfig,
   IQrlProvider,
   ProjectPaths,
-  QrlLocalAccountConfig,
-  QrlLocalNetworkConfig,
 } from "../../../types";
 import { decodeQrlFunctionResult } from "../../qrl/abi";
 import { isValidQrlAddress } from "../../qrl/address";
@@ -28,27 +28,26 @@ const log = debug("buidler:core:qrl:stack-traces");
 const DEFAULT_CHAIN_ID = 1;
 const DEFAULT_BLOCK_GAS_LIMIT = 30000000;
 
-export class QrlLocalHardhatProvider extends EventEmitter
-  implements IQrlProvider {
+export class HardhatQrlvmProvider extends EventEmitter implements IQrlProvider {
   private readonly _provider: any;
   private readonly _accounts: string[];
   private readonly _chainId: number;
   private readonly _blockGasLimit: number;
   private readonly _stackTracesEnabled: boolean;
-  private readonly _accountConfigs: QrlLocalAccountConfig[];
+  private readonly _accountConfigs: HardhatQrlvmAccountConfig[];
   private readonly _cachePath?: string;
   private readonly _projectRoot?: string;
   private _stackTraceDecoder?: QrlStackTraceDecoder | null;
   private _stackTraceCacheMtime?: number;
   private _stackTraceFailures = 0;
 
-  constructor(config: QrlLocalNetworkConfig, paths?: ProjectPaths) {
+  constructor(config: HardhatQrlvmNetworkConfig, paths?: ProjectPaths) {
     super();
     this._cachePath = paths?.cache;
     this._projectRoot = paths?.root;
 
     const { vmQrl, utilQrl } = loadQrlJsRuntime(
-      "qrlLocal",
+      "hardhatqrlvm",
       config.qrlJsMonorepoPath
     );
     const consoleLogSupported =
@@ -449,7 +448,7 @@ const REVERT_PANIC_ABI = [
 
 function normalizeLocalAccountAddress(
   utilQrl: any,
-  account: QrlLocalAccountConfig
+  account: HardhatQrlvmAccountConfig
 ): string {
   return utilQrl.QRLAddress.fromString(account.address).toString();
 }

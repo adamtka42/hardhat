@@ -1,14 +1,14 @@
 # Common problems
 
 This page collects the QRL Hardhat issues most likely to appear while compiling,
-testing, deploying, or running scripts against `qrlLocal` and HTTP go-qrl
+testing, deploying, or running scripts against `hardhatqrlvm` and HTTP go-qrl
 networks.
 
 For debug output and stack traces, see
 [verbose-logging.md](verbose-logging.md). For a code-by-code reference, see
 [error-codes.md](error-codes.md).
 
-## qrlLocal cannot load the QRL runtime
+## hardhatqrlvm cannot load the QRL runtime
 
 Typical error:
 
@@ -34,7 +34,7 @@ npm run build
 
 cd /path/to/qrl-hardhat-project
 QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo \
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 You can also set the path in `hardhat.config.js`:
@@ -42,15 +42,14 @@ You can also set the path in `hardhat.config.js`:
 ~~~js
 module.exports = {
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
     },
   },
 };
 ~~~
 
-If you do not need `qrlLocal`, use an HTTP go-qrl network instead:
+If you do not need `hardhatqrlvm`, use an HTTP go-qrl network instead:
 
 ~~~sh
 HARDHAT_DEFAULT_NETWORK=qrl npx hardhat test
@@ -137,7 +136,7 @@ accounts: [process.env.QRL_ACCOUNT_SEED]
 accounts: "remote"
 ~~~
 
-For `qrlLocal`, configure local accounts:
+For `hardhatqrlvm`, configure local accounts:
 
 ~~~js
 accounts: [
@@ -151,7 +150,7 @@ accounts: [
 Check accounts with:
 
 ~~~sh
-npx hardhat accounts --network qrlLocal
+npx hardhat accounts --network hardhatqrlvm
 ~~~
 
 or with direct RPC:
@@ -193,21 +192,21 @@ Fix one of these:
 - use an account returned by `qrl_accounts`,
 - set `QRL_ACCOUNT_SEED` for the account you want to sign with,
 - configure `accounts: "remote"` and unlock/manage the account in the node,
-- add the account to `qrlLocal.accounts` for local tests.
+- add the account to `hardhatqrlvm.accounts` for local tests.
 
 Recipient addresses do not need to be managed. Sender addresses do.
 
 ## Contract console.log prints nothing
 
-Contract-side `console.log` output is printed only by `qrlLocal`. If the same
+Contract-side `console.log` output is printed only by `hardhatqrlvm`. If the same
 contract runs on an HTTP go-qrl network, the console call succeeds silently and
 no logs are printed.
 
 Check these items:
 
-- run the script or test with `--network qrlLocal`,
+- run the script or test with `--network hardhatqrlvm`,
 - make sure the contract imports `@theqrl/hardhat/console.hyp`,
-- check that `networks.qrlLocal.consoleLog` is not set to `false`,
+- check that `networks.hardhatqrlvm.consoleLog` is not set to `false`,
 - if Hardhat warns that the loaded QRL runtime does not support contract
   console logging: update the installed package (bundled runtime) or rebuild
   the `qrljs-monorepo` checkout when a development override is active.
@@ -247,7 +246,7 @@ Then either connect to the intended network or update the `chainId` in
 
 ## Gas or block gas limit failures
 
-Private networks may use a lower block gas limit than `qrlLocal`. If a deploy or
+Private networks may use a lower block gas limit than `hardhatqrlvm`. If a deploy or
 state-changing test fails only on a private network, check the latest block:
 
 ~~~sh

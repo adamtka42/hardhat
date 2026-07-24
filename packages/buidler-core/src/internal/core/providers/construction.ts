@@ -1,14 +1,15 @@
 import {
+  HardhatQrlvmNetworkConfig,
   HttpNetworkConfig,
   IQrlProvider,
   NetworkConfig,
   ProjectPaths,
-  QrlLocalNetworkConfig,
   QrlProvider,
 } from "../../../types";
+import { HARDHAT_QRLVM_NETWORK_NAME } from "../../constants";
 
+import { HardhatQrlvmProvider } from "./hardhat-qrlvm";
 import { HttpProvider } from "./http";
-import { QrlLocalHardhatProvider } from "./qrl-local";
 
 export function createProvider(
   networkName: string,
@@ -17,19 +18,19 @@ export function createProvider(
 ): IQrlProvider {
   let provider: QrlProvider;
 
-  if (isQrlLocalNetworkConfig(networkConfig)) {
-    provider = new QrlLocalHardhatProvider(networkConfig, paths);
-    return wrapQrlProvider(provider, networkConfig);
+  if (networkName === HARDHAT_QRLVM_NETWORK_NAME) {
+    const hardhatQrlvmConfig = networkConfig as HardhatQrlvmNetworkConfig;
+    provider = new HardhatQrlvmProvider(hardhatQrlvmConfig, paths);
+  } else {
+    const httpNetConfig = networkConfig as HttpNetworkConfig;
+
+    provider = new HttpProvider(
+      httpNetConfig.url!,
+      networkName,
+      httpNetConfig.httpHeaders,
+      httpNetConfig.timeout
+    );
   }
-
-  const httpNetConfig = networkConfig as HttpNetworkConfig;
-
-  provider = new HttpProvider(
-    httpNetConfig.url!,
-    networkName,
-    httpNetConfig.httpHeaders,
-    httpNetConfig.timeout
-  );
 
   return wrapQrlProvider(provider, networkConfig);
 }
@@ -59,9 +60,8 @@ export function wrapQrlProvider(
   } = require("./transactions");
 
   const isHttpNetworkConfig = "url" in netConfig;
-  const isLocalNetworkConfig = isQrlLocalNetworkConfig(netConfig);
 
-  if (isHttpNetworkConfig && !isLocalNetworkConfig) {
+  if (isHttpNetworkConfig) {
     const httpNetConfig = netConfig as Partial<HttpNetworkConfig>;
 
     const accounts = httpNetConfig.accounts;
@@ -92,10 +92,4 @@ export function wrapQrlProvider(
   }
 
   return provider;
-}
-
-function isQrlLocalNetworkConfig(
-  netConfig: Partial<NetworkConfig>
-): netConfig is QrlLocalNetworkConfig {
-  return (netConfig as any).type === "qrl-local";
 }

@@ -67,10 +67,9 @@ task("accounts", "Prints QRL accounts", async (_, { network }) => {
 });
 
 export default {
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -120,7 +119,7 @@ describe("network", function () {
 Run it like any other QRL Hardhat test:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 Hardhat also injects runtime globals such as `network` and `qrl` when tests
@@ -152,7 +151,7 @@ main()
 Run the script with the selected QRL network:
 
 ~~~sh
-npx hardhat run scripts/deploy.ts --network qrlLocal
+npx hardhat run scripts/deploy.ts --network hardhatqrlvm
 
 QRL_RPC_URL=http://127.0.0.1:33462 \
 QRL_ACCOUNT_SEED=<qrl-extended-seed> \

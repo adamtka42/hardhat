@@ -286,7 +286,7 @@ Please make sure your node is running, and check your internet connection and ne
       message:
         "Cannot load the QRL runtime from %path%: %message%. Installed packages include a bundled runtime; when networks.%network%.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH is set it must point to a BUILT qrljs-monorepo checkout and is never silently ignored. When running Hardhat from its source tree, either set the override or generate the bundle with scripts/bundle-qrljs-runtime.js.",
       title: "QRL runtime is unavailable",
-      description: `The qrlLocal provider loads the QRL VM from the runtime bundled with the installed package, or from a locally built qrljs-monorepo checkout when the development override (QRLJS_MONOREPO_PATH / qrlJsMonorepoPath) is set. Fix the override, regenerate the bundle, or choose an HTTP network like qrl.`,
+      description: `The hardhatqrlvm provider loads the QRL VM from the runtime bundled with the installed package, or from a locally built qrljs-monorepo checkout when the development override (QRLJS_MONOREPO_PATH / qrlJsMonorepoPath) is set. Fix the override, regenerate the bundle, or choose an HTTP network like qrl.`,
     },
     TRANSACTION_RECEIPT_MISMATCH: {
       number: 122,
@@ -363,7 +363,7 @@ Remove one of the entries or make the addresses identical.`,
       message:
         "Invalid initialDate %value%. Use an ISO 8601 date string, e.g. 2026-01-01T00:00:00Z.",
       title: "Invalid initialDate network config value",
-      description: `The \`initialDate\` value of a qrl-local network could not be parsed as a date.
+      description: `The \`initialDate\` value of the \`hardhatqrlvm\` network could not be parsed as a date.
 
 Use an ISO 8601 date string, e.g. \`2026-01-01T00:00:00Z\`.`,
     },
@@ -754,11 +754,11 @@ We recommend not using this kind of dependencies.`,
     JSONRPC_UNSUPPORTED_NETWORK: {
       number: 606,
       message:
-        'The JSON-RPC server can only be started on a qrl-local network. Select a network of type "qrl-local" or omit --network to use qrlLocal.',
+        "The JSON-RPC server can only be started on the hardhatqrlvm network. Omit --network or select hardhatqrlvm.",
       title: "Unsupported network for JSON-RPC server.",
       description: `\`hardhat node\` serves the in-process local QRL network; it never proxies to an HTTP network.
 
-Run it without \`--network\`, or pass a network whose config has \`type: "qrl-local"\`.`,
+Run it without \`--network\`, or pass \`--network hardhatqrlvm\`.`,
     },
   },
   ARTIFACTS: {

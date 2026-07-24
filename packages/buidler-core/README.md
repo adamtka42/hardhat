@@ -4,7 +4,7 @@ QRL Hardhat is a QRL-only smart contract development tool based on the upstream
 Hardhat/Buidler `v1.3.3` codebase.
 
 It targets Hyperion `.hyp` contracts, QRL addresses, `qrl_*` JSON-RPC methods, local
-in-process tests through `qrlLocal`, and live go-qrl HTTP networks.
+in-process tests through `hardhatqrlvm`, and live go-qrl HTTP networks.
 
 ## Installation
 
@@ -30,7 +30,7 @@ The guide covers:
 
 - prerequisites and installation,
 - project layout,
-- `qrlLocal` configuration,
+- `hardhatqrlvm` configuration,
 - HTTP go-qrl network configuration,
 - Hyperion `.hyp` compilation,
 - tests and deployment scripts,
@@ -50,10 +50,10 @@ For project setup, see:
 docs/guides/project-setup.md
 ~~~
 
-For qrlLocal details, see:
+For hardhatqrlvm details, see:
 
 ~~~text
-docs/qrl-local/README.md
+docs/hardhat-qrlvm/README.md
 ~~~
 
 For compile details, see:
@@ -151,10 +151,9 @@ const accounts =
 const localAccountAddress = "Q" + "01".repeat(64);
 
 module.exports = {
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -173,7 +172,7 @@ Run tasks with:
 
 ~~~sh
 npx hardhat compile
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 npx hardhat run scripts/deploy.js --network qrl
 ~~~
 

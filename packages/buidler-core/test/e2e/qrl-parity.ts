@@ -70,7 +70,7 @@ describe("QRL parity e2e", function () {
     }
   });
 
-  it("matches private-network and qrlLocal behavior for core workflows", async function () {
+  it("matches private-network and hardhatqrlvm behavior for core workflows", async function () {
     this.timeout(600000);
 
     const hypcPath = resolveHypcPath();
@@ -108,7 +108,11 @@ describe("QRL parity e2e", function () {
       env,
       "qrlPrivate"
     );
-    const localResult = await runParityScenario(this.tmpDir, env, "qrlLocal");
+    const localResult = await runParityScenario(
+      this.tmpDir,
+      env,
+      "hardhatqrlvm"
+    );
 
     assert.deepEqual(
       normalizeResult(localResult),
@@ -116,7 +120,7 @@ describe("QRL parity e2e", function () {
     );
     assert.isTrue(
       localResult.rawTransactionRejected,
-      "qrlLocal should reject raw transactions until QRL raw tx signing is wired"
+      "hardhatqrlvm should reject raw transactions until QRL raw tx signing is wired"
     );
   });
 });
@@ -174,7 +178,7 @@ function runHardhat(
 async function runParityScenario(
   projectRoot: string,
   env: NodeJS.ProcessEnv,
-  network: "qrlPrivate" | "qrlLocal"
+  network: "qrlPrivate" | "hardhatqrlvm"
 ): Promise<ParityResult> {
   const { stdout } = await runHardhat(projectRoot, env, [
     "run",
@@ -265,7 +269,7 @@ function getConfigSource(): string {
 const localAccountAddress = \`Q\${"01".repeat(64)}\`;
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   hyperion: {
     compilerPath: process.env.HYPERION_HYPC_PATH,
   },
@@ -274,8 +278,7 @@ module.exports = {
       url: process.env.QRL_PARITY_RPC_URL,
       accounts: [process.env.QRL_PARITY_ACCOUNT_SEED],
     },
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: Number(process.env.QRL_PARITY_CHAIN_ID),
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -330,12 +333,12 @@ async function wait(hash) {
   return receipt;
 }
 
-function isQrlLocal() {
-  return hre.network.name === "qrlLocal";
+function isHardhatQrlvm() {
+  return hre.network.name === "hardhatqrlvm";
 }
 
 function txOptions(from, gas) {
-  if (isQrlLocal()) {
+  if (isHardhatQrlvm()) {
     return { from, gas };
   }
   return {
@@ -365,7 +368,7 @@ async function expectRejects(method, params) {
 
 async function main() {
   const [from] = await rpc("qrl_accounts");
-  const recipient = isQrlLocal()
+  const recipient = isHardhatQrlvm()
     ? "Q" + "02".repeat(64)
     : seedToAccount(process.env.QRL_PARITY_RECIPIENT_SEED).address;
   const blockBefore = BigInt(await rpc("qrl_blockNumber"));

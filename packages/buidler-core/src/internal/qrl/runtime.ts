@@ -6,7 +6,7 @@ import { HardhatError } from "../core/errors";
 import { ERRORS } from "../core/errors-list";
 
 /**
- * Single resolver for the qrljs runtime modules that power `qrlLocal`.
+ * Single resolver for the qrljs runtime modules that power `hardhatqrlvm`.
  *
  * Resolution order:
  *
@@ -86,7 +86,7 @@ export function loadQrlJsTxRuntime(): any | undefined {
   if (configuredPath !== undefined) {
     lastResolvedRuntime = loadOverrideRuntime(
       path.resolve(configuredPath),
-      "qrlLocal"
+      "hardhatqrlvm"
     );
     return lastResolvedRuntime.txQrl;
   }
@@ -95,7 +95,7 @@ export function loadQrlJsTxRuntime(): any | undefined {
     return undefined;
   }
 
-  lastResolvedRuntime = loadBundledRuntime("qrlLocal");
+  lastResolvedRuntime = loadBundledRuntime("hardhatqrlvm");
   return lastResolvedRuntime.txQrl;
 }
 

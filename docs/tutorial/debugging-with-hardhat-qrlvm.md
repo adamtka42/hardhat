@@ -1,6 +1,6 @@
-# 6. Debugging with qrlLocal
+# 6. Debugging with hardhatqrlvm
 
-QRL Hardhat includes **qrlLocal**, an in-process QRL VM network designed for
+QRL Hardhat includes **hardhatqrlvm**, an in-process QRL VM network designed for
 development. It lets you deploy contracts and run tests without starting a
 go-qrl node.
 
@@ -9,7 +9,7 @@ go-qrl node.
 Mocha lets you run a single test file or focus a single test while debugging:
 
 ```sh
-npx hardhat test test/Token.js --network qrlLocal
+npx hardhat test test/Token.js --network hardhatqrlvm
 ```
 
 You can also temporarily use `.only` in a test:
@@ -28,7 +28,7 @@ Use verbose Hardhat logging when you need to see more detail from task and
 provider execution:
 
 ```sh
-HARDHAT_VERBOSE=true npx hardhat test --network qrlLocal
+HARDHAT_VERBOSE=true npx hardhat test --network hardhatqrlvm
 ```
 
 For more details, see
@@ -37,7 +37,7 @@ For more details, see
 ## Contract console logging
 
 For temporary logs inside Hyperion contracts, import the QRL Hardhat console
-library and run on `qrlLocal`:
+library and run on `hardhatqrlvm`:
 
 ```solidity
 import "@theqrl/hardhat/console.hyp";
@@ -76,9 +76,9 @@ QRL Hardhat tests and scripts can be debugged with Node.js launch
 configurations. See [VS Code tests and scripts](../guides/vscode-tests.md) for
 ready-to-use launch configuration examples.
 
-## Common qrlLocal failures
+## Common hardhatqrlvm failures
 
-Installed packages ship the QRL runtime bundled. If qrlLocal still cannot
+Installed packages ship the QRL runtime bundled. If hardhatqrlvm still cannot
 load it, a development override is set but invalid — build the checkout and set
 `QRLJS_MONOREPO_PATH`:
 
@@ -88,7 +88,7 @@ npm run build --workspaces --if-present
 npm run tsc
 
 export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ```
 
 If you see invalid address errors, check that all addresses use the QRL format:

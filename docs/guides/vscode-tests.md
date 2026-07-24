@@ -10,16 +10,16 @@ Solidity tooling.
 Install QRL Hardhat in the project and make sure normal CLI commands work first:
 
 ~~~sh
-npx hardhat test --network qrlLocal
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat test --network hardhatqrlvm
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ~~~
 
 For TypeScript projects, also install `typescript` and `ts-node`; see
 [typescript.md](typescript.md).
 
-Installed packages run `qrlLocal` out of the box. To override the bundled
+Installed packages run `hardhatqrlvm` out of the box. To override the bundled
 runtime for development, configure a built `qrljs-monorepo` checkout with either
-`QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath`.
+`QRLJS_MONOREPO_PATH` or `networks.hardhatqrlvm.qrlJsMonorepoPath`.
 
 ## Environment files
 
@@ -50,13 +50,13 @@ Create `.vscode/launch.json` in the project:
     {
       "type": "node",
       "request": "launch",
-      "name": "Hardhat: test qrlLocal",
+      "name": "Hardhat: test hardhatqrlvm",
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/node_modules/@theqrl/hardhat/internal/cli/cli.js",
       "args": [
         "test",
         "--network",
-        "qrlLocal",
+        "hardhatqrlvm",
         "--show-stack-traces"
       ],
       "envFile": "${workspaceFolder}/.env.local",
@@ -74,7 +74,7 @@ Create `.vscode/launch.json` in the project:
         "test",
         "${file}",
         "--network",
-        "qrlLocal",
+        "hardhatqrlvm",
         "--show-stack-traces"
       ],
       "envFile": "${workspaceFolder}/.env.local",
@@ -85,14 +85,14 @@ Create `.vscode/launch.json` in the project:
     {
       "type": "node",
       "request": "launch",
-      "name": "Hardhat: run script qrlLocal",
+      "name": "Hardhat: run script hardhatqrlvm",
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/node_modules/@theqrl/hardhat/internal/cli/cli.js",
       "args": [
         "run",
         "scripts/deploy.js",
         "--network",
-        "qrlLocal",
+        "hardhatqrlvm",
         "--show-stack-traces"
       ],
       "envFile": "${workspaceFolder}/.env.local",
@@ -150,7 +150,7 @@ terminal.
 Add `--verbose` to `args` when debugging Hardhat internals:
 
 ~~~json
-"args": ["test", "--network", "qrlLocal", "--verbose", "--show-stack-traces"]
+"args": ["test", "--network", "hardhatqrlvm", "--verbose", "--show-stack-traces"]
 ~~~
 
 For narrower logs, set `DEBUG` in `.env.local`:
@@ -171,7 +171,7 @@ the project and confirm this file exists:
 node_modules/@theqrl/hardhat/internal/cli/cli.js
 ~~~
 
-If `qrlLocal` fails with `BDLR123`, the configured override is invalid —
+If `hardhatqrlvm` fails with `BDLR123`, the configured override is invalid —
 build the `qrljs-monorepo` checkout it points to (or unset it) and check
 `QRLJS_MONOREPO_PATH`.
 

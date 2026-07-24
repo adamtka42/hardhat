@@ -134,13 +134,12 @@ contract Probe {
     `const localAccountAddress = process.env.QRL_NODE_E2E_ADDRESS;
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   hyperion: {
     compilerPath: process.env.HYPERION_HYPC_PATH,
   },
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1337,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -300,7 +299,7 @@ describe("QRL node e2e", function () {
       { cwd: this.tmpDir, env, maxBuffer: 1024 * 1024 * 20 }
     );
 
-    // The node refuses to serve non-qrl-local networks.
+    // The node refuses to serve non-hardhatqrlvm networks.
     try {
       await execFileAsync(
         process.execPath,

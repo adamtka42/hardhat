@@ -1,7 +1,7 @@
 # Deploying contracts
 
 Deployment in QRL Hardhat is done with scripts and the `hre.qrl` runtime helpers.
-The same deployment script can target `qrlLocal` for fast local checks or an HTTP
+The same deployment script can target `hardhatqrlvm` for fast local checks or an HTTP
 go-qrl network for private/devnet deployments.
 
 This guide focuses on the operational deployment flow: choosing the network,
@@ -84,9 +84,9 @@ BDLR127 (ambiguous bare name), BDLR128 (invalid address), BDLR129
 Libraries with only `internal` functions (like the bundled `console.hyp`) are
 inlined by the compiler and need no linking.
 
-## Deploying to qrlLocal
+## Deploying to hardhatqrlvm
 
-`qrlLocal` is the in-process QRL VM network. It is the fastest target for local
+`hardhatqrlvm` is the in-process QRL VM network. It is the fastest target for local
 smoke tests and development deployments.
 
 Example config:
@@ -95,10 +95,9 @@ Example config:
 const localAccountAddress = "Q" + "01".repeat(64);
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -117,12 +116,12 @@ module.exports = {
 Installed packages include the QRL VM runtime, so simply run:
 
 ~~~sh
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ~~~
 
-If `qrlLocal` cannot load the runtime, an override is set but invalid — build
+If `hardhatqrlvm` cannot load the runtime, an override is set but invalid — build
 the `qrljs-monorepo` checkout it points to (or unset the override) and make
-sure `QRLJS_MONOREPO_PATH` or `networks.qrlLocal.qrlJsMonorepoPath` points at the
+sure `QRLJS_MONOREPO_PATH` or `networks.hardhatqrlvm.qrlJsMonorepoPath` points at the
 checkout.
 
 ## Deploying to an HTTP go-qrl network
@@ -203,7 +202,7 @@ confirm that the deployer account has funds.
 Deployment needs a `from` account that can sign and pay for the transaction.
 There are three common cases:
 
-- `qrlLocal`: use one of `networks.qrlLocal.accounts`.
+- `hardhatqrlvm`: use one of `networks.hardhatqrlvm.accounts`.
 - HTTP with local signing: set `QRL_ACCOUNT_SEED` and use the derived account.
 - HTTP with node signing: set `accounts: "remote"` and use an unlocked node
   account.
@@ -220,7 +219,7 @@ const [from] = await network.provider.send("qrl_accounts");
 ~~~
 
 If this returns no accounts, the network cannot deploy. Configure a local seed,
-remote accounts, or qrlLocal accounts.
+remote accounts, or hardhatqrlvm accounts.
 
 If you pass a custom `from`, make sure it is managed by Hardhat or the connected
 node:
@@ -321,7 +320,7 @@ port after every restart.
 
 The transaction `from` account is not available to Hardhat or the connected
 node. Use one of `qrl_accounts`, set `QRL_ACCOUNT_SEED`, configure
-`accounts: "remote"`, or add the account to `qrlLocal.accounts`.
+`accounts: "remote"`, or add the account to `hardhatqrlvm.accounts`.
 
 ### No accounts are returned
 

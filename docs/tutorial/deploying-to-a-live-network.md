@@ -4,7 +4,7 @@ Once you are ready to share your contract with other people, you can deploy it
 to a running QRL network. This can be a private development network, a shared
 test network, or another go-qrl network with HTTP JSON-RPC enabled.
 
-At the software level, deploying to qrlLocal and deploying to an HTTP network
+At the software level, deploying to hardhatqrlvm and deploying to an HTTP network
 use the same `hre.qrl` helpers. The main difference is which network you connect
 to and how the deployer account signs transactions.
 
@@ -41,13 +41,13 @@ the `--network` parameter:
 npx hardhat run scripts/deploy.js --network <network-name>
 ```
 
-Running against qrlLocal is useful for checking that the deployment code works:
+Running against hardhatqrlvm is useful for checking that the deployment code works:
 
 ```sh
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ```
 
-The deployment exists only in the in-process qrlLocal network used for that run.
+The deployment exists only in the in-process hardhatqrlvm network used for that run.
 
 ## Deploying to remote networks
 

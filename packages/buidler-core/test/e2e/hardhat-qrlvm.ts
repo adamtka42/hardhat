@@ -24,10 +24,10 @@ const LOCAL_QRLJS_MONOREPO_PATH = path.join(
   "qrljs-monorepo"
 );
 
-describe("QRL local e2e", function () {
-  useTmpDir("qrl-local-e2e");
+describe("Hardhat QRLVM e2e", function () {
+  useTmpDir("hardhat-qrlvm-e2e");
 
-  it("runs scripts and tests against the in-memory qrlLocal provider", async function () {
+  it("runs scripts and tests against the in-memory hardhatqrlvm provider", async function () {
     this.timeout(420000);
 
     const hypcPath = resolveHypcPath();
@@ -60,29 +60,29 @@ describe("QRL local e2e", function () {
 
     const runResult = await runHardhat(this.tmpDir, env, [
       "run",
-      "scripts/qrl-local-e2e.js",
+      "scripts/hardhat-qrlvm-e2e.js",
     ]);
     assert.include(runResult.stdout, "Stored value: 42");
 
     const explicitRunResult = await runHardhat(this.tmpDir, env, [
       "run",
-      "scripts/qrl-local-e2e.js",
+      "scripts/hardhat-qrlvm-e2e.js",
       "--network",
-      "qrlLocal",
+      "hardhatqrlvm",
     ]);
     assert.include(explicitRunResult.stdout, "Stored value: 42");
 
     const testResult = await runHardhat(this.tmpDir, env, [
       "test",
-      "test/qrl-local-e2e.js",
+      "test/hardhat-qrlvm-e2e.js",
     ]);
     assert.include(testResult.stdout, "1 passing");
 
     const pendingTestResult = await runHardhat(this.tmpDir, env, [
       "test",
-      "test/qrl-local-pending.js",
-      "--network",
-      "qrlManual",
+      "test/hardhat-qrlvm-pending.js",
+      "--config",
+      "hardhat.manual.config.js",
     ]);
     assert.include(pendingTestResult.stdout, "1 passing");
 
@@ -111,7 +111,7 @@ describe("QRL local e2e", function () {
     );
   });
 
-  it("prints contract console logs on qrlLocal", async function () {
+  it("prints contract console logs on hardhatqrlvm", async function () {
     this.timeout(420000);
 
     const hypcPath = resolveHypcPath();
@@ -366,7 +366,7 @@ describe("QRL local e2e", function () {
     assert.notInclude(offOutput, "at Inner.fail");
   });
 
-  it("deploys contracts with external libraries on qrlLocal", async function () {
+  it("deploys contracts with external libraries on hardhatqrlvm", async function () {
     this.timeout(420000);
 
     const hypcPath = resolveHypcPath();
@@ -434,15 +434,19 @@ async function prepareProject(projectRoot: string) {
     getConfigSource()
   );
   await fsExtra.writeFile(
-    path.join(projectRoot, "scripts", "qrl-local-e2e.js"),
+    path.join(projectRoot, "hardhat.manual.config.js"),
+    getManualConfigSource()
+  );
+  await fsExtra.writeFile(
+    path.join(projectRoot, "scripts", "hardhat-qrlvm-e2e.js"),
     getScriptSource()
   );
   await fsExtra.writeFile(
-    path.join(projectRoot, "test", "qrl-local-e2e.js"),
+    path.join(projectRoot, "test", "hardhat-qrlvm-e2e.js"),
     getTestSource()
   );
   await fsExtra.writeFile(
-    path.join(projectRoot, "test", "qrl-local-pending.js"),
+    path.join(projectRoot, "test", "hardhat-qrlvm-pending.js"),
     getPendingTestSource()
   );
 }
@@ -561,31 +565,28 @@ task("accounts", "Prints the list of QRL accounts", async (_, { network }) => {
 const localAccountAddress = \`Q\${"01".repeat(64)}\`;
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   hyperion: {
     compilerPath: process.env.HYPERION_HYPC_PATH,
   },
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
       accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
-      blockGasLimit: 30000000,
-    },
-    qrlManual: {
-      type: "qrl-local",
-      chainId: 1,
-      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
-      from: localAccountAddress,
-      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
-      automine: false,
       blockGasLimit: 30000000,
     },
   },
 };
 `;
+}
+
+function getManualConfigSource(): string {
+  return getConfigSource().replace(
+    "      blockGasLimit: 30000000,",
+    "      automine: false,\n      blockGasLimit: 30000000,"
+  );
 }
 
 function getStorageContractSource(): string {
@@ -638,7 +639,7 @@ const hre = require("@theqrl/hardhat");
 
 const RECEIVER = "Q" + "02".repeat(64);
 
-describe("QRL local", function () {
+describe("Hardhat QRLVM", function () {
   it("deploys and calls a contract", async function () {
     const [from] = await hre.network.provider.send("qrl_accounts");
     const Storage = await hre.qrl.getContractFactory("Storage");
@@ -728,7 +729,7 @@ const LOG_TOPIC = "0x" + "00".repeat(63) + "7b";
 const LOG_DATA = "0x" + "00".repeat(63) + "2a";
 const LOGGING_INIT_CODE = "0x602a5f52607b60405fc100";
 
-describe("QRL local pending", function () {
+describe("Hardhat QRLVM pending", function () {
   it("exposes pending state, pending blocks, mining, gas estimation, and logs", async function () {
     const [from] = await hre.network.provider.send("qrl_accounts");
 
@@ -875,13 +876,12 @@ function getNoTraceConfigSource(): string {
   return `const localAccountAddress = \`Q\${"01".repeat(64)}\`;
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   hyperion: {
     compilerPath: process.env.HYPERION_HYPC_PATH,
   },
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -1064,13 +1064,12 @@ function getInitialDateConfigSource(): string {
   return `const localAccountAddress = \`Q\${"01".repeat(64)}\`;
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   hyperion: {
     compilerPath: process.env.HYPERION_HYPC_PATH,
   },
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -1227,7 +1226,7 @@ main()
 
 function getConsoleOffConfigSource(): string {
   return getConfigSource().replace(
-    'type: "qrl-local",',
-    'type: "qrl-local",\n      consoleLog: false,'
+    "    hardhatqrlvm: {",
+    "    hardhatqrlvm: {\n      consoleLog: false,"
   );
 }

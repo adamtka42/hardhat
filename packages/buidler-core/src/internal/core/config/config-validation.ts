@@ -2,6 +2,7 @@ import * as t from "io-ts";
 import { Context, getFunctionName, ValidationError } from "io-ts/lib";
 import { Reporter } from "io-ts/lib/Reporter";
 
+import { HARDHAT_QRLVM_NETWORK_NAME } from "../../constants";
 import { isValidQrlAddress } from "../../qrl/address";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
@@ -83,7 +84,7 @@ const NetworkConfigAccounts = t.union([
 ]);
 
 const QRL_EXTENDED_SEED_REGEX = /^0x[0-9a-fA-F]{102}$/;
-const QRL_LOCAL_BALANCE_REGEX = /^(0x[0-9a-fA-F]+|[0-9]+)$/;
+const HARDHAT_QRLVM_BALANCE_REGEX = /^(0x[0-9a-fA-F]+|[0-9]+)$/;
 
 const HttpHeaders = t.record(t.string, t.string, "httpHeaders");
 
@@ -99,21 +100,20 @@ const HttpNetworkConfig = t.type({
   httpHeaders: optional(HttpHeaders),
 });
 
-const QrlLocalAccountConfig = t.type({
+const HardhatQrlvmAccountConfig = t.type({
   address: t.string,
   balance: optional(t.union([t.string, t.number])),
   seed: optional(t.string),
   nonce: optional(t.number),
 });
 
-const QrlLocalNetworkConfig = t.type({
-  type: t.literal("qrl-local"),
+const HardhatQrlvmNetworkConfig = t.type({
   chainId: optional(t.number),
   from: optional(t.string),
   gas: optional(t.union([t.literal("auto"), t.number])),
   gasPrice: optional(t.union([t.literal("auto"), t.number])),
   gasMultiplier: optional(t.number),
-  accounts: optional(t.array(QrlLocalAccountConfig)),
+  accounts: optional(t.array(HardhatQrlvmAccountConfig)),
   automine: optional(t.boolean),
   consoleLog: optional(t.boolean),
   blockGasLimit: optional(t.number),
@@ -125,7 +125,7 @@ const QrlLocalNetworkConfig = t.type({
   qrlJsMonorepoPath: optional(t.string),
 });
 
-const NetworkConfig = t.union([HttpNetworkConfig, QrlLocalNetworkConfig]);
+const NetworkConfig = t.union([HttpNetworkConfig, HardhatQrlvmNetworkConfig]);
 
 const Networks = t.record(t.string, NetworkConfig);
 
@@ -184,7 +184,7 @@ export function getValidationErrors(config: any): string[] {
     for (const [networkName, netConfig] of Object.entries<any>(
       config.networks
     )) {
-      if (netConfig.type === "qrl-local") {
+      if (networkName === HARDHAT_QRLVM_NETWORK_NAME) {
         if (netConfig.url !== undefined) {
           errors.push(
             getErrorMessage(
@@ -201,7 +201,7 @@ export function getValidationErrors(config: any): string[] {
               getErrorMessage(
                 `HardhatConfig.networks.${networkName}.accounts`,
                 netConfig.accounts,
-                "QRL local account array"
+                "Hardhat QRLVM account array"
               )
             );
           } else {
@@ -218,7 +218,7 @@ export function getValidationErrors(config: any): string[] {
                   getErrorMessage(
                     `HardhatConfig.networks.${networkName}.accounts.${accountIndex}`,
                     account,
-                    "QRL local account"
+                    "Hardhat QRLVM account"
                   )
                 );
                 continue;
@@ -242,7 +242,7 @@ export function getValidationErrors(config: any): string[] {
                 ((typeof account.balance !== "string" &&
                   typeof account.balance !== "number") ||
                   (typeof account.balance === "string" &&
-                    !QRL_LOCAL_BALANCE_REGEX.test(account.balance)) ||
+                    !HARDHAT_QRLVM_BALANCE_REGEX.test(account.balance)) ||
                   (typeof account.balance === "number" &&
                     (!Number.isSafeInteger(account.balance) ||
                       account.balance < 0)))

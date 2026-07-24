@@ -2,7 +2,7 @@
 
 Writing automated tests when building smart contracts is important because
 contract bugs are hard to fix after deployment. For this tutorial we are going
-to use **qrlLocal**, a local in-process QRL VM network, and [Mocha](https://mochajs.org/)
+to use **hardhatqrlvm**, a local in-process QRL VM network, and [Mocha](https://mochajs.org/)
 as our test runner.
 
 ## Writing tests
@@ -36,13 +36,13 @@ describe("Token contract", function () {
 On your terminal run:
 
 ```sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ```
 
 You should see output like this:
 
 ```text
-$ npx hardhat test --network qrlLocal
+$ npx hardhat test --network hardhatqrlvm
 All contracts have already been compiled, skipping compilation.
 
 
@@ -59,8 +59,8 @@ This means the test passed. Let's now explain the important lines:
 const [owner] = await network.provider.send("qrl_accounts");
 ```
 
-This asks the configured QRL provider for available accounts. With `qrlLocal`,
-the accounts come from `networks.qrlLocal.accounts` in `hardhat.config.js`.
+This asks the configured QRL provider for available accounts. With `hardhatqrlvm`,
+the accounts come from `networks.hardhatqrlvm.accounts` in `hardhat.config.js`.
 
 ```js
 const Token = await qrl.getContractFactory("Token");

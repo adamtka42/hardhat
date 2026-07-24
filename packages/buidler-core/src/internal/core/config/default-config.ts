@@ -13,8 +13,7 @@ const defaultConfig: HardhatConfig = {
     qrl: {
       url: "http://127.0.0.1:33462",
     },
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       accounts: [],
       automine: true,

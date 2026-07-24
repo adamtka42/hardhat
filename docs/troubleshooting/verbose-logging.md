@@ -10,7 +10,7 @@ Run any Hardhat command with `--verbose`:
 
 ~~~sh
 npx hardhat --verbose compile
-npx hardhat --verbose test --network qrlLocal
+npx hardhat --verbose test --network hardhatqrlvm
 QRL_RPC_URL=http://127.0.0.1:33462 npx hardhat --verbose test --network qrl
 ~~~
 
@@ -28,7 +28,7 @@ The exact namespaces that appear depend on the command path.
 Use `--show-stack-traces` when the compact Hardhat error message is not enough:
 
 ~~~sh
-npx hardhat --show-stack-traces test --network qrlLocal
+npx hardhat --show-stack-traces test --network hardhatqrlvm
 npx hardhat --verbose --show-stack-traces run scripts/deploy.js --network qrl
 ~~~
 
@@ -38,7 +38,7 @@ QRL Hardhat uses the `debug` package internally, so you can enable the same logs
 with `DEBUG`:
 
 ~~~sh
-DEBUG=hardhat* npx hardhat test --network qrlLocal
+DEBUG=hardhat* npx hardhat test --network hardhatqrlvm
 DEBUG=hardhat:core:* npx hardhat compile
 DEBUG=hardhat:core:bre npx hardhat run scripts/deploy.js --network qrl
 ~~~
@@ -51,9 +51,9 @@ namespace while debugging a specific area.
 CLI parameters can also be set with `HARDHAT_` environment variables:
 
 ~~~sh
-HARDHAT_VERBOSE=true npx hardhat test --network qrlLocal
-HARDHAT_SHOW_STACK_TRACES=true npx hardhat test --network qrlLocal
-HARDHAT_NETWORK=qrlLocal npx hardhat test
+HARDHAT_VERBOSE=true npx hardhat test --network hardhatqrlvm
+HARDHAT_SHOW_STACK_TRACES=true npx hardhat test --network hardhatqrlvm
+HARDHAT_NETWORK=hardhatqrlvm npx hardhat test
 HARDHAT_MAX_MEMORY=4096 npx hardhat compile
 ~~~
 
@@ -86,18 +86,18 @@ If the endpoint is a private go-qrl network, also check the node logs. Hardhat
 can report connection and RPC errors, but the node logs are the source of truth
 for server-side rejection details.
 
-## qrlLocal debugging
+## hardhatqrlvm debugging
 
-`qrlLocal` uses the QRL runtime bundled with the installed package, or a
+`hardhatqrlvm` uses the QRL runtime bundled with the installed package, or a
 built `qrljs-monorepo` checkout when the development override is set. If it
 fails before tests start, run with verbose logging to see which runtime
 source was selected:
 
 ~~~sh
-npx hardhat --verbose --show-stack-traces test --network qrlLocal
+npx hardhat --verbose --show-stack-traces test --network hardhatqrlvm
 ~~~
 
-For `BDLR123`, verbose output can confirm that Hardhat is creating a `qrlLocal`
+For `BDLR123`, verbose output can confirm that Hardhat is creating a `hardhatqrlvm`
 provider. The fix depends on the runtime source: if a development override
 (`QRLJS_MONOREPO_PATH` / `networks.<network>.qrlJsMonorepoPath`) is set,
 unset it or build the checkout it points to; without an override, the bundled
@@ -108,8 +108,8 @@ runtime in the installed package may be corrupted — reinstall the package.
 Redirect both stdout and stderr when sharing logs:
 
 ~~~sh
-npx hardhat --verbose --show-stack-traces test --network qrlLocal \
-  > hardhat-qrl-local.log 2>&1
+npx hardhat --verbose --show-stack-traces test --network hardhatqrlvm \
+  > hardhat-qrlvm.log 2>&1
 
 QRL_RPC_URL=http://127.0.0.1:33462 \
 npx hardhat --verbose --show-stack-traces test --network qrl \

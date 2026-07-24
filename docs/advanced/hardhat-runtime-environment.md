@@ -80,11 +80,11 @@ Prefer `qrl_*` methods. Legacy `eth_*` compatibility is not the primary surface
 of this fork.
 
 For HTTP networks, the provider points at the configured go-qrl endpoint. For
-`qrlLocal`, it points at the in-process QRL VM provider — loaded from the
+`hardhatqrlvm`, it points at the in-process QRL VM provider — loaded from the
 runtime bundled with the package, or from a built `qrljs-monorepo` checkout
 when the development override is set.
 
-Contract console logging is wired through the `qrlLocal` provider. When a
+Contract console logging is wired through the `hardhatqrlvm` provider. When a
 Hyperion contract imports `@theqrl/hardhat/console.hyp`, local executions can
 print decoded `console.log` lines to stdout. The HRE does not expose a separate
 log collection API; logs are streamed by the provider. See
@@ -358,7 +358,7 @@ Use these QRL-specific surfaces instead:
 - `@theqrl/hardhat` instead of `@nomiclabs/buidler`.
 - `hardhat.config.js` instead of `buidler.config.js`.
 - Hyperion `.hyp` contracts instead of Solidity `.sol` contracts.
-- `qrlLocal` for in-process QRL contract execution.
+- `hardhatqrlvm` for in-process QRL contract execution.
 - QRL addresses and QRL extended seeds instead of Ethereum addresses and private
   keys.
 - `hre.qrl` and `qrl_*` JSON-RPC methods instead of Ethers/Web3 helpers.

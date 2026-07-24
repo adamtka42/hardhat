@@ -19,7 +19,7 @@ interacting from any number of clients.
 
 ## What it serves
 
-The endpoint is the same `qrlLocal` provider used by `hardhat test`/`run`, so
+The endpoint is the same `hardhatqrlvm` provider used by `hardhat test`/`run`, so
 the network's full config applies: accounts, `initialDate`, failure flags,
 `allowUnlimitedContractSize`, `consoleLog`, `stackTraces`. Everything the
 local network supports works over the wire:
@@ -53,9 +53,9 @@ npx hardhat node --hostname 127.0.0.1 --port 8545
 - `--port` (default `8545`; `0` picks a free port, printed in the startup
   line).
 
-The node always serves a network of type `qrl-local` — by default the one
-named `qrlLocal` in your config. `--network` is accepted only when it names a
-qrl-local-type network; it never proxies to an HTTP network.
+The node always serves the reserved `hardhatqrlvm` network from your config.
+Passing another name through `--network` is rejected; the task never proxies to
+an HTTP network.
 
 ## Connecting a second Hardhat process
 
@@ -87,8 +87,8 @@ An account can optionally include its extended QRL seed. This enables
 ~~~js
 accounts: [
   {
-    address: process.env.QRL_LOCAL_ADDRESS,
-    seed: process.env.QRL_LOCAL_SEED,
+    address: process.env.HARDHAT_QRLVM_ADDRESS,
+    seed: process.env.HARDHAT_QRLVM_SEED,
     balance: "1000000000000000000000000",
   },
 ],

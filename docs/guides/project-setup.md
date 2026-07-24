@@ -127,24 +127,23 @@ For compile details, see [Compiling contracts](compile-contracts.md).
 The generated `hardhat.config.js` includes:
 
 - an `accounts` task that prints `qrl_accounts`,
-- a `qrlLocal` network for in-process tests,
+- a `hardhatqrlvm` network for in-process tests,
 - a `qrl` HTTP network for go-qrl endpoints,
 - `QRLJS_MONOREPO_PATH` — optional development override of the bundled
-  qrlLocal runtime,
+  hardhatqrlvm runtime,
 - `QRL_RPC_URL` and `QRL_ACCOUNT_SEED` for HTTP networks.
 
-`qrlLocal` is the default network in the sample project. The relevant config fragment looks like this:
+`hardhatqrlvm` is the default network in the sample project. The relevant config fragment looks like this:
 
 ~~~js
 module.exports = {
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   networks: {
     qrl: {
       url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
       accounts,
     },
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -162,13 +161,13 @@ For the full config reference, see [Configuration](../config/README.md).
 Installed packages include the QRL VM runtime, so simply run:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
-Run the sample script on qrlLocal:
+Run the sample script on hardhatqrlvm:
 
 ~~~sh
-npx hardhat run scripts/sample-script.js --network qrlLocal
+npx hardhat run scripts/sample-script.js --network hardhatqrlvm
 ~~~
 
 Run it against an HTTP go-qrl network:
@@ -216,10 +215,10 @@ actions. See [Writing scripts](scripts.md).
 
 ## Choosing a network
 
-Use `qrlLocal` for fast local tests that do not need a running node:
+Use `hardhatqrlvm` for fast local tests that do not need a running node:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 Use an HTTP network when you need to interact with go-qrl:
@@ -231,6 +230,6 @@ npx hardhat test --network qrl
 Private networks launched by Docker or Kurtosis often expose dynamic ports. Set
 `QRL_RPC_URL` instead of committing a machine-specific port.
 
-For qrlLocal details, see [qrlLocal](../qrl-local/README.md). For deployment
+For hardhatqrlvm details, see [hardhatqrlvm](../hardhat-qrlvm/README.md). For deployment
 details, see [Deploying contracts](deploying.md).
 

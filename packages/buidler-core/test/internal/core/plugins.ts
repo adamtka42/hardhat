@@ -28,6 +28,7 @@ describe("plugin system", function () {
 
     it("Should find packages from a given project", function () {
       assertPackageLoaded("pack1", "2.1.0");
+      assertPackageLoaded("exported-package", "3.2.1");
       assertPackageLoaded("requires-other-version-pack1", "1.0.0");
       assertPackageLoaded("requires-missing-pack", "1.0.0");
       assertPackageLoaded("requires-pack1", "1.2.3");
@@ -156,9 +157,9 @@ describe("plugin system", function () {
 });
 
 describe("Plugin public API", function () {
-  it("exports the qrl-local network name for plugin authors", function () {
+  it("exports the `hardhatqrlvm` network name for plugin authors", function () {
     // tslint:disable-next-line no-implicit-dependencies
     const pluginApi = require("../../../src/plugins");
-    assert.equal(pluginApi.QRL_LOCAL_NETWORK_NAME, "qrlLocal");
+    assert.equal(pluginApi.HARDHAT_QRLVM_NETWORK_NAME, "hardhatqrlvm");
   });
 });

@@ -23,8 +23,7 @@ task("accounts", "Prints QRL accounts", async (_, { network }) => {
 
 module.exports = {
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       accounts: [{ address: "Q" + "01".repeat(64), balance: "1000000000" }],
@@ -36,7 +35,7 @@ module.exports = {
 Run it with:
 
 ~~~sh
-npx hardhat accounts --network qrlLocal
+npx hardhat accounts --network hardhatqrlvm
 ~~~
 
 A task action receives two useful arguments:
@@ -195,7 +194,7 @@ resolves its sender from the network's `from` config or the first
 Run it with:
 
 ~~~sh
-npx hardhat deploy-sample --value 42 --network qrlLocal
+npx hardhat deploy-sample --value 42 --network hardhatqrlvm
 ~~~
 
 For HTTP networks, set `QRL_RPC_URL` and either `QRL_ACCOUNT_SEED` or

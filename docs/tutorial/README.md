@@ -14,7 +14,7 @@ codebase. It helps developers manage recurring tasks like compiling contracts,
 running tests, writing deployment scripts, and connecting to local or remote QRL
 networks.
 
-QRL Hardhat also includes **qrlLocal**, an in-process QRL VM network designed
+QRL Hardhat also includes **hardhatqrlvm**, an in-process QRL VM network designed
 for development. It lets you deploy contracts, run tests, and call contracts
 without starting a go-qrl node.
 
@@ -24,8 +24,8 @@ In this tutorial we will guide you through:
 - Creating and configuring a QRL Hardhat project
 - The basics of a Hyperion smart contract that implements a simple token
 - Writing automated tests for your contract using `hre.qrl` and Mocha
-- Debugging tests and scripts with qrlLocal and verbose logging
-- Deploying your contract to qrlLocal and an HTTP go-qrl network
+- Debugging tests and scripts with hardhatqrlvm and verbose logging
+- Deploying your contract to hardhatqrlvm and an HTTP go-qrl network
 
 To follow this tutorial you should be able to:
 
@@ -33,7 +33,7 @@ To follow this tutorial you should be able to:
 - Operate a terminal
 - Use git
 - Understand the basics of how smart contracts work
-- Run or connect to a QRL development network when deploying outside qrlLocal
+- Run or connect to a QRL development network when deploying outside hardhatqrlvm
 
 If you cannot do any of the above, take some time to learn the basics first.
 

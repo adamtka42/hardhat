@@ -52,13 +52,13 @@ describe("qrljs runtime resolver", function () {
     const brokenPath = path.join(this.tmpDir, "not-a-checkout");
 
     expectHardhatError(
-      () => loadQrlJsRuntime("qrlLocal", brokenPath),
+      () => loadQrlJsRuntime("hardhatqrlvm", brokenPath),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE
     );
 
     process.env[envVar] = brokenPath;
     expectHardhatError(
-      () => loadQrlJsRuntime("qrlLocal"),
+      () => loadQrlJsRuntime("hardhatqrlvm"),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE
     );
   });
@@ -84,7 +84,7 @@ describe("qrljs runtime resolver", function () {
     }
 
     expectHardhatError(
-      () => loadQrlJsRuntime("qrlLocal", checkout),
+      () => loadQrlJsRuntime("hardhatqrlvm", checkout),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
       /does not export qrl\.QRLLocalProvider/
     );
@@ -95,7 +95,7 @@ describe("qrljs runtime resolver", function () {
       this.skip();
     }
 
-    const runtime = loadQrlJsRuntime("qrlLocal");
+    const runtime = loadQrlJsRuntime("hardhatqrlvm");
     assert.equal(runtime.source.kind, "override");
     assert.isDefined(runtime.vmQrl.QRLLocalProvider);
     assert.isDefined(runtime.utilQrl.QRLAddress);
@@ -113,7 +113,7 @@ describe("qrljs runtime resolver", function () {
     const overridePath = process.env[envVar]!;
     delete process.env[envVar];
 
-    const runtime = loadQrlJsRuntime("qrlLocal", overridePath);
+    const runtime = loadQrlJsRuntime("hardhatqrlvm", overridePath);
     assert.equal(runtime.source.kind, "override");
 
     const txQrl = loadQrlJsTxRuntime();
@@ -126,7 +126,7 @@ describe("qrljs runtime resolver", function () {
     }
 
     delete process.env[envVar];
-    const runtime = loadQrlJsRuntime("qrlLocal");
+    const runtime = loadQrlJsRuntime("hardhatqrlvm");
     assert.equal(runtime.source.kind, "bundled");
     assert.isDefined(runtime.vmQrl.QRLLocalProvider);
     assert.isDefined(runtime.utilQrl.QRLAddress);
@@ -150,7 +150,7 @@ describe("qrljs runtime resolver", function () {
 
     delete process.env[envVar];
     expectHardhatError(
-      () => loadQrlJsRuntime("qrlLocal"),
+      () => loadQrlJsRuntime("hardhatqrlvm"),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE
     );
   });

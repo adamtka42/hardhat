@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import debug from "debug";
 
-import { QRL_LOCAL_NETWORK_NAME } from "../internal/constants";
+import { HARDHAT_QRLVM_NETWORK_NAME } from "../internal/constants";
 import { task, types } from "../internal/core/config/config-env";
 import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
@@ -12,8 +12,8 @@ import {
 } from "../internal/qrl/jsonrpc/server";
 import { lazyObject } from "../internal/util/lazy";
 import {
+  HardhatQrlvmNetworkConfig,
   IQrlProvider,
-  QrlLocalNetworkConfig,
   ResolvedHardhatConfig,
 } from "../types";
 
@@ -21,19 +21,19 @@ import { TASK_NODE } from "./task-names";
 
 const log = debug("buidler:core:tasks:node");
 
-function _createQrlLocalProvider(
+function _createHardhatQrlvmProvider(
   config: ResolvedHardhatConfig,
   networkName: string,
-  networkConfig: QrlLocalNetworkConfig
+  networkConfig: HardhatQrlvmNetworkConfig
 ): IQrlProvider {
-  log("Creating qrl-local provider for the JSON-RPC server");
+  log("Creating Hardhat QRLVM provider for the JSON-RPC server");
 
   return lazyObject(() =>
     createProvider(networkName, networkConfig, config.paths)
   );
 }
 
-function logQrlLocalAccounts(networkConfig: QrlLocalNetworkConfig) {
+function logHardhatQrlvmAccounts(networkConfig: HardhatQrlvmNetworkConfig) {
   if (networkConfig.accounts === undefined) {
     return;
   }
@@ -68,33 +68,33 @@ export default function () {
       types.int
     )
     .setAction(async ({ hostname, port }, { hardhatArguments, config }) => {
-      // The node always serves a qrl-local network: by default the one
-      // named `qrlLocal`; `--network` is accepted only when it names a
-      // qrl-local-type network. It never proxies to an HTTP network.
-      const networkName =
-        hardhatArguments.network !== undefined
-          ? hardhatArguments.network
-          : QRL_LOCAL_NETWORK_NAME;
+      const networkName = HARDHAT_QRLVM_NETWORK_NAME;
+      const networkConfig = config.networks[HARDHAT_QRLVM_NETWORK_NAME];
 
-      const networkConfig = config.networks[networkName];
       if (
-        networkConfig === undefined ||
-        (networkConfig as QrlLocalNetworkConfig).type !== "qrl-local"
+        hardhatArguments.network !== undefined &&
+        hardhatArguments.network !== HARDHAT_QRLVM_NETWORK_NAME
       ) {
         throw new HardhatError(
           ERRORS.BUILTIN_TASKS.JSONRPC_UNSUPPORTED_NETWORK
         );
       }
 
+      if (networkConfig === undefined || "url" in networkConfig) {
+        throw new HardhatError(
+          ERRORS.BUILTIN_TASKS.JSONRPC_UNSUPPORTED_NETWORK
+        );
+      }
+
       try {
-        const qrlLocalConfig = networkConfig as QrlLocalNetworkConfig;
+        const hardhatQrlvmConfig = networkConfig as HardhatQrlvmNetworkConfig;
         const serverConfig: JsonRpcServerConfig = {
           hostname,
           port,
-          provider: _createQrlLocalProvider(
+          provider: _createHardhatQrlvmProvider(
             config,
             networkName,
-            qrlLocalConfig
+            hardhatQrlvmConfig
           ),
         };
 
@@ -112,7 +112,7 @@ export default function () {
         // tslint:disable-next-line: no-console
         console.log();
 
-        logQrlLocalAccounts(qrlLocalConfig);
+        logHardhatQrlvmAccounts(hardhatQrlvmConfig);
 
         // Graceful shutdown: close the HTTP/WS servers and exit cleanly.
         const shutdown = () => {

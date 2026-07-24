@@ -12,7 +12,7 @@ const fs = require("fs");
 const path = require("path");
 const { keccak_256 } = require("js-sha3");
 
-// The console address observed by qrlLocal; low bytes spell
+// The console address observed by hardhatqrlvm; low bytes spell
 // "qrl.console.log". Must stay byte-identical to QRL_CONSOLE_LOG_ADDRESS in
 // src/internal/qrl/console-log.ts and in qrljs-monorepo's @theqrl/util.
 const CONSOLE_ADDRESS = `Q${"0".repeat(98)}71726c2e636f6e736f6c652e6c6f67`;
@@ -148,7 +148,7 @@ function generateConsoleLibrary() {
     `//\n` +
     `// Usage: import "@theqrl/hardhat/console.hyp"; then call console.log(...)\n` +
     `// inside contract functions (view or state-changing; not pure). On\n` +
-    `// qrlLocal the logs are decoded and printed by Hardhat. On real networks\n` +
+    `// hardhatqrlvm the logs are decoded and printed by Hardhat. On real networks\n` +
     `// the calls silently succeed (the console address has no code), so\n` +
     `// contracts behave identically everywhere; only local output differs.\n` +
     `pragma hyperion >=0.0;\n` +

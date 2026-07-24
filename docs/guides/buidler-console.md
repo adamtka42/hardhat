@@ -7,7 +7,7 @@ query QRL JSON-RPC methods, and interact with deployed Hyperion contracts.
 Run it with:
 
 ~~~sh
-npx hardhat console --network qrlLocal
+npx hardhat console --network hardhatqrlvm
 ~~~
 
 or against an HTTP go-qrl network:
@@ -22,7 +22,7 @@ The console runs the `compile` task before opening the prompt. Skip compilation
 with `--no-compile`:
 
 ~~~sh
-npx hardhat console --network qrlLocal --no-compile
+npx hardhat console --network hardhatqrlvm --no-compile
 ~~~
 
 ## Runtime globals
@@ -40,9 +40,9 @@ For example:
 
 ~~~js
 > network.name
-'qrlLocal'
+'hardhatqrlvm'
 > config.defaultNetwork
-'qrlLocal'
+'hardhatqrlvm'
 ~~~
 
 If you prefer explicit imports, require the runtime:
@@ -51,7 +51,7 @@ If you prefer explicit imports, require the runtime:
 > const hre = require("@theqrl/hardhat")
 undefined
 > hre.network.name
-'qrlLocal'
+'hardhatqrlvm'
 ~~~
 
 ## Querying QRL JSON-RPC
@@ -157,14 +157,14 @@ The file is local development state and should not be committed.
 
 ## Troubleshooting
 
-If `qrlLocal` cannot start, first check whether a development override
+If `hardhatqrlvm` cannot start, first check whether a development override
 (`QRLJS_MONOREPO_PATH` / `qrlJsMonorepoPath`) is set but invalid — unset it or
 build the checkout it points to. If no override is set, the bundled runtime in
 the installed package may be corrupted; reinstall the package:
 
 ~~~sh
 npm install @theqrl/hardhat --force
-npx hardhat console --network qrlLocal
+npx hardhat console --network hardhatqrlvm
 ~~~
 
 If an HTTP network cannot connect, verify `QRL_RPC_URL` with `qrl_chainId`:

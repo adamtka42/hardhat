@@ -1,22 +1,22 @@
-# qrlLocal network
+# hardhatqrlvm network
 
-`qrlLocal` is the in-process QRL VM network used by QRL Hardhat for fast local
+`hardhatqrlvm` is the in-process QRL VM network used by QRL Hardhat for fast local
 tests, scripts, and contract development. It is the QRL replacement for the old
 Ethereum in-memory network docs; it does not emulate `eth_*` JSON-RPC or the old
 Buidler EVM.
 
-Use `qrlLocal` when you want local execution without starting a go-qrl node. Use
+Use `hardhatqrlvm` when you want local execution without starting a go-qrl node. Use
 an HTTP go-qrl network when you need to test node-managed accounts, private
 network behavior, external RPC infrastructure, or raw transaction submission.
 
 ## Requirements
 
 Installed `@theqrl/hardhat` packages ship the QRL VM runtime bundled inside
-the artifact, so `qrlLocal` works out of the box — no extra repositories or
+the artifact, so `hardhatqrlvm` works out of the box — no extra repositories or
 environment variables:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 For qrljs or Hardhat development you can override the bundled runtime with a
@@ -29,25 +29,24 @@ npm run build
 
 cd /path/to/qrl-hardhat-project
 export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 A set override is authoritative: when the checkout is missing or unbuilt the
 error surfaces instead of silently falling back to the bundle. The path can
-also be set in `hardhat.config.js` with `networks.qrlLocal.qrlJsMonorepoPath`.
+also be set in `hardhat.config.js` with `networks.hardhatqrlvm.qrlJsMonorepoPath`.
 
 ## Configuration
 
-A typical `qrlLocal` config looks like this:
+A typical `hardhatqrlvm` config looks like this:
 
 ~~~js
 const localAccountAddress = "Q" + "01".repeat(64);
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -68,7 +67,7 @@ module.exports = {
 };
 ~~~
 
-`type` must be `"qrl-local"`.
+The in-process provider is selected by the reserved network name `hardhatqrlvm`.
 
 `chainId` defaults to `1`.
 
@@ -99,13 +98,13 @@ processes), run it as a standalone endpoint with
 Run tests against the in-process network:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 Run a script:
 
 ~~~sh
-npx hardhat run scripts/deploy.js --network qrlLocal
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
 ~~~
 
 Inside tests and scripts, use the same runtime APIs as with HTTP networks:
@@ -124,12 +123,12 @@ const sample = await Sample.deploy();
 console.log(sample.address);
 ~~~
 
-`deploy()` returns a ready-to-use contract wrapper. On `qrlLocal`, the sender
+`deploy()` returns a ready-to-use contract wrapper. On `hardhatqrlvm`, the sender
 defaults to the network's `from` config field.
 
 ## Contract console logging
 
-`qrlLocal` can print debug logs emitted from Hyperion contracts through
+`hardhatqrlvm` can print debug logs emitted from Hyperion contracts through
 `@theqrl/hardhat/console.hyp`:
 
 ~~~solidity
@@ -142,8 +141,8 @@ contract Sample {
 }
 ~~~
 
-Logs are enabled by default on `qrlLocal`. Disable them with
-`networks.qrlLocal.consoleLog: false`. HTTP go-qrl networks accept the same
+Logs are enabled by default on `hardhatqrlvm`. Disable them with
+`networks.hardhatqrlvm.consoleLog: false`. HTTP go-qrl networks accept the same
 config field for shared config compatibility, but they do not print contract
 console logs.
 
@@ -152,7 +151,7 @@ signatures, formatting, and limitations.
 
 ## Supported local RPC behavior
 
-`qrlLocal` supports the QRL JSON-RPC methods implemented by the underlying local
+`hardhatqrlvm` supports the QRL JSON-RPC methods implemented by the underlying local
 VM provider. Hardhat handles these methods directly:
 
 - `qrl_chainId`
@@ -170,7 +169,7 @@ VM provider. Hardhat handles these methods directly:
   WebSocket clients by `hardhat node`)
 
 The provider mirrors the go-qrl node's compatibility surface, so tooling that
-probes the connection on startup works against `qrlLocal` too:
+probes the connection on startup works against `hardhatqrlvm` too:
 
 - `net_version`, `net_listening`, `net_peerCount`
 - `web3_clientVersion`, `web3_sha3` (keccak-256, like go-qrl)
@@ -198,7 +197,7 @@ await network.provider.send("qrl_revert", [snapshot]);
 
 ## Time manipulation
 
-Block timestamps on `qrlLocal` are deterministic: the genesis block starts at
+Block timestamps on `hardhatqrlvm` are deterministic: the genesis block starts at
 `0` (or at the configured `initialDate`) and every mined block gets
 `parent + 1` second. Time-dependent contracts (vesting, timelocks, deadlines)
 are tested with the time helpers:
@@ -221,8 +220,7 @@ To start the chain clock at a real date, set `initialDate` (ISO 8601) on the
 network config:
 
 ~~~js
-qrlLocal: {
-  type: "qrl-local",
+hardhatqrlvm: {
   qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
   initialDate: "2026-01-01T00:00:00Z",
 },
@@ -242,7 +240,7 @@ are pending.
 
 ## Transaction failures
 
-By default `qrlLocal` throws when a transaction or call reverts, matching the
+By default `hardhatqrlvm` throws when a transaction or call reverts, matching the
 original Hardhat in-memory network:
 
 - `qrl_call` throws a provider error with the raw revert payload in
@@ -265,8 +263,7 @@ original Hardhat in-memory network:
 Both behaviors can be disabled per network:
 
 ~~~js
-qrlLocal: {
-  type: "qrl-local",
+hardhatqrlvm: {
   qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
   throwOnTransactionFailures: false,
   throwOnCallFailures: false,
@@ -278,22 +275,22 @@ status-`0x0` transaction and `qrl_call` returns the raw revert data.
 
 ## Differences from HTTP go-qrl networks
 
-`qrlLocal` does not connect to a go-qrl node and does not use node-managed
+`hardhatqrlvm` does not connect to a go-qrl node and does not use node-managed
 accounts. Accounts are configured in `hardhat.config.js`.
 
 HTTP networks can use locally signed QRL extended seeds or `accounts: "remote"`.
-`qrlLocal` uses configured local account objects instead. A local account can
+`hardhatqrlvm` uses configured local account objects instead. A local account can
 optionally include a seed to enable `qrl_sign`; the seed must derive the
 configured address.
 
-`qrlLocal` rejects `eth_*` RPC methods. Use `qrl_*` methods only.
+`hardhatqrlvm` rejects `eth_*` RPC methods. Use `qrl_*` methods only.
 
-`qrlLocal` accepts signed QRL transactions through `qrl_sendRawTransaction`.
+`hardhatqrlvm` accepts signed QRL transactions through `qrl_sendRawTransaction`.
 It verifies the ML-DSA signature and public key, then validates the local chain
 id and current account nonce before execution.
 
 Chain id validation is applied to HTTP networks with configured `chainId`.
-`qrlLocal` exposes its configured chain id directly from the in-process provider.
+`hardhatqrlvm` exposes its configured chain id directly from the in-process provider.
 
 ## Common errors
 
@@ -303,18 +300,18 @@ packages this normally means the development override (`QRLJS_MONOREPO_PATH`
 override never falls back to the bundled runtime. Unset the override or build
 the checkout it points to (see Requirements above).
 
-If a config includes `url` under a `qrl-local` network, config validation fails.
-`qrlLocal` is not an HTTP network.
+If a config includes `url` under a `hardhatqrlvm` network, config validation fails.
+`hardhatqrlvm` is not an HTTP network.
 
 If a local account address is malformed, config validation fails. Use native QRL
 addresses, not Ethereum-style `0x` addresses.
 
 If deployment fails because the sender is not managed, set `from` to one of the
-addresses in `networks.qrlLocal.accounts` or pass `{ from }` explicitly.
+addresses in `networks.hardhatqrlvm.accounts` or pass `{ from }` explicitly.
 
 ## When to use HTTP instead
 
-Use an HTTP go-qrl network instead of `qrlLocal` when you need to validate:
+Use an HTTP go-qrl network instead of `hardhatqrlvm` when you need to validate:
 
 - private-network ports and connectivity,
 - node-managed accounts,

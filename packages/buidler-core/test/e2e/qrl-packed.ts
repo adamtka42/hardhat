@@ -18,13 +18,13 @@ const LOCAL_QRLJS_MONOREPO_PATH = path.join(
 );
 
 // Proves the packed @theqrl/hardhat artifact is self-contained for
-// `qrlLocal`: npm pack (prepack bundles the qrljs runtime), install the
+// `hardhatqrlvm`: npm pack (prepack bundles the qrljs runtime), install the
 // tarball into a clean project, and run a transfer WITHOUT
 // QRLJS_MONOREPO_PATH or any qrljs checkout on a resolvable path.
 describe("QRL packed artifact e2e", function () {
   useTmpDir("qrl-packed-e2e");
 
-  it("starts qrlLocal from the packed artifact without a qrljs checkout", async function () {
+  it("starts hardhatqrlvm from the packed artifact without a qrljs checkout", async function () {
     this.timeout(420000);
 
     const qrlJsMonorepoPath = resolveQrlJsMonorepoPath();
@@ -158,10 +158,9 @@ async function prepareProject(projectDir: string) {
   await fsExtra.writeFile(
     path.join(projectDir, "hardhat.config.js"),
     `module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       accounts: [
         { address: "Q${"01".repeat(64)}", balance: "1000000000000" },

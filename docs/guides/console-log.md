@@ -1,7 +1,7 @@
 # Contract console logging
 
 QRL Hardhat supports `console.log`-style debugging from Hyperion contracts when
-those contracts run on `qrlLocal`. It is a development tool: use it in tests and
+those contracts run on `hardhatqrlvm`. It is a development tool: use it in tests and
 local scripts, then remove it from production contract code when you are done
 debugging.
 
@@ -36,10 +36,10 @@ contract Sample {
 }
 ~~~
 
-Run the contract on `qrlLocal`:
+Run the contract on `hardhatqrlvm`:
 
 ~~~sh
-npx hardhat test --network qrlLocal
+npx hardhat test --network hardhatqrlvm
 ~~~
 
 Example output:
@@ -95,7 +95,7 @@ line.
 
 | Network type | Behavior |
 | --- | --- |
-| `qrlLocal` | logs are decoded and printed by default |
+| `hardhatqrlvm` | logs are decoded and printed by default |
 | HTTP go-qrl networks | contract calls succeed, but no logs are printed |
 | private/public networks | same as HTTP networks: silent success |
 
@@ -105,14 +105,13 @@ listener is present, so the contract keeps running but nothing is printed.
 
 ## Disabling output
 
-Set `consoleLog: false` on a `qrl-local` network to disable output without
+Set `consoleLog: false` on a `hardhatqrlvm` network to disable output without
 changing contract behavior:
 
 ~~~js
 module.exports = {
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       consoleLog: false,
     },
@@ -121,7 +120,7 @@ module.exports = {
 ~~~
 
 The field is accepted on HTTP network configs too, so shared configs do not
-fail validation, but it only has an effect on `qrl-local` networks.
+fail validation, but it only has an effect on `hardhatqrlvm` networks.
 
 ## Gas and state
 

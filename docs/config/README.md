@@ -16,7 +16,7 @@ const accounts =
 const localAccountAddress = "Q" + "01".repeat(64);
 
 module.exports = {
-  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "qrlLocal",
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
   hyperion: {
     compilerPath: process.env.HYPERION_HYPC_PATH,
     optimizer: {
@@ -25,8 +25,7 @@ module.exports = {
     },
   },
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: localAccountAddress,
@@ -50,10 +49,10 @@ module.exports = {
 
 `defaultNetwork` selects the network used when a command does not pass
 `--network`. The default built into QRL Hardhat is `qrl`, but projects commonly
-set it to `qrlLocal` for tests.
+set it to `hardhatqrlvm` for tests.
 
 `networks` maps network names to either an HTTP go-qrl network or a local
-in-process `qrlLocal` network.
+in-process `hardhatqrlvm` network.
 
 `hyperion` configures the Hyperion compiler.
 
@@ -104,9 +103,9 @@ details.
 `optimizer.enabled` and `optimizer.runs` are passed into the Hyperion compiler
 input.
 
-## qrlLocal network
+## hardhatqrlvm network
 
-`qrlLocal` is an in-process QRL VM network for fast local tests. It does not
+`hardhatqrlvm` is an in-process QRL VM network for fast local tests. It does not
 connect to a go-qrl node. Installed packages ship the QRL VM runtime bundled,
 so no extra setup is needed; a built `qrljs-monorepo` checkout can optionally
 override the bundled runtime for development.
@@ -114,15 +113,14 @@ override the bundled runtime for development.
 ~~~js
 module.exports = {
   networks: {
-    qrlLocal: {
-      type: "qrl-local",
+    hardhatqrlvm: {
       chainId: 1,
       qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
       from: "Q" + "01".repeat(64),
       accounts: [
         {
           address: "Q" + "01".repeat(64),
-          seed: process.env.QRL_LOCAL_SEED,
+          seed: process.env.HARDHAT_QRLVM_SEED,
           balance: "1000000000000000000000000",
           nonce: 0,
         },
@@ -137,7 +135,7 @@ module.exports = {
 };
 ~~~
 
-`type` must be `"qrl-local"`.
+The in-process provider is selected by the reserved network name `hardhatqrlvm`.
 
 `qrlJsMonorepoPath` can also be provided with `QRLJS_MONOREPO_PATH`.
 
@@ -159,7 +157,7 @@ use `qrl_increaseTime` / `qrl_setNextBlockTimestamp` to shift time in tests.
 
 `throwOnTransactionFailures` / `throwOnCallFailures` (default `true`) make
 reverting transactions/calls throw with the decoded reason; see the
-[qrlLocal guide](../qrl-local/README.md) for details.
+[hardhatqrlvm guide](../hardhat-qrlvm/README.md) for details.
 
 `allowUnlimitedContractSize` skips the deployed-code size limit
 (`QRL_MAX_CODE_SIZE`), e.g. for coverage-instrumented contracts. Local testing
@@ -169,7 +167,7 @@ only — real networks always enforce the limit.
 transaction/call errors; see the
 [stack traces guide](../guides/stack-traces.md).
 
-For a focused qrlLocal guide, see [../qrl-local/README.md](../qrl-local/README.md).
+For a focused hardhatqrlvm guide, see [../hardhat-qrlvm/README.md](../hardhat-qrlvm/README.md).
 
 ## HTTP go-qrl networks
 
@@ -311,7 +309,7 @@ large timeouts are common for integration tests.
 
 `QRL_ACCOUNT_SEED` provides a locally signed QRL account for HTTP networks.
 
-`QRLJS_MONOREPO_PATH` points at a built `qrljs-monorepo` checkout for `qrlLocal`.
+`QRLJS_MONOREPO_PATH` points at a built `qrljs-monorepo` checkout for `hardhatqrlvm`.
 
 `HYPERION_HYPC_PATH` points at a local `hypc` compiler binary.
 

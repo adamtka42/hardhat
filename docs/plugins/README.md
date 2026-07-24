@@ -21,7 +21,7 @@ Install a QRL-compatible plugin and load it from `hardhat.config.js`:
 usePlugin("qrl-hardhat-example-plugin");
 
 module.exports = {
-  defaultNetwork: "qrlLocal",
+  defaultNetwork: "hardhatqrlvm",
 };
 ~~~
 
@@ -75,7 +75,7 @@ QRL plugins should use QRL-native surfaces:
 - QRL addresses,
 - `qrl_*` JSON-RPC methods,
 - `hre.qrl` helpers,
-- qrlLocal or HTTP go-qrl networks.
+- hardhatqrlvm or HTTP go-qrl networks.
 
 Avoid assuming Ethereum-only behavior such as `eth_*` RPC, Ethereum private
 keys, HD wallets, Solidity-only source paths, Ethers.js signers, Web3.js

@@ -14,9 +14,9 @@ interface CommonNetworkConfig {
   gasPrice?: "auto" | number;
   gasMultiplier?: number;
   /**
-   * Contract console logging (development only). Meaningful on `qrl-local`
-   * networks, where it defaults to enabled; accepted but inert on HTTP
-   * networks so shared config files validate everywhere.
+   * Contract console logging (development only). Meaningful on the
+   * `hardhatqrlvm` network, where it defaults to enabled; accepted but inert
+   * on HTTP networks so shared config files validate everywhere.
    */
   consoleLog?: boolean;
 }
@@ -25,7 +25,7 @@ export interface OtherAccountsConfig {
   type: string;
 }
 
-export interface QrlLocalAccountConfig {
+export interface HardhatQrlvmAccountConfig {
   /**
    * Optional extended seed enabling `qrl_sign` for this account. Local
    * transactions never need it — the local network accepts unsigned
@@ -37,9 +37,8 @@ export interface QrlLocalAccountConfig {
   nonce?: number;
 }
 
-export interface QrlLocalNetworkConfig extends CommonNetworkConfig {
-  type: "qrl-local";
-  accounts?: QrlLocalAccountConfig[];
+export interface HardhatQrlvmNetworkConfig extends CommonNetworkConfig {
+  accounts?: HardhatQrlvmAccountConfig[];
   automine?: boolean;
   blockGasLimit?: number;
   /**
@@ -87,7 +86,7 @@ export interface HttpNetworkConfig extends CommonNetworkConfig {
   accounts?: NetworkConfigAccounts;
 }
 
-export type NetworkConfig = HttpNetworkConfig | QrlLocalNetworkConfig;
+export type NetworkConfig = HttpNetworkConfig | HardhatQrlvmNetworkConfig;
 
 export interface Networks {
   [networkName: string]: NetworkConfig;

@@ -2,7 +2,7 @@
 
 This directory contains the QRL Hardhat documentation. QRL Hardhat targets
 Hyperion `.hyp` contracts, QRL addresses, `qrl_*` JSON-RPC methods, local
-in-process tests through `qrlLocal`, and live go-qrl HTTP networks.
+in-process tests through `hardhatqrlvm`, and live go-qrl HTTP networks.
 
 ## Start here
 
@@ -21,23 +21,23 @@ in-process tests through `qrlLocal`, and live go-qrl HTTP networks.
   compilation, artifacts, cache files, and compiler options.
 - [Writing scripts](guides/scripts.md): deployment and maintenance scripts that
   use `hre.qrl`.
-- [Deploying contracts](guides/deploying.md): qrlLocal and HTTP go-qrl
+- [Deploying contracts](guides/deploying.md): hardhatqrlvm and HTTP go-qrl
   deployment flows.
 - [Using the Hardhat console](guides/buidler-console.md): interactive REPL
   usage with QRL helpers and direct `qrl_*` RPC calls.
 - [Running a standalone local node](guides/node.md): `hardhat node` — an
   HTTP/WebSocket JSON-RPC endpoint over the local QRL network.
 - [Hyperion stack traces](guides/stack-traces.md): source-mapped stack
-  traces for reverts and the `debug_trace*` RPC on `qrlLocal`.
+  traces for reverts and the `debug_trace*` RPC on `hardhatqrlvm`.
 - [Contract console logging](guides/console-log.md): `console.log` from
-  Hyperion contracts on `qrlLocal`.
+  Hyperion contracts on `hardhatqrlvm`.
 - [Creating tasks](guides/create-task.md): custom CLI tasks for QRL projects.
 - [Creating plugins](guides/create-plugin.md): a small QRL-compatible plugin walkthrough.
 - [QRL Hardhat plugins](plugins/README.md): plugin status, loading, and QRL compatibility expectations.
 
 ## Networks and tooling
 
-- [qrlLocal](qrl-local/README.md): in-process QRL VM network for local tests.
+- [hardhatqrlvm](hardhat-qrlvm/README.md): in-process QRL VM network for local tests.
 - [TypeScript projects](guides/typescript.md): TypeScript setup and runtime
   imports.
 - [VS Code tests and scripts](guides/vscode-tests.md): debugging test and script
