@@ -91,16 +91,19 @@ export default function () {
         const failures = await network.provider.send(
           "qrl_getStackTraceFailuresCount"
         );
-        if (failures !== 0) {
-          console.warn(
-            chalk.yellow(
-              `Failed to generate ${failures} ${pluralize(
-                failures,
-                "stack trace"
-              )}. Run Hardhat with --verbose to learn more.`
-            )
-          );
+
+        if (failures === 0) {
+          return;
         }
+
+        console.warn(
+          chalk.yellow(
+            `Failed to generate ${failures} ${pluralize(
+              failures,
+              "stack trace"
+            )}. Run Hardhat with --verbose to learn more.`
+          )
+        );
       }
     );
 }
