@@ -132,12 +132,13 @@ export default function () {
       }
     );
 
-  internalTask(TASK_COMPILE_COMPILE).setAction(
+  internalTask(
+    TASK_COMPILE_COMPILE,
     async ({ compiler }: { compiler?: Compiler }, { config, run }) => {
       const selectedCompiler = compiler ?? createCompiler(config);
       const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
 
-      console.log("Compiling Hyperion sources...");
+      console.log("Compiling...");
       const output = await run(TASK_COMPILE_RUN_COMPILER, {
         input,
         compiler: selectedCompiler,
@@ -188,7 +189,8 @@ export default function () {
     }
   );
 
-  internalTask(TASK_COMPILE_CHECK_CACHE).setAction(
+  internalTask(
+    TASK_COMPILE_CHECK_CACHE,
     async (
       { force, compiler }: { force: boolean; compiler?: Compiler },
       { config, run }
@@ -202,26 +204,13 @@ export default function () {
       // The dependency graph includes every transitively imported file, so
       // changes to imported libraries (e.g. under node_modules) also
       // invalidate the cache, not just changes to project-local sources.
-      let sourceTimestamps: number[];
-      try {
-        const dependencyGraph: DependencyGraph = await run(
-          TASK_COMPILE_GET_DEPENDENCY_GRAPH
-        );
+      const dependencyGraph: DependencyGraph = await run(
+        TASK_COMPILE_GET_DEPENDENCY_GRAPH
+      );
 
-        sourceTimestamps = dependencyGraph
-          .getResolvedFiles()
-          .map((file) => file.lastModificationDate.getTime());
-      } catch (error) {
-        // Never let the cache check break a build that would compile fine:
-        // hypc resolves imports on its own, so if the resolver fails here we
-        // just recompile instead of risking a stale cache hit.
-        console.warn(
-          chalk.yellow(
-            "Could not resolve Hyperion dependencies for cache checking, recompiling."
-          )
-        );
-        return false;
-      }
+      const sourceTimestamps = dependencyGraph
+        .getResolvedFiles()
+        .map((file) => file.lastModificationDate.getTime());
 
       return areArtifactsCached(
         sourceTimestamps,

@@ -300,8 +300,6 @@ describe("Compile task cache", function () {
 
   const libFilePath = () =>
     path.join(process.cwd(), "node_modules", "dep-lib", "Lib.hyp");
-  const libPackageJsonPath = () =>
-    path.join(process.cwd(), "node_modules", "dep-lib", "package.json");
   const projectSourcePath = () =>
     path.join(process.cwd(), "contracts", "Consumer.hyp");
 
@@ -432,24 +430,5 @@ describe("Compile task cache", function () {
         await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
       );
     });
-  });
-
-  it("treats dependency resolution errors as cache misses", async function () {
-    await this.env.run(TASK_COMPILE, { force: true });
-
-    // Removing the package.json makes the resolver throw for the dep-lib
-    // import; the cache check must degrade to a cache miss, not crash.
-    const packageJsonContent = await fsExtra.readFile(
-      libPackageJsonPath(),
-      "utf8"
-    );
-    await fsExtra.remove(libPackageJsonPath());
-    try {
-      assert.isFalse(
-        await this.env.run(TASK_COMPILE_CHECK_CACHE, { force: false })
-      );
-    } finally {
-      await fsExtra.writeFile(libPackageJsonPath(), packageJsonContent);
-    }
   });
 });
