@@ -188,10 +188,23 @@ Each artifact contains:
 - `linkReferences`,
 - `deployedLinkReferences`.
 
-QRL Hardhat writes each contract artifact using its contract name:
+For unique contract names, QRL Hardhat writes a root artifact:
 
 ~~~text
 artifacts/ContractName.json
+~~~
+
+It also writes source-qualified artifacts:
+
+~~~text
+artifacts/contracts/Token.hyp/Token.json
+~~~
+
+If two source files define the same contract name, use the fully qualified name
+when reading artifacts or creating factories:
+
+~~~js
+const token = await qrl.getContractFactory("contracts/Token.hyp:Token");
 ~~~
 
 ## Cache invalidation
@@ -252,7 +265,12 @@ This removes cache and artifacts before compiling again.
 
 ### Contract not found by `hre.qrl`
 
-Make sure the contract was compiled and that the name matches its artifact.
+Make sure the contract was compiled and that the name is unambiguous. If multiple
+sources define the same contract name, use a fully qualified name:
+
+~~~js
+await hre.qrl.getContractFactory("contracts/MyToken.hyp:MyToken");
+~~~
 
 ### Solidity or EVM compiler options
 

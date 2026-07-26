@@ -14,7 +14,8 @@ import { ERRORS } from "./core/errors-list";
  */
 export function getArtifactFromContractOutput(
   contractName: string,
-  contractOutput: any
+  contractOutput: any,
+  sourceName?: string
 ): Artifact {
   const compilerBytecode =
     contractOutput.bytecodeOutput && contractOutput.bytecodeOutput.bytecode;
@@ -46,7 +47,7 @@ export function getArtifactFromContractOutput(
       ? compilerDeployedBytecode.linkReferences
       : {};
 
-  return {
+  const artifact: Artifact = {
     contractName,
     abi: contractOutput.abi,
     bytecode,
@@ -54,10 +55,49 @@ export function getArtifactFromContractOutput(
     linkReferences,
     deployedLinkReferences,
   };
+
+  if (sourceName !== undefined) {
+    artifact.sourceName = sourceName;
+  }
+
+  return artifact;
 }
 
 function getArtifactPath(artifactsPath: string, contractName: string): string {
+  const parsed = parseFullyQualifiedName(contractName);
+
+  if (parsed !== undefined) {
+    return getSourceArtifactPath(
+      artifactsPath,
+      parsed.sourceName,
+      parsed.contractName
+    );
+  }
+
   return path.join(artifactsPath, `${contractName}.json`);
+}
+
+function getSourceArtifactPath(
+  artifactsPath: string,
+  sourceName: string,
+  contractName: string
+): string {
+  return path.join(artifactsPath, sourceName, `${contractName}.json`);
+}
+
+function parseFullyQualifiedName(
+  contractName: string
+): { sourceName: string; contractName: string } | undefined {
+  const separator = contractName.lastIndexOf(":");
+
+  if (separator === -1) {
+    return undefined;
+  }
+
+  return {
+    sourceName: contractName.slice(0, separator),
+    contractName: contractName.slice(separator + 1),
+  };
 }
 
 /**
@@ -66,15 +106,35 @@ function getArtifactPath(artifactsPath: string, contractName: string): string {
  * @param artifactsPath the artifacts' directory.
  * @param artifact the artifact to be stored.
  */
-export async function saveArtifact(artifactsPath: string, artifact: Artifact) {
-  await fsExtra.ensureDir(artifactsPath);
-  await fsExtra.writeJSON(
-    path.join(artifactsPath, `${artifact.contractName}.json`),
-    artifact,
-    {
-      spaces: 2,
-    }
-  );
+export async function saveArtifact(
+  artifactsPath: string,
+  artifact: Artifact,
+  saveRootArtifact: boolean = true
+) {
+  if (artifact.sourceName !== undefined) {
+    await writeArtifact(
+      getSourceArtifactPath(
+        artifactsPath,
+        artifact.sourceName,
+        artifact.contractName
+      ),
+      artifact
+    );
+  }
+
+  if (saveRootArtifact || artifact.sourceName === undefined) {
+    await writeArtifact(
+      getArtifactPath(artifactsPath, artifact.contractName),
+      artifact
+    );
+  }
+}
+
+async function writeArtifact(artifactPath: string, artifact: Artifact) {
+  await fsExtra.ensureDir(path.dirname(artifactPath));
+  await fsExtra.writeJSON(artifactPath, artifact, {
+    spaces: 2,
+  });
 }
 
 /**

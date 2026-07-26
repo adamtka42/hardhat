@@ -317,7 +317,14 @@ Also check:
 
 - the contract source has a `.hyp` extension,
 - `paths.sources` points at the right directory,
-- the contract name matches the artifact name.
+- the contract name matches the artifact name,
+- duplicate contract names use fully qualified names.
+
+For duplicate names:
+
+~~~js
+const Factory = await qrl.getContractFactory("contracts/Sample.hyp:Sample");
+~~~
 
 If artifacts look stale, rebuild from scratch:
 
