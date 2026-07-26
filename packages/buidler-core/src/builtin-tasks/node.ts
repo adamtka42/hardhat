@@ -22,15 +22,19 @@ import { TASK_NODE } from "./task-names";
 const log = debug("buidler:core:tasks:node");
 
 function _createHardhatQrlvmProvider(
-  config: ResolvedHardhatConfig,
-  networkName: string,
-  networkConfig: HardhatQrlvmNetworkConfig
+  config: ResolvedHardhatConfig
 ): IQrlProvider {
-  log("Creating Hardhat QRLVM provider for the JSON-RPC server");
+  log("Creating Hardhat QRLVM Provider");
 
-  return lazyObject(() =>
-    createProvider(networkName, networkConfig, config.paths)
-  );
+  const networkName = HARDHAT_QRLVM_NETWORK_NAME;
+  const networkConfig = config.networks[
+    networkName
+  ] as HardhatQrlvmNetworkConfig;
+
+  return lazyObject(() => {
+    log("Creating hardhatqrlvm provider for JSON-RPC server");
+    return createProvider(networkName, networkConfig, config.paths);
+  });
 }
 
 function logHardhatQrlvmAccounts(networkConfig: HardhatQrlvmNetworkConfig) {
@@ -38,18 +42,16 @@ function logHardhatQrlvmAccounts(networkConfig: HardhatQrlvmNetworkConfig) {
     return;
   }
 
-  // tslint:disable-next-line: no-console
   console.log("Accounts");
-  // tslint:disable-next-line: no-console
   console.log("========");
 
-  // Q-addresses and balances ONLY — local accounts carry no key material
-  // today, and no secret (seeds included) must ever be printed here.
+  // QRL account seeds must never be printed here.
   for (const [index, account] of networkConfig.accounts.entries()) {
-    // tslint:disable-next-line: no-console
-    console.log(
-      `Account #${index}: ${account.address} (${account.balance ?? "0"} wei)\n`
-    );
+    const address = account.address;
+    const balance = account.balance ?? "0";
+
+    console.log(`Account #${index}: ${address} (${balance} wei)
+`);
   }
 }
 
@@ -68,9 +70,6 @@ export default function () {
       types.int
     )
     .setAction(async ({ hostname, port }, { hardhatArguments, config }) => {
-      const networkName = HARDHAT_QRLVM_NETWORK_NAME;
-      const networkConfig = config.networks[HARDHAT_QRLVM_NETWORK_NAME];
-
       if (
         hardhatArguments.network !== undefined &&
         hardhatArguments.network !== HARDHAT_QRLVM_NETWORK_NAME
@@ -80,39 +79,30 @@ export default function () {
         );
       }
 
-      if (networkConfig === undefined || "url" in networkConfig) {
-        throw new HardhatError(
-          ERRORS.BUILTIN_TASKS.JSONRPC_UNSUPPORTED_NETWORK
-        );
-      }
-
       try {
-        const hardhatQrlvmConfig = networkConfig as HardhatQrlvmNetworkConfig;
         const serverConfig: JsonRpcServerConfig = {
           hostname,
           port,
-          provider: _createHardhatQrlvmProvider(
-            config,
-            networkName,
-            hardhatQrlvmConfig
-          ),
+          provider: _createHardhatQrlvmProvider(config),
+          loggingEnabled: true,
         };
 
         const server = new JsonRpcServer(serverConfig);
 
         const { port: actualPort, address } = await server.listen();
 
-        // tslint:disable-next-line: no-console
         console.log(
           chalk.green(
             `Started HTTP and WebSocket JSON-RPC server at http://${address}:${actualPort}/`
           )
         );
 
-        // tslint:disable-next-line: no-console
         console.log();
 
-        logHardhatQrlvmAccounts(hardhatQrlvmConfig);
+        const networkConfig = config.networks[
+          HARDHAT_QRLVM_NETWORK_NAME
+        ] as HardhatQrlvmNetworkConfig;
+        logHardhatQrlvmAccounts(networkConfig);
 
         // Graceful shutdown: close the HTTP/WS servers and exit cleanly.
         const shutdown = () => {
