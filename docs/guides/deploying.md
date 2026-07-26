@@ -353,12 +353,7 @@ artifact bytecode.
 
 ### Contract artifact not found
 
-Run `npx hardhat compile` and make sure the contract name is correct. If more
-than one source file defines the same contract name, use a fully qualified name:
-
-~~~js
-const Factory = await qrl.getContractFactory("contracts/Sample.hyp:Sample");
-~~~
+Run `npx hardhat compile` and make sure the contract name is correct.
 
 ## Next steps
 
