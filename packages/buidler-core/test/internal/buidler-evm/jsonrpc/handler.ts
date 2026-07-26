@@ -2,7 +2,7 @@ import { assert } from "chai";
 import { EventEmitter } from "events";
 import http from "http";
 
-import { JsonRpcServer } from "../../../../src/internal/qrl/jsonrpc/server";
+import { JsonRpcServer } from "../../../../src/internal/buidler-evm/jsonrpc/server";
 
 class MockProvider extends EventEmitter {
   public subscribeDelayMs = 0;

@@ -2,8 +2,8 @@ import findup from "find-up";
 import * as fs from "fs";
 import path from "path";
 
-import { HardhatError } from "../core/errors";
-import { ERRORS } from "../core/errors-list";
+import { HardhatError } from "../../core/errors";
+import { ERRORS } from "../../core/errors-list";
 
 /**
  * Single resolver for the qrljs runtime modules that power `hardhatqrlvm`.
@@ -41,8 +41,8 @@ export interface ResolvedQrlJsRuntime extends QrlJsRuntimeModules {
 }
 
 // The bundle directory lives at the package root next to console.hyp. This
-// module runs from <root>/internal/qrl (compiled) or <root>/src/internal/qrl
-// (ts-node), so the root is located via the closest package.json.
+// This module runs from the compiled or source internal tree, so the package
+// root is located via the closest package.json.
 function getBundleDir(): string {
   const packageJsonPath = findup.sync("package.json", { cwd: __dirname });
   return path.join(path.dirname(packageJsonPath!), "qrljs-runtime");

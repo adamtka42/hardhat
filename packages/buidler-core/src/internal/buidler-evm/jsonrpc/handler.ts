@@ -10,42 +10,16 @@ import {
   JsonRpcRequest,
   JsonRpcResponse,
 } from "../../util/jsonrpc";
+import {
+  InternalError,
+  InvalidJsonInputError,
+  InvalidRequestError,
+  MethodNotFoundError,
+} from "../provider/errors";
 
 // tslint:disable only-hardhat-error
 
 const log = debug("buidler:core:qrl:jsonrpc");
-
-// Local JSON-RPC protocol errors. Provider errors pass through with their
-// own codes; these cover the transport layer itself.
-class JsonRpcProtocolError extends Error {
-  constructor(message: string, public readonly code: number) {
-    super(message);
-  }
-}
-
-class InvalidJsonInputError extends JsonRpcProtocolError {
-  constructor(message: string) {
-    super(message, -32700);
-  }
-}
-
-class InvalidRequestError extends JsonRpcProtocolError {
-  constructor(message: string) {
-    super(message, -32600);
-  }
-}
-
-class InternalError extends JsonRpcProtocolError {
-  constructor(message: string) {
-    super(message, -32603);
-  }
-}
-
-class MethodNotSupportedError extends JsonRpcProtocolError {
-  constructor(message: string) {
-    super(message, -32601);
-  }
-}
 
 export default class JsonRpcHandler {
   constructor(
@@ -216,7 +190,7 @@ export default class JsonRpcHandler {
       (rpcReq.method === "qrl_subscribe" || rpcReq.method === "qrl_unsubscribe")
     ) {
       const rpcResp = _handleError(
-        new MethodNotSupportedError(
+        new MethodNotFoundError(
           `${rpcReq.method} is only supported over WebSocket connections`
         )
       );

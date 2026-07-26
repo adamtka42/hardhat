@@ -1,4 +1,4 @@
-import { QrlStackTraceEntry } from "./decoder";
+import { QrlStackTraceEntry } from "./vm-trace-decoder";
 
 export enum QrlStackTraceEntryType {
   CALLSTACK_ENTRY,

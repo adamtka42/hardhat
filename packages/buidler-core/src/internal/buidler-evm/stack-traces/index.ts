@@ -1,7 +1,10 @@
-import { loadQrlDebugInfo, QrlDebugInfo } from "./debug-info";
-import { QrlStackTraceDecoder, QrlStackTraceEntry } from "./decoder";
-import { inferQrlStackTrace } from "./error-inferrer";
-import { QrlStackTraceDiagnostic, QrlStackTraceEntryType } from "./types";
+import { loadQrlDebugInfo, QrlDebugInfo } from "./compiler-to-model";
+import {
+  QrlStackTraceDiagnostic,
+  QrlStackTraceEntryType,
+} from "./solidity-stack-trace";
+import { inferQrlStackTrace } from "./solidityTracer";
+import { QrlStackTraceDecoder, QrlStackTraceEntry } from "./vm-trace-decoder";
 
 export { inferQrlStackTrace, loadQrlDebugInfo, QrlStackTraceDecoder };
 export {

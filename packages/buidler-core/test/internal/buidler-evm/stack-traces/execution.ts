@@ -3,7 +3,14 @@ import fsExtra from "fs-extra";
 import os from "os";
 import path from "path";
 
-import { HardhatQrlvmProvider } from "../../../../src/internal/core/providers/hardhat-qrlvm";
+import { HardhatQrlvmProvider } from "../../../../src/internal/buidler-evm/provider/provider";
+import {
+  inferQrlStackTrace,
+  loadQrlDebugInfo,
+  QrlStackTraceDecoder,
+  QrlStackTraceDiagnostic,
+  QrlStackTraceEntryType,
+} from "../../../../src/internal/buidler-evm/stack-traces";
 import { compileHyperion } from "../../../../src/internal/hyperion/compiler";
 import { buildHyperionStandardJsonInput } from "../../../../src/internal/hyperion/compiler-input";
 import {
@@ -12,13 +19,6 @@ import {
   getFunctionSignature,
 } from "../../../../src/internal/qrl/abi";
 import { linkQrlBytecode } from "../../../../src/internal/qrl/linking";
-import {
-  inferQrlStackTrace,
-  loadQrlDebugInfo,
-  QrlStackTraceDecoder,
-  QrlStackTraceDiagnostic,
-  QrlStackTraceEntryType,
-} from "../../../../src/internal/qrl/stack-traces";
 import { Artifact } from "../../../../src/types";
 
 interface FixtureManifestEntry {

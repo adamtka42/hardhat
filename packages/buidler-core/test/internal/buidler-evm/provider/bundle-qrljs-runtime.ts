@@ -6,7 +6,7 @@ import fsExtra from "fs-extra";
 import path from "path";
 import { promisify } from "util";
 
-import { useTmpDir } from "../../helpers/fs";
+import { useTmpDir } from "../../../helpers/fs";
 
 const execFileAsync = promisify(execFile);
 
@@ -16,6 +16,7 @@ const execFileAsync = promisify(execFile);
 // tslint:disable-next-line: no-var-requires
 const { bundleQrlJsRuntime } = require(path.join(
   __dirname,
+  "..",
   "..",
   "..",
   "..",

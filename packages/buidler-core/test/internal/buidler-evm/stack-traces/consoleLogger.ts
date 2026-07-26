@@ -3,14 +3,14 @@ import * as fs from "fs";
 import { keccak_256 } from "js-sha3";
 import path from "path";
 
-import { encodeQrlFunctionData } from "../../../src/internal/qrl/abi";
-import { toQrlChecksumAddress } from "../../../src/internal/qrl/address";
 import {
   decodeQrlConsoleLog,
   getConsoleLogSelectors,
   QRL_CONSOLE_LOG_ADDRESS,
-} from "../../../src/internal/qrl/console-log";
-import { CONSOLE_LOG_SIGNATURES } from "../../../src/internal/qrl/console-log-signatures";
+} from "../../../../src/internal/buidler-evm/stack-traces/consoleLogger";
+import { CONSOLE_LOG_SIGNATURES } from "../../../../src/internal/buidler-evm/stack-traces/logger";
+import { encodeQrlFunctionData } from "../../../../src/internal/qrl/abi";
+import { toQrlChecksumAddress } from "../../../../src/internal/qrl/address";
 
 function encodeConsoleCall(types: string[], args: any[]): Uint8Array {
   const abi = [
@@ -54,11 +54,12 @@ describe("QRL console log decoding", () => {
   });
 
   it("matches the artifacts committed by the console library generator", () => {
-    // Anti-drift guard: console.hyp and console-log-signatures.ts must be
+    // Anti-drift guard: console.hyp and logger.ts must be
     // exactly what the current generator produces from its type matrix.
     // tslint:disable-next-line: no-var-requires
     const { generateConsoleLibrary } = require(path.join(
       __dirname,
+      "..",
       "..",
       "..",
       "..",
@@ -67,7 +68,7 @@ describe("QRL console log decoding", () => {
     ));
     const generated = generateConsoleLibrary();
 
-    const packageRoot = path.join(__dirname, "..", "..", "..");
+    const packageRoot = path.join(__dirname, "..", "..", "..", "..");
     const committedHyp = fs.readFileSync(
       path.join(packageRoot, "console.hyp"),
       "utf8"
@@ -77,8 +78,9 @@ describe("QRL console log decoding", () => {
         packageRoot,
         "src",
         "internal",
-        "qrl",
-        "console-log-signatures.ts"
+        "buidler-evm",
+        "stack-traces",
+        "logger.ts"
       ),
       "utf8"
     );

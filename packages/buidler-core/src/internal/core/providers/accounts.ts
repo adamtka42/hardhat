@@ -1,13 +1,13 @@
 import path from "path";
 
 import { IQrlProvider } from "../../../types";
+import { loadQrlJsTxRuntime } from "../../buidler-evm/provider/runtime";
 import {
   isValidQrlAddress,
   normalizeQrlAddress,
   qrlAddressFromSeed,
   qrlAddressToBytes,
 } from "../../qrl/address";
-import { loadQrlJsTxRuntime } from "../../qrl/runtime";
 import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 

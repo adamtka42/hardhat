@@ -1,4 +1,4 @@
-import { QrlContractDebugInfo, QrlDebugInfo } from "./debug-info";
+import { QrlContractDebugInfo, QrlDebugInfo } from "./compiler-to-model";
 import {
   buildQrlPcToInstruction,
   decodeQrlSourceMap,

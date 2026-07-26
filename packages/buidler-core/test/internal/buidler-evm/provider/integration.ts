@@ -2,9 +2,9 @@ import { assert } from "chai";
 import fsExtra from "fs-extra";
 import path from "path";
 
+import { HardhatQrlvmProvider } from "../../../../src/internal/buidler-evm/provider/provider";
 import { ERRORS } from "../../../../src/internal/core/errors-list";
 import { createProvider } from "../../../../src/internal/core/providers/construction";
-import { HardhatQrlvmProvider } from "../../../../src/internal/core/providers/hardhat-qrlvm";
 import {
   expectHardhatError,
   expectHardhatErrorAsync,

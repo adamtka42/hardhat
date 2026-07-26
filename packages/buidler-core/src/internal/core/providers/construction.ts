@@ -6,9 +6,9 @@ import {
   ProjectPaths,
   QrlProvider,
 } from "../../../types";
+import { HardhatQrlvmProvider } from "../../buidler-evm/provider/provider";
 import { HARDHAT_QRLVM_NETWORK_NAME } from "../../constants";
 
-import { HardhatQrlvmProvider } from "./hardhat-qrlvm";
 import { HttpProvider } from "./http";
 
 export function createProvider(

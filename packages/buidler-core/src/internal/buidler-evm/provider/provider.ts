@@ -9,19 +9,19 @@ import {
   IQrlProvider,
   ProjectPaths,
 } from "../../../types";
+import { HardhatError } from "../../core/errors";
+import { ERRORS } from "../../core/errors-list";
+import { numberToRpcQuantity } from "../../core/providers/provider-utils";
 import { decodeQrlFunctionResult } from "../../qrl/abi";
 import { isValidQrlAddress } from "../../qrl/address";
-import { printQrlConsoleLog } from "../../qrl/console-log";
-import { loadQrlJsRuntime } from "../../qrl/runtime";
 import {
   buildQrlStackTraceLines,
   loadQrlDebugInfo,
   QrlStackTraceDecoder,
-} from "../../qrl/stack-traces";
-import { HardhatError } from "../errors";
-import { ERRORS } from "../errors-list";
+} from "../stack-traces";
+import { printQrlConsoleLog } from "../stack-traces/consoleLogger";
 
-import { numberToRpcQuantity } from "./provider-utils";
+import { loadQrlJsRuntime } from "./runtime";
 
 const log = debug("buidler:core:qrl:stack-traces");
 

@@ -2,11 +2,11 @@ import { assert } from "chai";
 import fsExtra from "fs-extra";
 import path from "path";
 
+import { loadQrlDebugInfo } from "../../../../src/internal/buidler-evm/stack-traces/compiler-to-model";
 import {
   COMPILER_INPUT_FILENAME,
   COMPILER_OUTPUT_FILENAME,
 } from "../../../../src/internal/constants";
-import { loadQrlDebugInfo } from "../../../../src/internal/qrl/stack-traces/debug-info";
 import { useTmpDir } from "../../../helpers/fs";
 
 describe("QRL stack trace debug info", function () {

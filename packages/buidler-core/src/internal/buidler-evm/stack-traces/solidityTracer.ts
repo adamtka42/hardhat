@@ -1,8 +1,11 @@
-import { getFunctionSignature } from "../abi";
+import { getFunctionSignature } from "../../qrl/abi";
 
-import { QrlContractDebugInfo } from "./debug-info";
-import { QrlStackTraceDecoder } from "./decoder";
-import { QrlStackTraceDiagnostic, QrlStackTraceEntryType } from "./types";
+import { QrlContractDebugInfo } from "./compiler-to-model";
+import {
+  QrlStackTraceDiagnostic,
+  QrlStackTraceEntryType,
+} from "./solidity-stack-trace";
+import { QrlStackTraceDecoder } from "./vm-trace-decoder";
 
 export function inferQrlStackTrace(
   rootFrame: any,

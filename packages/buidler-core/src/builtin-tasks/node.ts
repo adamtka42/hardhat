@@ -1,15 +1,15 @@
 import chalk from "chalk";
 import debug from "debug";
 
+import {
+  JsonRpcServer,
+  JsonRpcServerConfig,
+} from "../internal/buidler-evm/jsonrpc/server";
 import { HARDHAT_QRLVM_NETWORK_NAME } from "../internal/constants";
 import { task, types } from "../internal/core/config/config-env";
 import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
 import { createProvider } from "../internal/core/providers/construction";
-import {
-  JsonRpcServer,
-  JsonRpcServerConfig,
-} from "../internal/qrl/jsonrpc/server";
 import { lazyObject } from "../internal/util/lazy";
 import {
   HardhatQrlvmNetworkConfig,

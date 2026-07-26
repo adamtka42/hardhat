@@ -55,7 +55,7 @@ describe("QRL stack trace fixture manifest", function () {
         fixture.id
       );
       assert.deepEqual(fixture.coverage, [
-        `test/internal/qrl/stack-traces/fixtures.ts :: ${fixture.id}`,
+        `test/internal/buidler-evm/stack-traces/execution.ts :: ${fixture.id}`,
       ]);
     }
 

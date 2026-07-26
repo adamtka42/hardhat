@@ -4,7 +4,7 @@ import fsExtra from "fs-extra";
 import path from "path";
 import { promisify } from "util";
 
-import { QRL_CONSOLE_LOG_ADDRESS } from "../../src/internal/qrl/console-log";
+import { QRL_CONSOLE_LOG_ADDRESS } from "../../src/internal/buidler-evm/stack-traces/consoleLogger";
 import { useTmpDir } from "../helpers/fs";
 
 const execFileAsync = promisify(execFile);

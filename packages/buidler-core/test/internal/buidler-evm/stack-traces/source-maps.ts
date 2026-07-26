@@ -4,7 +4,7 @@ import {
   buildQrlPcToInstruction,
   decodeQrlSourceMap,
   offsetToLine,
-} from "../../../../src/internal/qrl/stack-traces/source-maps";
+} from "../../../../src/internal/buidler-evm/stack-traces/source-maps";
 
 describe("QRL source maps", function () {
   describe("decodeQrlSourceMap", function () {

@@ -1,10 +1,10 @@
 import { assert } from "chai";
 
-import { buildQrlStackTraceLines } from "../../../../src/internal/qrl/stack-traces";
-import { QrlDebugInfo } from "../../../../src/internal/qrl/stack-traces/debug-info";
-import { QrlStackTraceDecoder } from "../../../../src/internal/qrl/stack-traces/decoder";
-import { inferQrlStackTrace } from "../../../../src/internal/qrl/stack-traces/error-inferrer";
-import { QrlStackTraceEntryType } from "../../../../src/internal/qrl/stack-traces/types";
+import { buildQrlStackTraceLines } from "../../../../src/internal/buidler-evm/stack-traces";
+import { QrlDebugInfo } from "../../../../src/internal/buidler-evm/stack-traces/compiler-to-model";
+import { QrlStackTraceEntryType } from "../../../../src/internal/buidler-evm/stack-traces/solidity-stack-trace";
+import { inferQrlStackTrace } from "../../../../src/internal/buidler-evm/stack-traces/solidityTracer";
+import { QrlStackTraceDecoder } from "../../../../src/internal/buidler-evm/stack-traces/vm-trace-decoder";
 
 const CODE = "5f5ffd";
 const SOURCE = "function probe(uint256 value) public { revert(); }";

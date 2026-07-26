@@ -1,7 +1,8 @@
 import { keccak_256 } from "js-sha3";
 
-import { decodeQrlFunctionResult, getFunctionSignature } from "./abi";
-import { CONSOLE_LOG_SIGNATURES } from "./console-log-signatures";
+import { decodeQrlFunctionResult, getFunctionSignature } from "../../qrl/abi";
+
+import { CONSOLE_LOG_SIGNATURES } from "./logger";
 
 /**
  * Address observed for contract console logging; must stay byte-identical to
