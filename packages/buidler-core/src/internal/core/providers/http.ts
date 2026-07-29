@@ -31,12 +31,6 @@ export class HttpProvider extends EventEmitter {
   }
 
   public async send(method: string, params?: any[]): Promise<any> {
-    if (method.startsWith("eth_")) {
-      throw new HardhatError(ERRORS.NETWORK.LEGACY_ETH_RPC_UNSUPPORTED, {
-        method,
-      });
-    }
-
     // We create the error here to capture the stack traces at this point,
     // the async call that follows would probably loose of the stack trace
     const error: ProviderError = new Error();

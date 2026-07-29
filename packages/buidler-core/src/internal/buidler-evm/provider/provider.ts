@@ -149,12 +149,6 @@ export class HardhatQrlvmProvider extends EventEmitter implements IQrlProvider {
   }
 
   public async send(method: string, params: any[] = []): Promise<any> {
-    if (method.startsWith("eth_")) {
-      throw new HardhatError(ERRORS.NETWORK.LEGACY_ETH_RPC_UNSUPPORTED, {
-        method,
-      });
-    }
-
     switch (method) {
       case "qrl_chainId":
         return numberToRpcQuantity(this._chainId);
