@@ -285,6 +285,7 @@ describe("Config validation", function () {
                   },
                 ],
                 automine: true,
+                loggingEnabled: true,
                 blockGasLimit: 30000000,
                 qrlJsMonorepoPath: "/tmp/qrljs-monorepo",
               },

@@ -112,10 +112,7 @@ describe("bundle-qrljs-runtime guard rails", function () {
 
     const result = await runBundler(checkout, outDir);
     assert.notEqual(result.code, 0);
-    assert.include(
-      result.stderr,
-      "bundled vm does not export qrl.QRLLocalProvider"
-    );
+    assert.include(result.stderr, "bundled vm does not export qrl.QRLVM");
   });
 
   it("aborts when a bundled package carries no license text", async function () {
@@ -227,9 +224,12 @@ async function createFixtureCheckout(
   const checkout = path.join(tmpDir, "fixture-checkout");
 
   const modules: Array<[string, string, string]> = [
-    ["vm", "QRLLocalProvider", vmVersion],
-    ["util", "QRLAddress", "10.1.2"],
+    ["block", "QRLBlock", "10.1.2"],
+    ["evm", "QRLEVM", "10.1.2"],
+    ["statemanager", "QRLStateManager", "10.1.2"],
     ["tx", "QRLDynamicFeeTransaction", "10.1.2"],
+    ["util", "QRLAddress", "10.1.2"],
+    ["vm", "QRLVM", vmVersion],
   ];
 
   for (const [name, exportedClass, version] of modules) {
@@ -247,11 +247,16 @@ async function createFixtureCheckout(
       fs.writeFileSync(path.join(packageDir, "LICENSE"), FIXTURE_LICENSE);
     }
     const importDep =
-      options.nestedDep === true ? `require("fixture-dep");\n` : "";
-    const exportExpr =
-      options.corruptVmExport === true && name === "vm"
-        ? "undefined"
-        : `{ qrl: { ${exportedClass}: class ${exportedClass} {} } }`;
+      options.nestedDep === true && ["vm", "util", "tx"].includes(name)
+        ? `require("fixture-dep");\n`
+        : "";
+    let exportExpr = `{ qrl: { ${exportedClass}: class ${exportedClass} {} } }`;
+    if (name === "vm") {
+      exportExpr =
+        options.corruptVmExport === true
+          ? "undefined"
+          : `{ qrl: { ${exportedClass}: class ${exportedClass} {}, createFrameCollector: () => {}, createRawStructLogCollector: () => {}, qrlOpcodeName: () => "STOP" } }`;
+    }
     fs.writeFileSync(
       path.join(packageDir, "dist", "cjs", "index.js"),
       `${importDep}module.exports = ${exportExpr};\n`

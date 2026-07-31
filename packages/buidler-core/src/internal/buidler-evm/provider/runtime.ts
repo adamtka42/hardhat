@@ -21,14 +21,17 @@ import { ERRORS } from "../../core/errors-list";
  *    `@theqrl/hardhat` artifact under `qrljs-runtime/` (built by
  *    `scripts/bundle-qrljs-runtime.js` from a local qrljs checkout).
  *
- * vm, util, and tx always come from ONE source — mixing versions between
- * signing (tx) and execution (vm) is never allowed.
+ * All runtime modules come from ONE source; mixing versions between state,
+ * execution, blocks, transactions, and utilities is never allowed.
  */
 
 export interface QrlJsRuntimeModules {
-  vmQrl: any;
-  utilQrl: any;
+  blockQrl: any;
+  evmQrl: any;
+  stateQrl: any;
   txQrl: any;
+  utilQrl: any;
+  vmQrl: any;
 }
 
 interface RuntimeSource {
@@ -121,6 +124,21 @@ function loadOverrideRuntime(
   monorepoPath: string,
   networkName: string
 ): ResolvedQrlJsRuntime {
+  const block = requireOverrideModule(
+    monorepoPath,
+    "packages/block/dist/cjs/index.js",
+    networkName
+  );
+  const evm = requireOverrideModule(
+    monorepoPath,
+    "packages/evm/dist/cjs/index.js",
+    networkName
+  );
+  const statemanager = requireOverrideModule(
+    monorepoPath,
+    "packages/statemanager/dist/cjs/index.js",
+    networkName
+  );
   const vm = requireOverrideModule(
     monorepoPath,
     "packages/vm/dist/cjs/index.js",
@@ -137,17 +155,29 @@ function loadOverrideRuntime(
     networkName
   );
 
-  assertRuntimeExports(vm, util, tx, monorepoPath, networkName);
+  assertRuntimeExports(
+    block,
+    evm,
+    statemanager,
+    tx,
+    util,
+    vm,
+    monorepoPath,
+    networkName
+  );
 
   return {
-    vmQrl: vm.qrl,
-    utilQrl: util.qrl,
+    blockQrl: block.qrl,
+    evmQrl: evm.qrl,
+    stateQrl: statemanager.qrl,
     txQrl: tx.qrl,
+    utilQrl: util.qrl,
+    vmQrl: vm.qrl,
     source: { kind: "override", description: monorepoPath },
   };
 }
 
-// The runtime ships as ONE bundle so vm, util, and tx share a single copy of
+// The runtime ships as ONE bundle so all modules share a single copy of
 // every dependency (separate bundles would break instanceof checks across
 // their duplicated @theqrl/util copies).
 function loadBundledRuntime(networkName: string): ResolvedQrlJsRuntime {
@@ -174,9 +204,12 @@ function loadBundledRuntime(networkName: string): ResolvedQrlJsRuntime {
   }
 
   assertRuntimeExports(
-    bundle.vm,
-    bundle.util,
+    bundle.block,
+    bundle.evm,
+    bundle.statemanager,
     bundle.tx,
+    bundle.util,
+    bundle.vm,
     getBundleDir(),
     networkName
   );
@@ -188,9 +221,12 @@ function loadBundledRuntime(networkName: string): ResolvedQrlJsRuntime {
       : "bundled runtime";
 
   return {
-    vmQrl: bundle.vm.qrl,
-    utilQrl: bundle.util.qrl,
+    blockQrl: bundle.block.qrl,
+    evmQrl: bundle.evm.qrl,
+    stateQrl: bundle.statemanager.qrl,
     txQrl: bundle.tx.qrl,
+    utilQrl: bundle.util.qrl,
+    vmQrl: bundle.vm.qrl,
     source: { kind: "bundled", description },
   };
 }
@@ -214,37 +250,32 @@ function requireOverrideModule(
 }
 
 function assertRuntimeExports(
-  vm: any,
-  util: any,
+  block: any,
+  evm: any,
+  statemanager: any,
   tx: any,
+  util: any,
+  vm: any,
   sourcePath: string,
   networkName: string
 ): void {
-  // Full optional chains: a corrupted bundle/override may lack the whole
-  // vm/util/tx key — that must surface as the Hardhat error below, never as
-  // a raw TypeError.
-  if (vm?.qrl?.QRLLocalProvider === undefined) {
-    throwQrlJsRuntimeUnavailable(
-      sourcePath,
-      networkName,
-      "the vm module does not export qrl.QRLLocalProvider"
-    );
-  }
+  const requiredExports: Array<[any, string, string]> = [
+    [block, "block", "QRLBlock"],
+    [evm, "evm", "QRLEVM"],
+    [statemanager, "statemanager", "QRLStateManager"],
+    [tx, "tx", "QRLDynamicFeeTransaction"],
+    [util, "util", "QRLAddress"],
+    [vm, "vm", "QRLVM"],
+  ];
 
-  if (util?.qrl?.QRLAddress === undefined) {
-    throwQrlJsRuntimeUnavailable(
-      sourcePath,
-      networkName,
-      "the util module does not export qrl.QRLAddress"
-    );
-  }
-
-  if (tx?.qrl?.QRLDynamicFeeTransaction === undefined) {
-    throwQrlJsRuntimeUnavailable(
-      sourcePath,
-      networkName,
-      "the tx module does not export qrl.QRLDynamicFeeTransaction"
-    );
+  for (const [runtimeModule, moduleName, exportName] of requiredExports) {
+    if (runtimeModule?.qrl?.[exportName] === undefined) {
+      throwQrlJsRuntimeUnavailable(
+        sourcePath,
+        networkName,
+        `the ${moduleName} module does not export qrl.${exportName}`
+      );
+    }
   }
 }
 

@@ -115,6 +115,7 @@ const HardhatQrlvmNetworkConfig = t.type({
   gasMultiplier: optional(t.number),
   accounts: optional(t.array(HardhatQrlvmAccountConfig)),
   automine: optional(t.boolean),
+  loggingEnabled: optional(t.boolean),
   consoleLog: optional(t.boolean),
   blockGasLimit: optional(t.number),
   initialDate: optional(t.string),

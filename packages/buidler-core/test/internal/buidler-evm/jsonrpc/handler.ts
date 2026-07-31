@@ -89,7 +89,6 @@ describe("QRL JSON-RPC server", function () {
       hostname: "127.0.0.1",
       port: 0,
       provider: new MockProvider() as any,
-      loggingEnabled: false,
     });
     const address = await server.listen();
     port = address.port;
@@ -211,7 +210,6 @@ describe("QRL JSON-RPC server", function () {
       hostname: "127.0.0.1",
       port: 0,
       provider: provider as any,
-      loggingEnabled: false,
     });
     const address = await delayedServer.listen();
 

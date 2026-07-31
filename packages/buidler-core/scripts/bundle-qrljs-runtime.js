@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Bundles the qrljs runtime (vm, util, tx) from a locally built
+// Bundles the low-level qrljs runtime from a locally built
 // qrljs-monorepo checkout into a self-contained CJS file shipped inside the
 // packed @theqrl/hardhat artifact. This is the interim distribution channel
 // until the @theqrl/* runtime packages are published to a registry.
@@ -14,9 +14,12 @@ const path = require("path");
 const semver = require("semver");
 
 const ENTRIES = {
-  vm: "packages/vm/dist/cjs/index.js",
-  util: "packages/util/dist/cjs/index.js",
+  block: "packages/block/dist/cjs/index.js",
+  evm: "packages/evm/dist/cjs/index.js",
+  statemanager: "packages/statemanager/dist/cjs/index.js",
   tx: "packages/tx/dist/cjs/index.js",
+  util: "packages/util/dist/cjs/index.js",
+  vm: "packages/vm/dist/cjs/index.js",
 };
 
 // Generated artifacts. Cleanup removes ONLY these names — never the whole
@@ -61,7 +64,7 @@ function bundleQrlJsRuntime(checkoutArg, outDir) {
     fs.rmSync(path.join(outDir, name), { force: true });
   }
 
-  // One synthetic entry produces ONE bundle so vm, util, and tx share a
+  // One synthetic entry produces ONE bundle so all runtime packages share a
   // single inlined copy of every dependency. Separate bundles would each
   // carry their own @theqrl/util and break instanceof checks across the
   // module boundary (dual-package hazard). The entry is fed through stdin
@@ -69,7 +72,9 @@ function bundleQrlJsRuntime(checkoutArg, outDir) {
   // comments esbuild writes into the bundle are relative — the same commit
   // produces a byte-identical artifact regardless of checkout location.
   const entrySource = `module.exports = {\n${Object.entries(ENTRIES)
-    .map(([name, entry]) => `  ${name}: require(${JSON.stringify(`./${entry}`)}),`)
+    .map(
+      ([name, entry]) => `  ${name}: require(${JSON.stringify(`./${entry}`)}),`
+    )
     .join("\n")}\n};\n`;
 
   const result = esbuild.buildSync({
@@ -138,7 +143,10 @@ function collectBundledPackages(metafile, checkout) {
   for (const inputPath of Object.keys(metafile.inputs)) {
     // The stdin pseudo-entry owns no package; metafile paths are relative
     // to absWorkingDir (the checkout).
-    if (inputPath.includes("<stdin>") || inputPath.includes("qrljs-runtime-entry")) {
+    if (
+      inputPath.includes("<stdin>") ||
+      inputPath.includes("qrljs-runtime-entry")
+    ) {
       continue;
     }
     const absolutePath = path.resolve(checkout, inputPath);
@@ -312,18 +320,25 @@ function smokeTest(outDir) {
   const bundlePath = path.join(outDir, "runtime.cjs");
   // In-process callers (tests) may bundle repeatedly into the same path.
   delete require.cache[require.resolve(bundlePath)];
-  const { vm, util, tx } = require(bundlePath);
+  const { block, evm, statemanager, tx, util, vm } = require(bundlePath);
 
   // Full optional chains: a broken bundle may lack a whole module export —
   // that must fail with the message below, never a raw TypeError.
-  if (vm?.qrl?.QRLLocalProvider === undefined) {
-    fail("bundled vm does not export qrl.QRLLocalProvider");
-  }
-  if (util?.qrl?.QRLAddress === undefined) {
-    fail("bundled util does not export qrl.QRLAddress");
-  }
-  if (tx?.qrl?.QRLDynamicFeeTransaction === undefined) {
-    fail("bundled tx does not export qrl.QRLDynamicFeeTransaction");
+  const requiredExports = [
+    [block, "block", "QRLBlock"],
+    [evm, "evm", "QRLEVM"],
+    [statemanager, "statemanager", "QRLStateManager"],
+    [tx, "tx", "QRLDynamicFeeTransaction"],
+    [util, "util", "QRLAddress"],
+    [vm, "vm", "QRLVM"],
+    [vm, "vm", "createFrameCollector"],
+    [vm, "vm", "createRawStructLogCollector"],
+    [vm, "vm", "qrlOpcodeName"],
+  ];
+  for (const [runtimeModule, moduleName, exportName] of requiredExports) {
+    if (runtimeModule?.qrl?.[exportName] === undefined) {
+      fail(`bundled ${moduleName} does not export qrl.${exportName}`);
+    }
   }
 }
 

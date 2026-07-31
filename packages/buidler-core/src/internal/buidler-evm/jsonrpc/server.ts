@@ -14,7 +14,6 @@ export interface JsonRpcServerConfig {
   port: number;
 
   provider: IQrlProvider;
-  loggingEnabled?: boolean;
 }
 
 export class JsonRpcServer {
@@ -25,10 +24,7 @@ export class JsonRpcServer {
   constructor(config: JsonRpcServerConfig) {
     this._config = config;
 
-    const handler = new JsonRpcHandler(
-      config.provider,
-      config.loggingEnabled ?? true
-    );
+    const handler = new JsonRpcHandler(config.provider);
 
     this._httpServer = http.createServer();
     this._wsServer = new WSServer({

@@ -1,7 +1,9 @@
+import chalk, { Chalk } from "chalk";
 import debug from "debug";
 import { EventEmitter } from "events";
 import fsExtra from "fs-extra";
 import path from "path";
+import util from "util";
 
 import {
   HardhatQrlvmAccountConfig,
@@ -11,7 +13,6 @@ import {
 } from "../../../types";
 import { HardhatError } from "../../core/errors";
 import { ERRORS } from "../../core/errors-list";
-import { numberToRpcQuantity } from "../../core/providers/provider-utils";
 import { decodeQrlFunctionResult } from "../../qrl/abi";
 import { isValidQrlAddress } from "../../qrl/address";
 import {
@@ -19,174 +20,375 @@ import {
   loadQrlDebugInfo,
   QrlStackTraceDecoder,
 } from "../stack-traces";
-import { printQrlConsoleLog } from "../stack-traces/consoleLogger";
+import {
+  decodeQrlConsoleLog,
+  printQrlConsoleLog,
+} from "../stack-traces/consoleLogger";
+import { Mutex } from "../vendor/await-semaphore";
 
+import {
+  BuidlerEVMProviderError,
+  MethodNotFoundError,
+  MethodNotSupportedError,
+} from "./errors";
+import { rpcHash, validateParams } from "./input";
+import { BuidlerModule } from "./modules/buidler";
+import { DebugModule } from "./modules/debug";
+import { EvmModule } from "./modules/evm";
+import { ModulesLogger } from "./modules/logger";
+import { NetModule } from "./modules/net";
+import { QrlModule } from "./modules/qrl";
+import { Web3Module } from "./modules/web3";
+import { HardhatNode } from "./node";
+import { numberToRpcQuantity } from "./output";
 import { loadQrlJsRuntime } from "./runtime";
+
+interface AnsiEscapes {
+  cursorHide: string;
+  cursorPrevLine: string;
+  eraseEndLine: string;
+  cursorShow: string;
+}
+
+// tslint:disable-next-line: no-var-requires
+const ansiEscapes: AnsiEscapes = require("ansi-escapes");
 
 const log = debug("buidler:core:qrl:stack-traces");
 
 const DEFAULT_CHAIN_ID = 1;
 const DEFAULT_BLOCK_GAS_LIMIT = 30000000;
 
+const PRIVATE_RPC_METHODS = new Set(["qrl_getStackTraceFailuresCount"]);
+
+const QRL_EVM_METHODS = new Set([
+  "qrl_increaseTime",
+  "qrl_setNextBlockTimestamp",
+  "qrl_mine",
+  "qrl_revert",
+  "qrl_snapshot",
+]);
+
 export class HardhatQrlvmProvider extends EventEmitter implements IQrlProvider {
-  private readonly _provider: any;
-  private readonly _accounts: string[];
+  private _node?: HardhatNode;
+  private _qrlModule?: QrlModule;
+  private _netModule?: NetModule;
+  private _web3Module?: Web3Module;
+  private _evmModule?: EvmModule;
+  private _buidlerModule?: BuidlerModule;
+  private _debugModule?: DebugModule;
+  private _accounts: string[] = [];
   private readonly _chainId: number;
   private readonly _blockGasLimit: number;
-  private readonly _stackTracesEnabled: boolean;
+  private _stackTracesEnabled = false;
+  private readonly _config: HardhatQrlvmNetworkConfig;
   private readonly _accountConfigs: HardhatQrlvmAccountConfig[];
   private readonly _cachePath?: string;
   private readonly _projectRoot?: string;
   private _stackTraceDecoder?: QrlStackTraceDecoder | null;
   private _stackTraceCacheMtime?: number;
-  private _stackTraceFailures = 0;
+  private readonly _mutex = new Mutex();
+  private readonly _logger = new ModulesLogger();
+  private readonly _loggingEnabled: boolean;
+  private _methodBeingCollapsed?: string;
+  private _methodCollapsedCount = 0;
+  private _consoleLogMessages: string[] = [];
 
   constructor(config: HardhatQrlvmNetworkConfig, paths?: ProjectPaths) {
     super();
+    this._config = config;
     this._cachePath = paths?.cache;
     this._projectRoot = paths?.root;
+    this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
+    this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
+    this._accountConfigs = config.accounts ?? [];
+    this._loggingEnabled = config.loggingEnabled ?? false;
+  }
 
-    const { vmQrl, utilQrl } = loadQrlJsRuntime(
-      "hardhatqrlvm",
-      config.qrlJsMonorepoPath
+  public async send(method: string, params: any[] = []): Promise<any> {
+    const release = await this._mutex.acquire();
+
+    try {
+      if (this._loggingEnabled && !PRIVATE_RPC_METHODS.has(method)) {
+        return await this._sendWithLogging(method, params);
+      }
+
+      return await this._send(method, params);
+    } finally {
+      release();
+    }
+  }
+
+  private async _sendWithLogging(
+    method: string,
+    params: any[] = []
+  ): Promise<any> {
+    this._logger.clearLogs();
+    this._consoleLogMessages = [];
+
+    try {
+      const result = await this._send(method, params);
+
+      if (this._shouldCollapseMethod(method)) {
+        this._logCollapsedMethod(method);
+      } else {
+        this._startCollapsingMethod(method);
+        this._log(method, false, chalk.green);
+      }
+
+      const loggedSomething = this._logModuleMessages();
+      if (loggedSomething) {
+        this._stopCollapsingMethod();
+        this._log("");
+      }
+
+      return result;
+    } catch (error) {
+      this._stopCollapsingMethod();
+
+      if (
+        error instanceof MethodNotFoundError ||
+        error instanceof MethodNotSupportedError
+      ) {
+        this._log(`${method} - Method not supported`, false, chalk.red);
+        // tslint:disable-next-line only-hardhat-error
+        throw error;
+      }
+
+      this._log(method, false, chalk.red);
+
+      const loggedSomething = this._logModuleMessages();
+      if (loggedSomething) {
+        this._log("");
+      }
+
+      if (
+        BuidlerEVMProviderError.isBuidlerEVMProviderError(error) ||
+        HardhatError.isHardhatError(error)
+      ) {
+        this._log(error.message, true);
+      } else {
+        this._logError(error, true);
+        this._log("");
+        this._log(
+          "If you think this is a bug in Hardhat, please report it to the project maintainers.",
+          true
+        );
+      }
+
+      this._log("");
+      // tslint:disable-next-line only-hardhat-error
+      throw error;
+    }
+  }
+
+  private _logCollapsedMethod(method: string): void {
+    this._methodCollapsedCount += 1;
+
+    process.stdout.write(
+      // tslint:disable-next-line:prefer-template
+      ansiEscapes.cursorHide +
+        ansiEscapes.cursorPrevLine +
+        chalk.green(`${method} (${this._methodCollapsedCount})`) +
+        "\n" +
+        ansiEscapes.eraseEndLine +
+        ansiEscapes.cursorShow
     );
-    const consoleLogSupported =
-      (vmQrl as any).QRL_CONSOLE_LOG_SUPPORTED === true;
-    if (config.consoleLog === true && !consoleLogSupported) {
-      // tslint:disable-next-line: no-console
-      console.warn(
-        "The loaded QRL runtime does not support contract console logging. Update the bundled runtime or rebuild the qrljs-monorepo override to enable it."
-      );
+  }
+
+  private _startCollapsingMethod(method: string): void {
+    this._methodBeingCollapsed = method;
+    this._methodCollapsedCount = 1;
+  }
+
+  private _stopCollapsingMethod(): void {
+    this._methodBeingCollapsed = undefined;
+    this._methodCollapsedCount = 0;
+  }
+
+  private _shouldCollapseMethod(method: string): boolean {
+    return (
+      method === this._methodBeingCollapsed &&
+      !this._logger.hasLogs() &&
+      this._methodCollapsedCount > 0
+    );
+  }
+
+  private async _send(method: string, params: any[] = []): Promise<any> {
+    await this._init();
+
+    try {
+      return await this._routeRequest(method, params);
+    } catch (error) {
+      const enriched = enrichQrlProviderError(error);
+      if (this._stackTracesEnabled) {
+        try {
+          await this._appendStackTrace(enriched);
+        } catch (stackTraceError) {
+          this._node!.recordStackTraceFailure();
+          log("Failed to generate a QRL stack trace: %O", stackTraceError);
+          // Stack trace decoding must never mask the original error.
+        }
+      }
+      // tslint:disable-next-line only-hardhat-error
+      throw enriched;
+    }
+  }
+
+  private async _routeRequest(method: string, params: any[]): Promise<any> {
+    if (method === "qrl_requestAccounts") {
+      return [...this._accounts];
     }
 
-    const timeControlsSupported =
-      (vmQrl as any).QRL_TIME_CONTROLS_SUPPORTED === true;
-    if (config.initialDate !== undefined && !timeControlsSupported) {
-      // tslint:disable-next-line: no-console
-      console.warn(
-        "The loaded QRL runtime does not support time controls. Update the bundled runtime or rebuild the qrljs-monorepo override to enable initialDate."
-      );
+    if (method === "qrl_sign") {
+      return this._signWithLocalSeed(params);
     }
 
-    const txFailureFlagsSupported =
-      (vmQrl as any).QRL_TX_FAILURE_FLAGS_SUPPORTED === true;
-    if (
-      (config.throwOnTransactionFailures !== undefined ||
-        config.throwOnCallFailures !== undefined) &&
-      !txFailureFlagsSupported
-    ) {
-      // tslint:disable-next-line: no-console
-      console.warn(
-        "The loaded QRL runtime does not support transaction failure flags. Update the bundled runtime or rebuild the qrljs-monorepo override to enable them."
-      );
+    if (method === "qrl_getStackTraceFailuresCount") {
+      return this._buidlerModule!.processRequest(method, params);
     }
 
-    const rpcCompatSupported = (vmQrl as any).QRL_RPC_COMPAT_SUPPORTED === true;
-    const rpcCompletionSupported =
-      (vmQrl as any).QRL_RPC_COMPLETION_SUPPORTED === true;
-    if (
-      config.allowUnlimitedContractSize !== undefined &&
-      !rpcCompatSupported
-    ) {
-      // tslint:disable-next-line: no-console
-      console.warn(
-        "The loaded QRL runtime does not support allowUnlimitedContractSize. Update the bundled runtime or rebuild the qrljs-monorepo override to enable it."
-      );
+    if (QRL_EVM_METHODS.has(method)) {
+      return this._evmModule!.processRequest(method, params);
     }
-    const debugTraceSupported =
-      (vmQrl as any).QRL_DEBUG_TRACE_SUPPORTED === true;
-    if (config.stackTraces === true && !debugTraceSupported) {
+
+    if (method.startsWith("debug_")) {
+      return this._debugModule!.processRequest(method, params);
+    }
+
+    if (method.startsWith("qrl_")) {
+      return this._qrlModule!.processRequest(method, params);
+    }
+
+    if (method.startsWith("net_")) {
+      return this._netModule!.processRequest(method, params);
+    }
+
+    if (method.startsWith("web3_")) {
+      return this._web3Module!.processRequest(method, params);
+    }
+
+    // tslint:disable-next-line only-hardhat-error
+    throw new MethodNotFoundError(`Method ${method} not found`);
+  }
+
+  private async _init(): Promise<void> {
+    if (this._node !== undefined) {
+      return;
+    }
+
+    const config = this._config;
+    const {
+      blockQrl,
+      evmQrl,
+      stateQrl,
+      txQrl,
+      utilQrl,
+      vmQrl,
+    } = loadQrlJsRuntime("hardhatqrlvm", config.qrlJsMonorepoPath);
+    const stackTracesSupported =
+      typeof (vmQrl as any).createFrameCollector === "function";
+    if (config.stackTraces === true && !stackTracesSupported) {
       // tslint:disable-next-line: no-console
       console.warn(
         "The loaded QRL runtime does not support execution tracing. Update the bundled runtime or rebuild the qrljs-monorepo override to enable stack traces."
       );
     }
     this._stackTracesEnabled =
-      config.stackTraces !== false && debugTraceSupported;
+      config.stackTraces !== false && stackTracesSupported;
 
-    this._chainId = config.chainId ?? DEFAULT_CHAIN_ID;
-    this._blockGasLimit = config.blockGasLimit ?? DEFAULT_BLOCK_GAS_LIMIT;
-    this._accountConfigs = config.accounts ?? [];
-    this._accounts = (config.accounts ?? []).map((account) =>
+    const initialTimestamp =
+      config.initialDate === undefined
+        ? undefined
+        : parseInitialDate(config.initialDate);
+    const accounts = this._accountConfigs.map((account) => ({
+      address: utilQrl.QRLAddress.fromString(account.address),
+      balance: parseLocalAccountBalance(account.balance),
+      nonce:
+        account.nonce === undefined
+          ? undefined
+          : toRuntimeBigInt(account.nonce),
+    }));
+    this._accounts = this._accountConfigs.map((account) =>
       normalizeLocalAccountAddress(utilQrl, account)
     );
 
-    this._provider = new vmQrl.QRLLocalProvider({
-      accounts: (config.accounts ?? []).map((account) => ({
-        address: utilQrl.QRLAddress.fromString(account.address),
-        balance: parseLocalAccountBalance(account.balance),
-        nonce:
-          account.nonce === undefined
+    const rawTransactionSigner = createRawTransactionSigner(
+      utilQrl,
+      this._chainId
+    );
+    const context = {
+      chainId: toRuntimeBigInt(this._chainId),
+      gasLimit: toRuntimeBigInt(this._blockGasLimit),
+      noBaseFee: true,
+    };
+    const consoleLogListener =
+      config.consoleLog === false
+        ? undefined
+        : (data: Uint8Array) =>
+            this._loggingEnabled
+              ? this._logConsoleLog(data)
+              : printQrlConsoleLog(data);
+
+    const node = await HardhatNode.create(
+      { blockQrl, evmQrl, stateQrl, txQrl, vmQrl },
+      {
+        accounts,
+        automine: config.automine ?? true,
+        genesisHeader:
+          initialTimestamp === undefined
             ? undefined
-            : toRuntimeBigInt(account.nonce),
-      })),
-      automine: config.automine ?? true,
-      initialTimestamp:
-        config.initialDate === undefined || !timeControlsSupported
-          ? undefined
-          : parseInitialDate(config.initialDate),
-      throwOnTransactionFailures: config.throwOnTransactionFailures,
-      throwOnCallFailures: config.throwOnCallFailures,
-      allowUnlimitedContractSize: config.allowUnlimitedContractSize,
-      rawTransactionSigner: rpcCompletionSupported
-        ? createRawTransactionSigner(utilQrl, this._chainId)
-        : undefined,
-      defaultContext: {
-        chainId: toRuntimeBigInt(this._chainId),
-        gasLimit: toRuntimeBigInt(this._blockGasLimit),
-        noBaseFee: true,
-      },
-      onConsoleLog:
-        config.consoleLog === false || !consoleLogSupported
-          ? undefined
-          : (data: Uint8Array) => printQrlConsoleLog(data),
-      // qrl_subscribe push notifications surface as EIP-1193-style
-      // "notification" events; the standalone WebSocket server forwards
-      // them to the owning client connection.
-      onSubscriptionEvent: (event: { subscription: string; result: unknown }) =>
-        this.emit("notification", event),
+            : { timestamp: initialTimestamp },
+        rawTransactionSigner,
+        context,
+        allowUnlimitedContractSize: config.allowUnlimitedContractSize,
+        consoleLogListener,
+      }
+    );
+
+    const qrlModuleConfig = {
+      chainId: toRuntimeBigInt(this._chainId),
+      addressFromBytes: (value: Uint8Array) =>
+        utilQrl.QRLAddress.fromBytes(value),
+      defaultGasLimit: toRuntimeBigInt(this._blockGasLimit),
+      noBaseFee: true,
+      createTransaction: (data: Record<string, any>) =>
+        new txQrl.QRLDynamicFeeTransaction(data),
+      transactionFromSerialized: (data: Uint8Array) =>
+        txQrl.QRLDynamicFeeTransaction.fromSerialized(data),
+      effectiveGasPrice: (transaction: any, executionContext: any) =>
+        vmQrl.effectiveQrlGasPrice(transaction, executionContext),
+    };
+    this._qrlModule = new QrlModule(
+      qrlModuleConfig,
+      node,
+      config.throwOnTransactionFailures ?? true,
+      config.throwOnCallFailures ?? true,
+      this._loggingEnabled ? this._logger : undefined,
+      this._stackTracesEnabled
+    );
+    this._debugModule = new DebugModule(qrlModuleConfig, node);
+    this._netModule = new NetModule(toRuntimeBigInt(this._chainId));
+    this._web3Module = new Web3Module();
+    this._evmModule = new EvmModule(node, {
+      addressFromBytes: (value: Uint8Array) =>
+        utilQrl.QRLAddress.fromBytes(value),
     });
+    this._buidlerModule = new BuidlerModule(node);
+
+    const listener = (payload: { filterId: bigint; result: any }) => {
+      this.emit("notification", {
+        subscription: numberToRpcQuantity(payload.filterId),
+        result: payload.result,
+      });
+    };
+
+    // Handle qrl_subscribe events and proxy them to JSON-RPC/Web3 consumers.
+    node.addListener("ethEvent", listener);
+
+    this._node = node;
   }
 
-  public async send(method: string, params: any[] = []): Promise<any> {
-    switch (method) {
-      case "qrl_chainId":
-        return numberToRpcQuantity(this._chainId);
-      case "qrl_accounts":
-      case "qrl_requestAccounts":
-        return [...this._accounts];
-      case "qrl_gasPrice":
-        return "0x0";
-      case "qrl_getStackTraceFailuresCount":
-        return this._stackTraceFailures;
-      case "qrl_sign":
-        return this._signWithLocalSeed(params);
-      default:
-        try {
-          return await this._provider.request({ method, params });
-        } catch (error) {
-          const enriched = enrichQrlProviderError(error);
-          if (this._stackTracesEnabled) {
-            try {
-              await this._appendStackTrace(enriched, method, params);
-            } catch (stackTraceError) {
-              this._stackTraceFailures += 1;
-              log("Failed to generate a QRL stack trace: %O", stackTraceError);
-              // Stack trace decoding must never mask the original error.
-            }
-          }
-          // Rethrow of the local provider's own error, enriched in place.
-          // tslint:disable-next-line only-hardhat-error
-          throw enriched;
-        }
-    }
-  }
-
-  private async _appendStackTrace(
-    error: any,
-    method: string,
-    params: any[]
-  ): Promise<void> {
+  private async _appendStackTrace(error: any): Promise<void> {
     if (
       error === undefined ||
       error === null ||
@@ -196,25 +398,17 @@ export class HardhatQrlvmProvider extends EventEmitter implements IQrlProvider {
       return;
     }
 
-    let rootFrame: any;
-    if (typeof error.transactionHash === "string") {
-      rootFrame = await this._provider.traceTransactionFrames(
-        error.transactionHash
+    let rootFrame = error.traceFrame;
+    if (rootFrame === undefined) {
+      if (typeof error.transactionHash !== "string") {
+        return;
+      }
+      rootFrame = await this._node!.traceTransactionFrames(
+        validateParams([error.transactionHash], rpcHash)[0]
       );
-    } else if (
-      (method === "qrl_call" || method === "qrl_estimateGas") &&
-      params[0] !== undefined
-    ) {
-      rootFrame =
-        method === "qrl_estimateGas"
-          ? await this._provider.traceEstimateGasFrames(params[0], params[1])
-          : await this._provider.traceCallFrames(params[0], params[1]);
-    } else {
-      return;
     }
 
     if (typeof rootFrame?.traceError === "string") {
-      this._stackTraceFailures += 1;
       log("QRL frame collector failed: %s", rootFrame.traceError);
       return;
     }
@@ -306,6 +500,63 @@ export class HardhatQrlvmProvider extends EventEmitter implements IQrlProvider {
         debugInfo === undefined ? null : new QrlStackTraceDecoder(debugInfo);
     }
     return this._stackTraceDecoder ?? undefined;
+  }
+
+  private _logModuleMessages(): boolean {
+    if (this._consoleLogMessages.length > 0) {
+      this._logger.log("");
+      this._logger.log("console.log:");
+      for (const message of this._consoleLogMessages) {
+        this._logger.log(`  ${message}`);
+      }
+      this._consoleLogMessages = [];
+    }
+
+    const logs = this._logger.getLogs();
+    if (logs.length === 0) {
+      return false;
+    }
+
+    for (const msg of logs) {
+      this._log(msg, true);
+    }
+
+    return true;
+  }
+
+  private _logConsoleLog(data: Uint8Array): void {
+    let line = decodeQrlConsoleLog(data);
+    if (line === undefined) {
+      const selector =
+        data.length >= 4
+          ? `0x${Buffer.from(data.slice(0, 4)).toString("hex")}`
+          : `0x${Buffer.from(data).toString("hex")}`;
+      line = `console.log <unknown selector ${selector}>`;
+    }
+
+    this._consoleLogMessages.push(line);
+  }
+
+  private _logError(err: Error, logInRed = false): void {
+    this._log(util.inspect(err), true, logInRed ? chalk.red : undefined);
+  }
+
+  private _log(msg: string, indent = false, color?: Chalk): void {
+    if (indent) {
+      msg = msg
+        .split("\n")
+        .map((line) => `  ${line}`)
+        .join("\n");
+    }
+
+    if (color !== undefined) {
+      // tslint:disable-next-line: no-console
+      console.log(color(msg));
+      return;
+    }
+
+    // tslint:disable-next-line: no-console
+    console.log(msg);
   }
 }
 

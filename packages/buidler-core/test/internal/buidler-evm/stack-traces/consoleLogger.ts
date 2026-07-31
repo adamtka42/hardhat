@@ -4,6 +4,7 @@ import { keccak_256 } from "js-sha3";
 import path from "path";
 
 import {
+  createQrlConsoleLogTraceListener,
   decodeQrlConsoleLog,
   getConsoleLogSelectors,
   QRL_CONSOLE_LOG_ADDRESS,
@@ -40,6 +41,41 @@ describe("QRL console log decoding", () => {
       Buffer.from("71726c2e636f6e736f6c652e6c6f67", "hex").toString(),
       "qrl.console.log"
     );
+  });
+
+  it("recognizes console calls through neutral VM frame events", () => {
+    const received: Uint8Array[] = [];
+    const listener = createQrlConsoleLogTraceListener((input) =>
+      received.push(input)
+    );
+    const consoleTarget = { toString: () => QRL_CONSOLE_LOG_ADDRESS };
+
+    listener.enterFrame({
+      kind: "staticcall",
+      target: consoleTarget,
+      input: new Uint8Array([1]),
+      value: (global as any).BigInt(0),
+    });
+    listener.enterFrame({
+      kind: "call",
+      target: consoleTarget,
+      input: new Uint8Array([2]),
+      value: (global as any).BigInt(0),
+    });
+    listener.enterFrame({
+      kind: "delegatecall",
+      target: consoleTarget,
+      input: new Uint8Array([3]),
+      value: (global as any).BigInt(0),
+    });
+    listener.enterFrame({
+      kind: "call",
+      target: consoleTarget,
+      input: new Uint8Array([4]),
+      value: (global as any).BigInt(1),
+    });
+
+    assert.deepEqual(received, [new Uint8Array([1]), new Uint8Array([2])]);
   });
 
   it("derives a unique selector for every generated signature", () => {

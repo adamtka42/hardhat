@@ -172,7 +172,6 @@ async function runFixture(
       allowUnlimitedContractSize: true,
       accounts: [{ address: SENDER, balance: "1000000000000000000000000" }],
     });
-    const rawProvider = (provider as any)._provider;
     const deployed = new Map<number, DeployedContract>();
 
     for (let index = 0; index < definition.transactions.length; index++) {
@@ -210,7 +209,14 @@ async function runFixture(
       }
 
       if (shouldFail) {
-        const frame = await rawProvider.traceTransactionFrames(transactionHash);
+        const node = (provider as any)._node;
+        assert.isDefined(
+          node,
+          `${fixture.id}: provider node was not initialized`
+        );
+        const frame = await node.traceTransactionFrames(
+          Uint8Array.from(Buffer.from(transactionHash.slice(2), "hex"))
+        );
         const trace = inferQrlStackTrace(frame, decoder);
         compareStackTrace(
           fixture.id,

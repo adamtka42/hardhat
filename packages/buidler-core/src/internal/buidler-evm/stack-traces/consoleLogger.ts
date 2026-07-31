@@ -4,15 +4,47 @@ import { decodeQrlFunctionResult, getFunctionSignature } from "../../qrl/abi";
 
 import { CONSOLE_LOG_SIGNATURES } from "./logger";
 
-/**
- * Address observed for contract console logging; must stay byte-identical to
- * `QRL_CONSOLE_LOG_ADDRESS` in qrljs-monorepo's `@theqrl/util` (the e2e suite
- * asserts the two constants match) and to the `CONSOLE_ADDRESS` literal in
- * the bundled `console.hyp`. The low bytes spell ASCII "qrl.console.log".
- */
+/** Address observed by Hardhat for calls emitted from `console.hyp`. */
 export const QRL_CONSOLE_LOG_ADDRESS = `Q${"0".repeat(
   98
 )}71726c2e636f6e736f6c652e6c6f67`;
+
+interface QrlConsoleCallFrame {
+  kind: string;
+  target?: { toString(): string };
+  input: Uint8Array;
+  value: bigint;
+}
+
+/**
+ * Builds a Hardhat-owned observer on top of qrljs's generic frame events.
+ * The VM still executes the empty-account call normally; this only surfaces
+ * its calldata to local development tooling.
+ */
+export function createQrlConsoleLogTraceListener(
+  listener: ((input: Uint8Array) => void) | undefined
+): any | undefined {
+  if (listener === undefined) {
+    return undefined;
+  }
+
+  return {
+    enterFrame: (frame: QrlConsoleCallFrame) => {
+      if (
+        (frame.kind === "call" || frame.kind === "staticcall") &&
+        frame.value === (global as any).BigInt(0) &&
+        frame.target?.toString().toLowerCase() ===
+          QRL_CONSOLE_LOG_ADDRESS.toLowerCase()
+      ) {
+        try {
+          listener(frame.input);
+        } catch {
+          // Development logging must never affect contract execution.
+        }
+      }
+    },
+  };
+}
 
 // The selector map is GENERATED together with console.hyp from one type
 // matrix (scripts/console-library-generator.js), so the library and the

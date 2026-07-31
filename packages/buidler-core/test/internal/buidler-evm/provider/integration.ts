@@ -3,12 +3,10 @@ import fsExtra from "fs-extra";
 import path from "path";
 
 import { HardhatQrlvmProvider } from "../../../../src/internal/buidler-evm/provider/provider";
+import { QRL_CONSOLE_LOG_ADDRESS } from "../../../../src/internal/buidler-evm/stack-traces/consoleLogger";
 import { ERRORS } from "../../../../src/internal/core/errors-list";
 import { createProvider } from "../../../../src/internal/core/providers/construction";
-import {
-  expectHardhatError,
-  expectHardhatErrorAsync,
-} from "../../../helpers/errors";
+import { expectHardhatErrorAsync } from "../../../helpers/errors";
 
 const SENDER = `Q${"01".repeat(64)}`;
 const RECEIVER = `Q${"02".repeat(64)}`;
@@ -62,6 +60,26 @@ function createLocalProviderWithReverter(
 // payload ending in 0x2a.
 const REVERTER_RUNTIME = [0x60, 0x2a, 0x5f, 0x52, 0x60, 0x40, 0x5f, 0xfd];
 
+// Runtime: MSTORE(0, 42); STATICCALL(gas, CONSOLE, args=[0..64), ret=[]); STOP.
+const CONSOLE_PROBE_RUNTIME = [
+  0x60,
+  0x2a,
+  0x5f,
+  0x52,
+  0x5f,
+  0x5f,
+  0x60,
+  0x40,
+  0x5f,
+  0x9f,
+  ...Buffer.from(QRL_CONSOLE_LOG_ADDRESS.slice(1), "hex"),
+  0x61,
+  0x10,
+  0x00,
+  0xfa,
+  0x00,
+];
+
 // Runtime: CODECOPY the trailing payload into memory, then REVERT with it.
 function revertWithPayloadRuntime(payloadHex: string): number[] {
   const payload = Buffer.from(payloadHex, "hex");
@@ -89,6 +107,17 @@ async function deployRuntime(
   provider: HardhatQrlvmProvider,
   runtime: number[]
 ): Promise<string> {
+  const data = runtimeDeploymentData(runtime);
+
+  const txHash = await provider.send("qrl_sendTransaction", [
+    { from: SENDER, data, gas: "0x30d40" },
+  ]);
+  const receipt = await provider.send("qrl_getTransactionReceipt", [txHash]);
+  assert.equal(receipt.status, "0x1");
+  return receipt.contractAddress;
+}
+
+function runtimeDeploymentData(runtime: number[]): string {
   const lengthHi = Math.floor(runtime.length / 256);
   const lengthLo = runtime.length % 256;
   const init = [
@@ -105,16 +134,47 @@ async function deployRuntime(
     0x5f,
     0xf3,
   ];
-  const data = `0x${[...init, ...runtime]
+  return `0x${[...init, ...runtime]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")}`;
+}
 
-  const txHash = await provider.send("qrl_sendTransaction", [
-    { from: SENDER, data, gas: "0x30d40" },
-  ]);
-  const receipt = await provider.send("qrl_getTransactionReceipt", [txHash]);
-  assert.equal(receipt.status, "0x1");
-  return receipt.contractAddress;
+function createConsoleProvider(
+  automine: boolean = true
+): {
+  provider: HardhatQrlvmProvider;
+  received: Uint8Array[];
+} {
+  const provider = new HardhatQrlvmProvider({
+    chainId: 1337,
+    blockGasLimit: 30000000,
+    qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+    accounts: [{ address: SENDER, balance: "1000000000000" }],
+    automine,
+    loggingEnabled: true,
+  });
+  const received: Uint8Array[] = [];
+  (provider as any)._logConsoleLog = (data: Uint8Array) => {
+    received.push(new Uint8Array(data));
+  };
+  return { provider, received };
+}
+
+async function captureConsoleLogs(
+  action: () => Promise<void>
+): Promise<string[]> {
+  const output: string[] = [];
+  const originalLog = console.log;
+  (console as any).log = (...args: any[]) => {
+    output.push(args.map(String).join(" "));
+  };
+
+  try {
+    await action();
+    return output;
+  } finally {
+    console.log = originalLog;
+  }
 }
 
 async function deployReverter(provider: HardhatQrlvmProvider): Promise<string> {
@@ -133,6 +193,257 @@ describe("Hardhat QRLVM provider", function () {
     if (!hasQrlJsMonorepoDist()) {
       this.skip();
     }
+  });
+
+  it("serializes concurrent requests and releases the lock after errors", async () => {
+    const provider = createLocalProvider();
+    let activeRequests = 0;
+    let maximumActiveRequests = 0;
+
+    (provider as any)._send = async (method: string) => {
+      activeRequests += 1;
+      maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      activeRequests -= 1;
+
+      if (method === "qrl_fail") {
+        throw new Error("expected failure");
+      }
+
+      return method;
+    };
+
+    const results = await Promise.all([
+      provider.send("qrl_first"),
+      provider.send("qrl_second"),
+    ]);
+
+    assert.deepEqual(results, ["qrl_first", "qrl_second"]);
+    assert.equal(maximumActiveRequests, 1);
+
+    try {
+      await provider.send("qrl_fail");
+      assert.fail("the delegated request should fail");
+    } catch (error) {
+      assert.equal((error as Error).message, "expected failure");
+    }
+
+    assert.equal(await provider.send("qrl_after_failure"), "qrl_after_failure");
+  });
+
+  it("initializes the node and modules lazily exactly once", async () => {
+    const provider = createLocalProvider();
+    const internalProvider = provider as any;
+
+    for (const field of [
+      "_node",
+      "_qrlModule",
+      "_netModule",
+      "_web3Module",
+      "_evmModule",
+      "_buidlerModule",
+      "_debugModule",
+    ]) {
+      assert.isUndefined(internalProvider[field]);
+    }
+
+    await provider.send("qrl_chainId");
+
+    const initialized = [
+      internalProvider._node,
+      internalProvider._qrlModule,
+      internalProvider._netModule,
+      internalProvider._web3Module,
+      internalProvider._evmModule,
+      internalProvider._buidlerModule,
+      internalProvider._debugModule,
+    ];
+    initialized.forEach((value) => assert.isDefined(value));
+    assert.deepEqual(
+      await internalProvider._qrlModule.processRequest("qrl_accounts"),
+      [SENDER]
+    );
+    assert.equal(
+      await internalProvider._qrlModule.processRequest("qrl_chainId"),
+      "0x539"
+    );
+
+    await provider.send("qrl_chainId");
+
+    assert.deepEqual(
+      [
+        internalProvider._node,
+        internalProvider._qrlModule,
+        internalProvider._netModule,
+        internalProvider._web3Module,
+        internalProvider._evmModule,
+        internalProvider._buidlerModule,
+        internalProvider._debugModule,
+      ],
+      initialized
+    );
+  });
+
+  it("routes supported namespaces and rejects unknown methods", async () => {
+    const provider = createLocalProvider();
+
+    assert.equal(await provider.send("net_version"), "1337");
+    assert.equal(
+      await provider.send("web3_clientVersion"),
+      "QRLLocalProvider/qrljs"
+    );
+
+    for (const method of ["qrl_unknown", "unknown_method"]) {
+      try {
+        await provider.send(method);
+        assert.fail("unknown method should be rejected");
+      } catch (error) {
+        assert.equal((error as any).code, -32601);
+      }
+    }
+  });
+
+  it("does not log methods when provider logging is disabled", async () => {
+    const output = await captureConsoleLogs(async () => {
+      await createLocalProvider().send("qrl_chainId");
+    });
+
+    assert.deepEqual(output, []);
+  });
+
+  it("logs QRL calls, transactions, and method errors", async () => {
+    const provider = new HardhatQrlvmProvider({
+      chainId: 1337,
+      blockGasLimit: 30000,
+      qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+      loggingEnabled: true,
+      accounts: [{ address: SENDER, balance: "1000" }],
+    });
+
+    const transactionOutput = await captureConsoleLogs(async () => {
+      await provider.send("qrl_sendTransaction", [
+        {
+          from: SENDER,
+          to: RECEIVER,
+          gas: "0x5208",
+          maxFeePerGas: "0x0",
+          maxPriorityFeePerGas: "0x0",
+          value: "0x2a",
+        },
+      ]);
+    });
+    const transactionLog = transactionOutput.join("\n");
+    assert.include(transactionLog, "qrl_sendTransaction");
+    assert.include(transactionLog, "Transaction:");
+    assert.include(transactionLog, "From:");
+    assert.include(transactionLog, "To:");
+    assert.include(transactionLog, "Value:");
+    assert.include(transactionLog, "Gas used:");
+    assert.include(transactionLog, "Block #1:");
+
+    const callOutput = await captureConsoleLogs(async () => {
+      await provider.send("qrl_call", [
+        { from: SENDER, to: RECEIVER, gas: "0x5208" },
+      ]);
+    });
+    const callLog = callOutput.join("\n");
+    assert.include(callLog, "qrl_call");
+    assert.include(callLog, "Contract call:");
+    assert.include(callLog, "Gas limit:");
+
+    const privateOutput = await captureConsoleLogs(async () => {
+      await provider.send("qrl_getStackTraceFailuresCount");
+    });
+    assert.deepEqual(privateOutput, []);
+
+    const errorOutput = await captureConsoleLogs(async () => {
+      try {
+        await provider.send("unknown_method");
+        assert.fail("unknown method should be rejected");
+      } catch (error) {
+        assert.equal((error as any).code, -32601);
+      }
+    });
+    assert.include(
+      errorOutput.join("\n"),
+      "unknown_method - Method not supported"
+    );
+  });
+
+  it("owns console logging for transactions and calls, but not estimation", async () => {
+    const { provider, received } = createConsoleProvider();
+
+    await captureConsoleLogs(async () => {
+      const contractAddress = await deployRuntime(
+        provider,
+        CONSOLE_PROBE_RUNTIME
+      );
+      received.length = 0;
+
+      await provider.send("qrl_sendTransaction", [
+        { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      ]);
+      assert.lengthOf(received, 1);
+
+      await provider.send("qrl_call", [
+        { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      ]);
+      assert.lengthOf(received, 2);
+
+      await provider.send("qrl_estimateGas", [
+        { from: SENDER, to: contractAddress },
+      ]);
+      assert.lengthOf(received, 2);
+    });
+
+    for (const payload of received) {
+      assert.lengthOf(payload, 64);
+      assert.equal(payload[63], 0x2a);
+    }
+  });
+
+  it("emits pending console logs once across mining and snapshot revert", async () => {
+    const { provider, received } = createConsoleProvider(false);
+
+    await captureConsoleLogs(async () => {
+      const deployHash = await provider.send("qrl_sendTransaction", [
+        {
+          from: SENDER,
+          data: runtimeDeploymentData(CONSOLE_PROBE_RUNTIME),
+          gas: "0x30d40",
+        },
+      ]);
+      await provider.send("qrl_mine");
+      const deployReceipt = await provider.send("qrl_getTransactionReceipt", [
+        deployHash,
+      ]);
+      assert.equal(deployReceipt.status, "0x1");
+      received.length = 0;
+
+      const snapshot = await provider.send("qrl_snapshot");
+      await provider.send("qrl_sendTransaction", [
+        {
+          from: SENDER,
+          to: deployReceipt.contractAddress,
+          gas: "0x186a0",
+        },
+      ]);
+      assert.lengthOf(received, 1);
+
+      await provider.send("qrl_mine");
+      assert.lengthOf(received, 1);
+      assert.isTrue(await provider.send("qrl_revert", [snapshot]));
+      assert.lengthOf(received, 1);
+
+      await provider.send("qrl_sendTransaction", [
+        {
+          from: SENDER,
+          to: deployReceipt.contractAddress,
+          gas: "0x186a0",
+        },
+      ]);
+      assert.lengthOf(received, 2);
+    });
   });
 
   it("exposes local chain, account, gas, and transaction methods", async () => {
@@ -212,10 +523,12 @@ describe("Hardhat QRLVM provider", function () {
   it("rejects legacy eth methods and malformed raw transactions", async () => {
     const provider = createLocalProvider();
 
-    await expectHardhatErrorAsync(
-      () => provider.send("eth_blockNumber"),
-      ERRORS.NETWORK.LEGACY_ETH_RPC_UNSUPPORTED
-    );
+    try {
+      await provider.send("eth_blockNumber");
+      assert.fail("legacy method should not be routed");
+    } catch (error) {
+      assert.equal((error as any).code, -32601);
+    }
     // Raw transactions are supported now; junk payloads fail parsing.
     try {
       await provider.send("qrl_sendRawTransaction", ["0x00"]);
@@ -255,18 +568,21 @@ describe("Hardhat QRLVM provider", function () {
   it("counts collector failures without masking the contract error", async () => {
     const provider = createLocalProviderWithReverter();
     const contractAddress = await deployReverter(provider);
-    const runtimeProvider = (provider as any)._provider;
-    runtimeProvider.traceTransactionFrames = async () => ({
-      kind: "call",
-      depth: 0,
-      input: new Uint8Array(0),
-      value: (global as any).BigInt(0),
-      gasLimit: (global as any).BigInt(0),
-      steps: [],
-      children: [],
-      errorMessage: "revert",
-      traceError: "collector failed",
-    });
+    const runtimeNode = (provider as any)._node;
+    runtimeNode.traceTransactionFrames = async () => {
+      runtimeNode._failedStackTraces += 1;
+      return {
+        kind: "call",
+        depth: 0,
+        input: new Uint8Array(0),
+        value: (global as any).BigInt(0),
+        gasLimit: (global as any).BigInt(0),
+        steps: [],
+        children: [],
+        errorMessage: "revert",
+        traceError: "collector failed",
+      };
+    };
 
     let caught: any;
     try {
@@ -280,6 +596,35 @@ describe("Hardhat QRLVM provider", function () {
     assert.isDefined(caught);
     assert.match(caught.message, /revert/i);
     assert.equal(await provider.send("qrl_getStackTraceFailuresCount"), 1);
+  });
+
+  it("traces transactions and calls through the debug namespace", async () => {
+    const provider = createLocalProviderWithReverter({
+      throwOnTransactionFailures: false,
+    });
+    const contractAddress = await deployReverter(provider);
+    const txHash = await provider.send("qrl_sendTransaction", [
+      { from: SENDER, to: contractAddress, gas: "0x186a0" },
+    ]);
+
+    const transactionTrace = await provider.send("debug_traceTransaction", [
+      txHash,
+      { disableStack: true },
+    ]);
+    assert.isTrue(transactionTrace.failed);
+    assert.equal(
+      transactionTrace.structLogs[transactionTrace.structLogs.length - 1].op,
+      "REVERT"
+    );
+    assert.notProperty(transactionTrace.structLogs[0], "stack");
+
+    const callTrace = await provider.send("debug_traceCall", [
+      { from: SENDER, to: contractAddress, gas: "0x186a0" },
+      "latest",
+      { limit: "0x2" },
+    ]);
+    assert.isTrue(callTrace.failed);
+    assert.lengthOf(callTrace.structLogs, 2);
   });
 
   it("returns silent status-0 receipts when throwOnTransactionFailures is false", async () => {
@@ -350,9 +695,9 @@ describe("Hardhat QRLVM provider", function () {
     assert.equal(await provider.send("net_version"), "1337");
     assert.equal(await provider.send("net_listening"), true);
     assert.equal(await provider.send("net_peerCount"), "0x0");
-    assert.match(
+    assert.equal(
       await provider.send("web3_clientVersion"),
-      /^QRLLocalProvider/
+      "QRLLocalProvider/qrljs"
     );
     // keccak-256("") — the well-known empty-input hash, like go-qrl returns.
     assert.equal(
@@ -505,7 +850,7 @@ describe("Hardhat QRLVM provider", function () {
       await provider.send("qrl_sendRawTransaction", [rawTampered]);
       assert.fail("tampered raw transaction should be rejected");
     } catch (error) {
-      assert.match((error as any).message, /signature verification failed/);
+      assert.match((error as any).message, /Invalid transaction signature/);
     }
   });
 
@@ -587,6 +932,26 @@ describe("Hardhat QRLVM provider", function () {
     assert.deepEqual(await provider.send("qrl_pendingTransactions"), []);
   });
 
+  it("forwards node subscription events through the provider", async () => {
+    const provider = createLocalProvider();
+    const notifications: any[] = [];
+    provider.on("notification", (notification) => {
+      notifications.push(notification);
+    });
+
+    const subscriptionId = await provider.send("qrl_subscribe", ["newHeads"]);
+    assert.equal(subscriptionId, "0x1");
+
+    await provider.send("qrl_mine");
+    assert.lengthOf(notifications, 1);
+    assert.equal(notifications[0].subscription, subscriptionId);
+    assert.equal(notifications[0].result.number, "0x1");
+
+    assert.isTrue(await provider.send("qrl_unsubscribe", [subscriptionId]));
+    await provider.send("qrl_mine");
+    assert.lengthOf(notifications, 1);
+  });
+
   it("applies initialDate to the genesis block and supports time controls", async () => {
     const provider = new HardhatQrlvmProvider({
       chainId: 1337,
@@ -626,18 +991,18 @@ describe("Hardhat QRLVM provider", function () {
     assert.equal(parseInt(overridden.timestamp, 16), genesisTimestamp + 10000);
   });
 
-  it("fails with a Hardhat error for an invalid initialDate", function () {
+  it("fails with a Hardhat error for an invalid initialDate", async function () {
     if (!hasQrlJsMonorepoDist()) {
       this.skip();
       return;
     }
 
-    expectHardhatError(
-      () =>
-        new HardhatQrlvmProvider({
-          qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
-          initialDate: "not-a-date",
-        }),
+    const provider = new HardhatQrlvmProvider({
+      qrlJsMonorepoPath: QRLJS_MONOREPO_PATH,
+      initialDate: "not-a-date",
+    });
+    await expectHardhatErrorAsync(
+      () => provider.send("qrl_chainId"),
       ERRORS.NETWORK.INVALID_INITIAL_DATE
     );
   });
@@ -655,19 +1020,19 @@ describe("Hardhat QRLVM provider", function () {
     );
   });
 
-  it("fails with a Hardhat error when qrljs-monorepo cannot be loaded", () => {
+  it("fails with a Hardhat error when qrljs-monorepo cannot be loaded", async () => {
     const missingQrlJsMonorepoPath = path.resolve("missing-qrljs-monorepo");
-    expectHardhatError(
-      () =>
-        new HardhatQrlvmProvider({
-          qrlJsMonorepoPath: missingQrlJsMonorepoPath,
-        }),
+    const provider = new HardhatQrlvmProvider({
+      qrlJsMonorepoPath: missingQrlJsMonorepoPath,
+    });
+    await expectHardhatErrorAsync(
+      () => provider.send("qrl_chainId"),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
       missingQrlJsMonorepoPath
     );
   });
 
-  it("without an override uses the bundled runtime or explains how to configure one", function () {
+  it("without an override uses the bundled runtime or explains how to configure one", async function () {
     const previousQrlJsMonorepoPath = process.env.QRLJS_MONOREPO_PATH;
     delete process.env.QRLJS_MONOREPO_PATH;
 
@@ -688,11 +1053,13 @@ describe("Hardhat QRLVM provider", function () {
         // With a bundled runtime present, no override is required at all.
         const provider = new HardhatQrlvmProvider({});
         assert.instanceOf(provider, HardhatQrlvmProvider);
+        await provider.send("qrl_chainId");
         return;
       }
 
-      expectHardhatError(
-        () => new HardhatQrlvmProvider({}),
+      const unavailableProvider = new HardhatQrlvmProvider({});
+      await expectHardhatErrorAsync(
+        () => unavailableProvider.send("qrl_chainId"),
         ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
         /QRLJS_MONOREPO_PATH/s
       );

@@ -40,6 +40,7 @@ export interface HardhatQrlvmAccountConfig {
 export interface HardhatQrlvmNetworkConfig extends CommonNetworkConfig {
   accounts?: HardhatQrlvmAccountConfig[];
   automine?: boolean;
+  loggingEnabled?: boolean;
   blockGasLimit?: number;
   /**
    * Genesis block timestamp as an ISO 8601 date string. Later blocks default

@@ -67,14 +67,17 @@ describe("qrljs runtime resolver", function () {
   it("reports a Hardhat error, not a TypeError, for modules missing the qrl export", function () {
     // The original TypeError only reproduced when a module export was
     // MISSING ENTIRELY (module.exports = undefined) — `{}` was already
-    // handled by the old `vm.qrl?.` chain. The vm module therefore exports
+    // handled by the old optional chain. The block module therefore exports
     // undefined here; the others export an empty object for coverage of
     // both corruption shapes.
     const checkout = path.join(this.tmpDir, "corrupted-checkout");
     for (const [name, exportExpr] of [
-      ["vm", "undefined"],
-      ["util", "{}"],
+      ["block", "undefined"],
+      ["evm", "{}"],
+      ["statemanager", "{}"],
       ["tx", "{}"],
+      ["util", "{}"],
+      ["vm", "{}"],
     ]) {
       const dir = path.join(checkout, "packages", name, "dist", "cjs");
       fsExtra.ensureDirSync(dir);
@@ -87,7 +90,7 @@ describe("qrljs runtime resolver", function () {
     expectHardhatError(
       () => loadQrlJsRuntime("hardhatqrlvm", checkout),
       ERRORS.NETWORK.QRLJS_MONOREPO_UNAVAILABLE,
-      /does not export qrl\.QRLLocalProvider/
+      /does not export qrl\.QRLBlock/
     );
   });
 
@@ -98,9 +101,12 @@ describe("qrljs runtime resolver", function () {
 
     const runtime = loadQrlJsRuntime("hardhatqrlvm");
     assert.equal(runtime.source.kind, "override");
-    assert.isDefined(runtime.vmQrl.QRLLocalProvider);
-    assert.isDefined(runtime.utilQrl.QRLAddress);
+    assert.isDefined(runtime.blockQrl.QRLBlock);
+    assert.isDefined(runtime.evmQrl.QRLEVM);
+    assert.isDefined(runtime.stateQrl.QRLStateManager);
     assert.isDefined(runtime.txQrl.QRLDynamicFeeTransaction);
+    assert.isDefined(runtime.utilQrl.QRLAddress);
+    assert.isDefined(runtime.vmQrl.QRLVM);
   });
 
   it("serves tx from the same source as a config-path resolution", function () {
@@ -129,8 +135,11 @@ describe("qrljs runtime resolver", function () {
     delete process.env[envVar];
     const runtime = loadQrlJsRuntime("hardhatqrlvm");
     assert.equal(runtime.source.kind, "bundled");
-    assert.isDefined(runtime.vmQrl.QRLLocalProvider);
+    assert.isDefined(runtime.blockQrl.QRLBlock);
+    assert.isDefined(runtime.evmQrl.QRLEVM);
+    assert.isDefined(runtime.stateQrl.QRLStateManager);
     assert.isDefined(runtime.utilQrl.QRLAddress);
+    assert.isDefined(runtime.vmQrl.QRLVM);
 
     const txQrl = loadQrlJsTxRuntime();
     assert.isDefined(txQrl.QRLDynamicFeeTransaction);

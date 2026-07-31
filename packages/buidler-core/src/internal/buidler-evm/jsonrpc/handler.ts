@@ -22,10 +22,7 @@ import {
 const log = debug("buidler:core:qrl:jsonrpc");
 
 export default class JsonRpcHandler {
-  constructor(
-    private readonly _provider: IQrlProvider,
-    private readonly _loggingEnabled: boolean = true
-  ) {}
+  constructor(private readonly _provider: IQrlProvider) {}
 
   public handleHttp = async (req: IncomingMessage, res: ServerResponse) => {
     this._setCorsHeaders(res);
@@ -84,7 +81,7 @@ export default class JsonRpcHandler {
       }
     };
 
-    // Dormant until the local provider implements qrl_subscribe.
+    // Forward notifications owned by this WebSocket connection.
     this._provider.addListener("notification", listener);
 
     ws.on("message", async (msg) => {
@@ -251,11 +248,6 @@ export default class JsonRpcHandler {
   private _handleRequest = async (
     req: JsonRpcRequest
   ): Promise<JsonRpcResponse> => {
-    if (this._loggingEnabled) {
-      // tslint:disable-next-line: no-console
-      console.log(req.method);
-    }
-
     const result = await this._provider.send(req.method, req.params);
 
     return {

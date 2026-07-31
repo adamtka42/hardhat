@@ -33,7 +33,11 @@ function _createHardhatQrlvmProvider(
 
   return lazyObject(() => {
     log("Creating hardhatqrlvm provider for JSON-RPC server");
-    return createProvider(networkName, networkConfig, config.paths);
+    return createProvider(
+      networkName,
+      { loggingEnabled: true, ...networkConfig },
+      config.paths
+    );
   });
 }
 
@@ -90,7 +94,6 @@ export default function () {
             hostname,
             port,
             provider: _createHardhatQrlvmProvider(config),
-            loggingEnabled: true,
           };
 
           const server = new JsonRpcServer(serverConfig);

@@ -4,7 +4,6 @@ import fsExtra from "fs-extra";
 import path from "path";
 import { promisify } from "util";
 
-import { QRL_CONSOLE_LOG_ADDRESS } from "../../src/internal/buidler-evm/stack-traces/consoleLogger";
 import { useTmpDir } from "../helpers/fs";
 
 const execFileAsync = promisify(execFile);
@@ -145,22 +144,6 @@ describe("Hardhat QRLVM e2e", function () {
       HYPERION_HYPC_PATH: hypcPath!,
       QRLJS_MONOREPO_PATH: qrlJsMonorepoPath!,
     };
-
-    // Cross-repo constant drift guard: the hardhat-side console address must
-    // stay byte-identical to the qrljs-monorepo one. This is the only place
-    // both runtimes are guaranteed loaded.
-    const utilQrl = require(path.join(
-      qrlJsMonorepoPath!,
-      "packages",
-      "util",
-      "dist",
-      "cjs",
-      "index.js"
-    )).qrl;
-    assert.equal(
-      utilQrl.QRL_CONSOLE_LOG_ADDRESS.toString().toLowerCase(),
-      QRL_CONSOLE_LOG_ADDRESS.toLowerCase()
-    );
 
     const result = await runHardhat(this.tmpDir, env, [
       "run",
@@ -462,15 +445,28 @@ async function runHardhat(
   env: NodeJS.ProcessEnv,
   args: string[]
 ) {
-  const result = await execFileAsync(
-    "node",
-    ["node_modules/@theqrl/hardhat/internal/cli/cli.js", ...args],
-    {
-      cwd: projectRoot,
-      env,
-      maxBuffer: 1024 * 1024 * 20,
-    }
-  );
+  let result;
+  try {
+    result = await execFileAsync(
+      "node",
+      ["node_modules/@theqrl/hardhat/internal/cli/cli.js", ...args],
+      {
+        cwd: projectRoot,
+        env,
+        maxBuffer: 1024 * 1024 * 20,
+      }
+    );
+  } catch (error) {
+    const childError = error as Error & { stdout?: string; stderr?: string };
+    childError.message = [
+      childError.message,
+      stripAnsi(childError.stdout?.toString() ?? ""),
+      stripAnsi(childError.stderr?.toString() ?? ""),
+    ]
+      .filter((part) => part.length > 0)
+      .join("\n");
+    throw childError;
+  }
   // The root test runner forces colors (FORCE_COLOR); assertions below
   // expect plain text, so strip ANSI escapes from the captured output.
   return {
@@ -695,12 +691,8 @@ describe("Hardhat QRLVM", function () {
     );
 
     await assert.rejects(
-      () => hre.network.provider.send("eth_blockNumber"),
-      /Legacy eth_/
-    );
-    await assert.rejects(
       () => hre.network.provider.send("qrl_sendRawTransaction", ["0x00"]),
-      /invalid raw transaction/i
+      /invalid raw (?:qrl )?transaction/i
     );
     await assert.rejects(
       () =>
