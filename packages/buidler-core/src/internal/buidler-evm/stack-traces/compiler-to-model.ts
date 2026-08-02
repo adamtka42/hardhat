@@ -1,529 +1,190 @@
-import abi from "ethereumjs-abi";
+import fsExtra from "fs-extra";
+import path from "path";
 
 import {
-  CompilerInput,
-  CompilerOutput,
-  CompilerOutputBytecode,
-} from "./compiler-types";
-import {
-  getLibraryAddressPositions,
-  normalizeCompilerOutputBytecode,
-} from "./library-utils";
-import {
-  Bytecode,
-  Contract,
-  ContractFunction,
-  ContractFunctionType,
-  ContractFunctionVisibility,
-  ContractType,
-  SourceFile,
-  SourceLocation,
-} from "./model";
-import { decodeInstructions } from "./source-maps";
+  COMPILER_INPUT_FILENAME,
+  COMPILER_OUTPUT_FILENAME,
+} from "../../constants";
 
-export function createModelsAndDecodeBytecodes(
-  solcVersion: string,
-  compilerInput: CompilerInput,
-  compilerOutput: CompilerOutput
-): Bytecode[] {
-  const fileIdToSourceFile = new Map<number, SourceFile>();
-  const contractIdToContract = new Map<number, Contract>();
-
-  createSourcesModelFromAst(
-    compilerOutput,
-    compilerInput,
-    fileIdToSourceFile,
-    contractIdToContract
-  );
-
-  const bytecodes = decodeBytecodes(
-    solcVersion,
-    compilerOutput,
-    fileIdToSourceFile,
-    contractIdToContract
-  );
-
-  correctSelectors(bytecodes, compilerOutput);
-
-  return bytecodes;
+export interface QrlContractDebugInfo {
+  sourceName: string;
+  contractName: string;
+  abi: any[];
+  contractKind?: string;
+  bytecode: string;
+  bytecodeSourceMap?: string;
+  deployedBytecode: string;
+  deployedSourceMap?: string;
+  linkReferences: any;
+  deployedLinkReferences: any;
+  immutableReferences: any;
+  methodIdentifiers: { [signature: string]: string };
+  compilerVersion?: string;
 }
 
-function createSourcesModelFromAst(
-  compilerOutput: CompilerOutput,
-  compilerInput: CompilerInput,
-  fileIdToSourceFile: Map<number, SourceFile>,
-  contractIdToContract: Map<number, Contract>
-) {
-  const contractIdToLinearizedBaseContractIds = new Map<number, number[]>();
+export interface QrlDebugInfo {
+  contracts: QrlContractDebugInfo[];
+  /** Source content by sourceName (from the cached compiler input). */
+  sourceContent: Map<string, string>;
+  /** sourceName by numeric source index (from the cached compiler output). */
+  sourceNamesByIndex: Map<number, string>;
+  /** Raw per-source ASTs by sourceName. */
+  astBySourceName: Map<string, any>;
+}
 
-  for (const [globalName, source] of Object.entries(compilerOutput.sources)) {
-    const file = new SourceFile(
-      globalName,
-      compilerInput.sources[globalName].content
+/**
+ * Loads the debug information the stack trace decoder needs from the cached
+ * compiler input/output JSON files. Returns `undefined` when the cache is
+ * missing or unreadable — stack traces then degrade gracefully.
+ */
+export function loadQrlDebugInfo(
+  cachePath: string,
+  projectRoot?: string
+): QrlDebugInfo | undefined {
+  try {
+    const output = fsExtra.readJsonSync(
+      path.join(cachePath, COMPILER_OUTPUT_FILENAME)
+    );
+    const input = fsExtra.readJsonSync(
+      path.join(cachePath, COMPILER_INPUT_FILENAME)
     );
 
-    fileIdToSourceFile.set(source.id, file);
+    const contracts: QrlContractDebugInfo[] = [];
+    const fallbackCompilerVersion = readCachedCompilerVersion(cachePath);
+    for (const sourceName of Object.keys(output.contracts ?? {})) {
+      for (const contractName of Object.keys(output.contracts[sourceName])) {
+        const contractOutput = output.contracts[sourceName][contractName];
+        const bytecodeOutput = contractOutput.bytecodeOutput ?? {};
+        contracts.push({
+          sourceName,
+          contractName,
+          abi: contractOutput.abi ?? [],
+          contractKind: findContractKind(
+            output.sources?.[sourceName]?.ast,
+            contractName
+          ),
+          bytecode: bytecodeOutput.bytecode?.object ?? "",
+          bytecodeSourceMap: bytecodeOutput.bytecode?.sourceMap,
+          deployedBytecode: bytecodeOutput.deployedBytecode?.object ?? "",
+          deployedSourceMap: bytecodeOutput.deployedBytecode?.sourceMap,
+          linkReferences: bytecodeOutput.bytecode?.linkReferences ?? {},
+          deployedLinkReferences:
+            bytecodeOutput.deployedBytecode?.linkReferences ?? {},
+          immutableReferences:
+            bytecodeOutput.deployedBytecode?.immutableReferences ?? {},
+          methodIdentifiers: contractOutput.methodIdentifiers ?? {},
+          compilerVersion:
+            readCompilerVersion(contractOutput.metadata) ??
+            fallbackCompilerVersion,
+        });
+      }
+    }
 
-    for (const contractNode of source.ast.nodes) {
-      if (contractNode.nodeType !== "ContractDefinition") {
-        continue;
+    const sourceContent = new Map<string, string>();
+    for (const sourceName of Object.keys(input.sources ?? {})) {
+      const content = input.sources[sourceName]?.content;
+      if (typeof content === "string") {
+        sourceContent.set(sourceName, content);
+      }
+    }
+
+    const sourceNamesByIndex = new Map<number, string>();
+    const astBySourceName = new Map<string, any>();
+    for (const sourceName of Object.keys(output.sources ?? {})) {
+      const source = output.sources[sourceName];
+      if (typeof source?.id === "number") {
+        sourceNamesByIndex.set(source.id, sourceName);
+      }
+      if (source?.ast !== undefined) {
+        astBySourceName.set(sourceName, source.ast);
       }
 
-      const contractType = contractKindToContractType(
-        contractNode.contractKind
-      );
-
-      if (contractType === undefined) {
-        continue;
+      // Older or externally generated compiler caches may omit source
+      // content. Recover it from disk so library frames still get real line
+      // numbers.
+      if (!sourceContent.has(sourceName) && projectRoot !== undefined) {
+        const candidates = [
+          path.join(projectRoot, sourceName),
+          path.join(projectRoot, "node_modules", sourceName),
+        ];
+        for (const candidate of candidates) {
+          try {
+            sourceContent.set(
+              sourceName,
+              fsExtra.readFileSync(candidate, "utf8")
+            );
+            break;
+          } catch {
+            // Try the next candidate; missing content degrades to line 0.
+          }
+        }
       }
-
-      processContractAstNode(
-        file,
-        contractNode,
-        fileIdToSourceFile,
-        contractType,
-        contractIdToContract,
-        contractIdToLinearizedBaseContractIds
-      );
-    }
-  }
-
-  applyContractsInheritance(
-    contractIdToContract,
-    contractIdToLinearizedBaseContractIds
-  );
-}
-
-function processContractAstNode(
-  file: SourceFile,
-  contractNode: any,
-  fileIdToSourceFile: Map<number, SourceFile>,
-  contractType: ContractType,
-  contractIdToContract: Map<number, Contract>,
-  contractIdToLinearizedBaseContractIds: Map<number, number[]>
-) {
-  const contractLocation = astSrcToSourceLocation(
-    contractNode.src,
-    fileIdToSourceFile
-  )!;
-
-  const contract = new Contract(
-    contractNode.name,
-    contractType,
-    contractLocation
-  );
-
-  contractIdToContract.set(contractNode.id, contract);
-  contractIdToLinearizedBaseContractIds.set(
-    contractNode.id,
-    contractNode.linearizedBaseContracts
-  );
-
-  file.addContract(contract);
-
-  for (const node of contractNode.nodes) {
-    if (node.nodeType === "FunctionDefinition") {
-      processFunctionDefinitionAstNode(
-        node,
-        fileIdToSourceFile,
-        contract,
-        file
-      );
-    } else if (node.nodeType === "ModifierDefinition") {
-      processModifierDefinitionAstNode(
-        node,
-        fileIdToSourceFile,
-        contract,
-        file
-      );
-    } else if (node.nodeType === "VariableDeclaration") {
-      processVariableDeclarationAstNode(
-        node,
-        fileIdToSourceFile,
-        contract,
-        file
-      );
-    }
-  }
-}
-
-function processFunctionDefinitionAstNode(
-  functionDefinitionNode: any,
-  fileIdToSourceFile: Map<number, SourceFile>,
-  contract: Contract,
-  file: SourceFile
-) {
-  if (functionDefinitionNode.implemented === false) {
-    return;
-  }
-
-  const functionType = functionDefinitionKindToFunctionType(
-    functionDefinitionNode.kind
-  );
-  const functionLocation = astSrcToSourceLocation(
-    functionDefinitionNode.src,
-    fileIdToSourceFile
-  )!;
-  const visibility = astVisibilityToVisibility(
-    functionDefinitionNode.visibility
-  );
-
-  const cf = new ContractFunction(
-    functionDefinitionNode.name,
-    functionType,
-    functionLocation,
-    contract,
-    visibility,
-    functionDefinitionNode.stateMutability === "payable",
-    functionType === ContractFunctionType.FUNCTION
-      ? astFunctionDefinitionToSelector(functionDefinitionNode)
-      : undefined
-  );
-
-  contract.addLocalFunction(cf);
-  file.addFunction(cf);
-}
-
-function processModifierDefinitionAstNode(
-  modifierDefinitionNode: any,
-  fileIdToSourceFile: Map<number, SourceFile>,
-  contract: Contract,
-  file: SourceFile
-) {
-  const functionLocation = astSrcToSourceLocation(
-    modifierDefinitionNode.src,
-    fileIdToSourceFile
-  )!;
-
-  const cf = new ContractFunction(
-    modifierDefinitionNode.name,
-    ContractFunctionType.MODIFIER,
-    functionLocation,
-    contract
-  );
-
-  contract.addLocalFunction(cf);
-  file.addFunction(cf);
-}
-
-function getPublicVariableSelectorFromDeclarationAstNode(
-  variableDeclaration: any
-) {
-  const paramTypes: string[] = [];
-
-  let nextType = variableDeclaration.typeName;
-  while (true) {
-    if (nextType.nodeType === "Mapping") {
-      paramTypes.push(toCanonicalAbiType(nextType.keyType.name));
-
-      nextType = nextType.valueType;
-    } else {
-      if (nextType.nodeType === "ArrayTypeName") {
-        paramTypes.push("uint256");
-      }
-
-      break;
-    }
-  }
-
-  return abi.methodID(variableDeclaration.name, paramTypes);
-}
-
-function processVariableDeclarationAstNode(
-  variableDeclarationNode: any,
-  fileIdToSourceFile: Map<number, SourceFile>,
-  contract: Contract,
-  file: SourceFile
-) {
-  const visibility = astVisibilityToVisibility(
-    variableDeclarationNode.visibility
-  );
-
-  // Variables can't be external
-  if (visibility !== ContractFunctionVisibility.PUBLIC) {
-    return;
-  }
-
-  const functionLocation = astSrcToSourceLocation(
-    variableDeclarationNode.src,
-    fileIdToSourceFile
-  )!;
-
-  const cf = new ContractFunction(
-    variableDeclarationNode.name,
-    ContractFunctionType.GETTER,
-    functionLocation,
-    contract,
-    visibility,
-    false, // Getters aren't payable
-    getPublicVariableSelectorFromDeclarationAstNode(variableDeclarationNode)
-  );
-
-  contract.addLocalFunction(cf);
-  file.addFunction(cf);
-}
-
-function applyContractsInheritance(
-  contractIdToContract: Map<number, Contract>,
-  contractIdToLinearizedBaseContractIds: Map<number, number[]>
-) {
-  for (const [cid, contract] of contractIdToContract.entries()) {
-    const inheritanceIds = contractIdToLinearizedBaseContractIds.get(cid)!;
-
-    for (const baseId of inheritanceIds) {
-      const baseContract = contractIdToContract.get(baseId);
-
-      if (baseContract === undefined) {
-        // This list includes interface, which we don't model
-        continue;
-      }
-
-      contract.addNextLinearizedBaseContract(baseContract);
-    }
-  }
-}
-
-function decodeBytecodes(
-  solcVersion: string,
-  compilerOutput: CompilerOutput,
-  fileIdToSourceFile: Map<number, SourceFile>,
-  contractIdToContract: Map<number, Contract>
-): Bytecode[] {
-  const bytecodes: Bytecode[] = [];
-
-  for (const contract of contractIdToContract.values()) {
-    const contractFile = contract.location.file.globalName;
-    const contractEvmOutput =
-      compilerOutput.contracts[contractFile][contract.name].evm;
-
-    // This is an abstract contract
-    if (contractEvmOutput.bytecode.object === "") {
-      continue;
     }
 
-    const deploymentBytecode = decodeEvmBytecode(
-      contract,
-      solcVersion,
-      true,
-      contractEvmOutput.bytecode,
-      fileIdToSourceFile
-    );
-
-    const runtimeBytecode = decodeEvmBytecode(
-      contract,
-      solcVersion,
-      false,
-      contractEvmOutput.deployedBytecode,
-      fileIdToSourceFile
-    );
-
-    bytecodes.push(deploymentBytecode);
-    bytecodes.push(runtimeBytecode);
-  }
-
-  return bytecodes;
-}
-
-function decodeEvmBytecode(
-  contract: Contract,
-  solcVersion: string,
-  isDeployment: boolean,
-  compilerBytecode: CompilerOutputBytecode,
-  fileIdToSourceFile: Map<number, SourceFile>
-): Bytecode {
-  const libraryAddressPositions = getLibraryAddressPositions(compilerBytecode);
-
-  const normalizedCode = normalizeCompilerOutputBytecode(
-    compilerBytecode.object,
-    libraryAddressPositions
-  );
-
-  const instructions = decodeInstructions(
-    normalizedCode,
-    compilerBytecode.sourceMap,
-    fileIdToSourceFile
-  );
-
-  return new Bytecode(
-    contract,
-    isDeployment,
-    normalizedCode,
-    instructions,
-    libraryAddressPositions,
-    solcVersion
-  );
-}
-
-function astSrcToSourceLocation(
-  src: string,
-  fileIdToSourceFile: Map<number, SourceFile>
-): SourceLocation | undefined {
-  const [offset, length, fileId] = src.split(":").map((p) => +p);
-  const file = fileIdToSourceFile.get(fileId);
-
-  if (file === undefined) {
+    return { contracts, sourceContent, sourceNamesByIndex, astBySourceName };
+  } catch {
     return undefined;
   }
-
-  return new SourceLocation(file, offset, length);
 }
 
-function contractKindToContractType(
-  contractKind?: string
-): ContractType | undefined {
-  if (contractKind === "library") {
-    return ContractType.LIBRARY;
-  }
-
-  if (contractKind === "contract") {
-    return ContractType.CONTRACT;
-  }
-
-  return undefined;
-}
-
-function astVisibilityToVisibility(
-  visibility: string
-): ContractFunctionVisibility {
-  if (visibility === "private") {
-    return ContractFunctionVisibility.PRIVATE;
-  }
-
-  if (visibility === "internal") {
-    return ContractFunctionVisibility.INTERNAL;
-  }
-
-  if (visibility === "public") {
-    return ContractFunctionVisibility.PUBLIC;
-  }
-
-  return ContractFunctionVisibility.EXTERNAL;
-}
-
-function functionDefinitionKindToFunctionType(
-  kind: string
-): ContractFunctionType {
-  if (kind === "constructor") {
-    return ContractFunctionType.CONSTRUCTOR;
-  }
-
-  if (kind === "fallback") {
-    return ContractFunctionType.FALLBACK;
-  }
-
-  return ContractFunctionType.FUNCTION;
-}
-
-function astFunctionDefinitionToSelector(functionDefinition: any): Buffer {
-  const paramTypes: string[] = [];
-
-  for (const param of functionDefinition.parameters.parameters) {
-    if (isContractType(param)) {
-      paramTypes.push("address");
-      continue;
+function findContractKind(ast: any, contractName: string): string | undefined {
+  let kind: string | undefined;
+  visitNodes(ast, (node) => {
+    if (
+      kind === undefined &&
+      node.nodeType === "ContractDefinition" &&
+      node.name === contractName &&
+      typeof node.contractKind === "string"
+    ) {
+      kind = node.contractKind;
     }
-
-    if (isEnumType(param)) {
-      // TODO: If the enum has >= 256 elements this will fail. It should be a uint16. This is
-      //  complicated, as enums can be inherited. Fortunately, if multiple parent contracts
-      //  define the same enum, solc fails to compile.
-      paramTypes.push("uint8");
-      continue;
-    }
-
-    if (param.typeName.nodeType === "ArrayTypeName") {
-      paramTypes.push(`${toCanonicalAbiType(param.typeName.baseType.name)}[]`);
-      continue;
-    }
-
-    paramTypes.push(toCanonicalAbiType(param.typeName.name));
-  }
-
-  return abi.methodID(functionDefinition.name, paramTypes);
+  });
+  return kind;
 }
 
-function isContractType(param: any) {
-  return (
-    param.typeName.nodeType === "UserDefinedTypeName" &&
-    param.typeDescriptions.typeString.startsWith("contract ")
-  );
-}
-
-function isEnumType(param: any) {
-  return (
-    param.typeName.nodeType === "UserDefinedTypeName" &&
-    param.typeDescriptions.typeString.startsWith("enum ")
-  );
-}
-
-function toCanonicalAbiType(type: string): string {
-  if (type.startsWith("int[")) {
-    return `int256${type.slice(3)}`;
+function visitNodes(node: any, visit: (node: any) => void): void {
+  if (node === null || typeof node !== "object") {
+    return;
   }
-
-  if (type === "int") {
-    return "int256";
-  }
-
-  if (type.startsWith("uint[")) {
-    return `uint256${type.slice(4)}`;
-  }
-
-  if (type === "uint") {
-    return "uint256";
-  }
-
-  if (type.startsWith("fixed[")) {
-    return `fixed128x128${type.slice(5)}`;
-  }
-
-  if (type === "fixed") {
-    return "fixed128x128";
-  }
-
-  if (type.startsWith("ufixed[")) {
-    return `ufixed128x128${type.slice(6)}`;
-  }
-
-  if (type === "ufixed") {
-    return "ufixed128x128";
-  }
-
-  return type;
-}
-
-function correctSelectors(
-  bytecodes: Bytecode[],
-  compilerOutput: CompilerOutput
-) {
-  for (const bytecode of bytecodes) {
-    if (bytecode.isDeployment) {
-      continue;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      visitNodes(child, visit);
     }
+    return;
+  }
+  visit(node);
+  for (const child of Object.values(node)) {
+    visitNodes(child, visit);
+  }
+}
 
-    const contract = bytecode.contract;
-    const methodIdentifiers =
-      compilerOutput.contracts[contract.location.file.globalName][contract.name]
-        .evm.methodIdentifiers;
-
-    for (const [signature, hexSelector] of Object.entries(methodIdentifiers)) {
-      const functionName = signature.slice(0, signature.indexOf("("));
-      const selector = Buffer.from(hexSelector, "hex");
-
-      const contractFunction = contract.getFunctionFromSelector(selector);
-
-      if (contractFunction !== undefined) {
-        continue;
-      }
-
-      const fixedSelector = contract.correctSelector(functionName, selector);
-
-      if (!fixedSelector) {
-        // tslint:disable-next-line only-buidler-error
-        throw new Error(
-          `Failed to compute the selector one or more implementations of ${contract.name}#${functionName}. BuidlerEVM can automatically fix this problem if you don't use function overloading.`
-        );
-      }
+function readCachedCompilerVersion(cachePath: string): string | undefined {
+  try {
+    const config = fsExtra.readJsonSync(
+      path.join(cachePath, "last-compiler-config.json")
+    );
+    if (typeof config?.compiler?.longVersion === "string") {
+      return config.compiler.longVersion;
     }
+    const configured = config?.hyperion?.version;
+    return typeof configured === "string" && configured !== "local"
+      ? configured
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readCompilerVersion(metadata: unknown): string | undefined {
+  if (typeof metadata !== "string") {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(metadata);
+    return typeof parsed?.compiler?.version === "string"
+      ? parsed.compiler.version
+      : undefined;
+  } catch {
+    return undefined;
   }
 }

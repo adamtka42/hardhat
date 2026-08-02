@@ -1,18 +1,27 @@
 # 9. Final thoughts
 
-Congratulations on finishing the tutorial!
+Congratulations on finishing the tutorial.
 
-Here are some links you might find useful throughout your journey:
+You now have a QRL Hardhat project that can:
 
-- [Buidler's Hackathon Boilerplate](https://github.com/nomiclabs/buidler-hackathon-boilerplate)
-- [Buidler's documentation site](https://buidler.dev/getting-started/)
-- [Telegram Buidler Support Group](https://t.me/BuidlerSupport)
-- [Ethers.js Documentation](https://docs.ethers.io/ethers.js/html/)
-- [Waffle Documentation](https://getwaffle.io/)
-- [Mocha Documentation](https://mochajs.org/)
-- [Chai Documentation](https://www.chaijs.com/)
+- Compile Hyperion `.hyp` contracts
+- Test contracts on hardhatqrlvm
+- Send state-changing transactions through direct contract method aliases and
+  wait for receipts with `tx.wait()`
+- Call read-only contract functions directly on contract wrappers
+- Deploy contracts with scripts
+- Connect to HTTP go-qrl networks
+
+Here are some links you might find useful:
+
+- [Getting started](../getting-started.md)
+- [Compiling contracts](../guides/compile-contracts.md)
+- [Deploying contracts](../guides/deploying.md)
+- [Scripts](../guides/scripts.md)
+- [Creating tasks](../guides/create-task.md)
+- [hardhatqrlvm](../hardhat-qrlvm/README.md)
+- [Common problems](../troubleshooting/common-problems.md)
+- [Mocha documentation](https://mochajs.org/)
 
 Happy hacking!
 
-
-![](/cool-buidler.svg)

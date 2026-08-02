@@ -1,226 +1,364 @@
-import { Transaction } from "ethereumjs-tx";
-import { BN, bufferToHex } from "ethereumjs-util";
+interface QrlAddressLike {
+  toString(): string;
+}
 
-import { Block, TxBlockResult } from "./node";
+interface QrlTransactionLike {
+  type: number | bigint;
+  chainId: bigint;
+  nonce: bigint;
+  to?: QrlAddressLike;
+  gasLimit: bigint;
+  gasFeeCap: bigint;
+  gasTipCap: bigint;
+  value: bigint;
+  data: Uint8Array;
+  hash(): Uint8Array;
+}
+
+interface QrlLogLike {
+  address: QrlAddressLike;
+  topics: ReadonlyArray<Uint8Array>;
+  data: Uint8Array;
+  blockNumber?: bigint;
+  txHash?: Uint8Array;
+  txIndex?: number;
+  blockHash?: Uint8Array;
+  index?: number;
+  removed: boolean;
+}
+
+interface QrlReceiptLike {
+  txHash: Uint8Array;
+  blockHash?: Uint8Array;
+  blockNumber?: bigint;
+  transactionIndex?: number;
+  from: QrlAddressLike;
+  to?: QrlAddressLike;
+  createdAddress?: QrlAddressLike;
+  status: 0 | 1;
+  gasUsed: bigint;
+  cumulativeGasUsed: bigint;
+  effectiveGasPrice?: bigint;
+  logs: ReadonlyArray<QrlLogLike>;
+  logsBloom: Uint8Array;
+}
+
+interface QrlBlockLike {
+  header: {
+    parentHash: Uint8Array;
+    number: bigint;
+    timestamp: bigint;
+    gasLimit: bigint;
+    gasUsed: bigint;
+    baseFee: bigint;
+    coinbase: QrlAddressLike;
+    stateRoot: Uint8Array;
+    transactionsRoot: Uint8Array;
+    receiptsRoot: Uint8Array;
+    logsBloom: Uint8Array;
+  };
+  transactions: ReadonlyArray<QrlTransactionLike>;
+  receipts: ReadonlyArray<QrlReceiptLike>;
+  hash(): Uint8Array;
+}
 
 export interface RpcBlockOutput {
-  difficulty: string;
-  extraData: string;
+  hash: string;
+  parentHash: string;
+  number: string;
+  timestamp: string;
   gasLimit: string;
   gasUsed: string;
-  hash: string | null;
-  logsBloom: string | null;
+  baseFeePerGas: string;
   miner: string;
-  nonce: string | null;
-  number: string | null;
-  parentHash: string;
-  receiptsRoot: string;
-  sha3Uncles: string;
-  size: string;
   stateRoot: string;
-  timestamp: string;
-  totalDifficulty: string;
-  transactions: string[] | RpcTransactionOutput[];
   transactionsRoot: string;
-  uncles: string[];
+  receiptsRoot: string;
+  logsBloom: string;
+  transactions: string[] | RpcTransactionOutput[];
+  receipts: RpcTransactionReceiptOutput[];
 }
 
 export interface RpcTransactionOutput {
-  blockHash: string | null;
-  blockNumber: string | null;
-  from: string;
-  gas: string;
-  gasPrice: string;
   hash: string;
-  input: string;
+  type: string;
+  chainId: string;
   nonce: string;
-  r: string; // This is documented as DATA, but implementations use QUANTITY
-  s: string; // This is documented as DATA, but implementations use QUANTITY
-  to: string | null;
-  transactionIndex: string | null;
-  v: string;
+  from?: string;
+  to?: string;
+  gas: string;
+  gasLimit: string;
+  gasFeeCap: string;
+  gasTipCap: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
   value: string;
+  input: string;
+  data: string;
+  blockHash?: string;
+  blockNumber?: string;
+  transactionIndex?: string;
 }
 
 export interface RpcTransactionReceiptOutput {
-  blockHash: string;
-  blockNumber: string;
-  contractAddress: string | null;
-  cumulativeGasUsed: string;
-  from: string;
-  gasUsed: string;
-  logs: RpcLogOutput[];
-  logsBloom: string;
-  status: string;
-  to: string | null;
   transactionHash: string;
-  transactionIndex: string;
+  blockHash?: string;
+  blockNumber?: string;
+  transactionIndex?: string;
+  from: string;
+  to?: string;
+  contractAddress?: string;
+  status: string;
+  gasUsed: string;
+  cumulativeGasUsed: string;
+  effectiveGasPrice?: string;
+  logsBloom: string;
+  logs: RpcLogOutput[];
 }
 
 export interface RpcLogOutput {
   address: string;
-  blockHash: string | null;
-  blockNumber: string | null;
-  data: string;
-  logIndex: string | null;
-  removed: boolean;
   topics: string[];
-  transactionHash: string | null;
-  transactionIndex: string | null;
+  data: string;
+  blockNumber?: string;
+  transactionHash?: string;
+  transactionIndex?: string;
+  blockHash?: string;
+  logIndex?: string;
+  removed: boolean;
 }
 
-// tslint:disable only-buidler-error
-
-export function numberToRpcQuantity(n: number | BN): string {
-  // This is here because we have some any's from dependencies
-  if (typeof n !== "number" && Buffer.isBuffer(n)) {
-    throw new Error(`Expected a number and got ${n}`);
-  }
-
-  if (Buffer.isBuffer(n)) {
-    n = new BN(n);
-  }
-
-  return `0x${n.toString(16)}`;
+export interface QrlRawStructLogOutputInput {
+  pc: number;
+  opcode: number;
+  depth: number;
+  gasLeft: bigint;
+  gasCost: bigint;
+  stack?: Array<bigint>;
+  memory?: Uint8Array;
 }
 
-export function bufferToRpcData(buffer: Buffer, pad: number = 0): string {
-  let s = bufferToHex(buffer);
-  if (pad > 0 && s.length < pad + 2) {
-    s = `0x${"0".repeat(pad + 2 - s.length)}${s.slice(2)}`;
+export interface RpcStructLogOutput {
+  pc: number;
+  op: string;
+  gas: number;
+  gasCost: number;
+  depth: number;
+  stack?: string[];
+  memory?: string[];
+}
+
+export interface RpcDebugTraceOutput {
+  gas: number;
+  failed: boolean;
+  returnValue: string;
+  structLogs: RpcStructLogOutput[];
+}
+
+// tslint:disable only-hardhat-error
+
+export function numberToRpcQuantity(n: number | bigint): string {
+  const normalized = typeof n === "number" ? (global as any).BigInt(n) : n;
+  if (normalized < (global as any).BigInt(0)) {
+    throw new Error("QRL quantity cannot be negative");
   }
-  return s;
+  return `0x${normalized.toString(16)}`;
+}
+
+export function bufferToRpcData(buffer: Uint8Array, pad: number = 0): string {
+  let value = `0x${Buffer.from(buffer).toString("hex")}`;
+  if (pad > 0 && value.length < pad + 2) {
+    value = `0x${"0".repeat(pad + 2 - value.length)}${value.slice(2)}`;
+  }
+  return value;
 }
 
 export function getRpcBlock(
-  block: Block,
-  totalDifficulty: BN,
+  block: QrlBlockLike,
   includeTransactions = true
 ): RpcBlockOutput {
   return {
-    number: numberToRpcQuantity(new BN(block.header.number)), // TODO: null when it's a pending block,
-    hash: bufferToRpcData(block.hash()), // TODO: null when it's a pending block,
+    hash: bufferToRpcData(block.hash()),
     parentHash: bufferToRpcData(block.header.parentHash),
-    // We pad this to 8 bytes because of a limitation in The Graph
-    // See: https://github.com/nomiclabs/buidler/issues/491
-    nonce: bufferToRpcData(block.header.nonce, 16), // TODO: null when it's a pending block,
-    sha3Uncles: bufferToRpcData(block.header.uncleHash),
-    logsBloom: bufferToRpcData(block.header.bloom), // TODO: null when it's a pending block,
-    transactionsRoot: bufferToRpcData(block.header.transactionsTrie),
+    number: numberToRpcQuantity(block.header.number),
+    timestamp: numberToRpcQuantity(block.header.timestamp),
+    gasLimit: numberToRpcQuantity(block.header.gasLimit),
+    gasUsed: numberToRpcQuantity(block.header.gasUsed),
+    baseFeePerGas: numberToRpcQuantity(block.header.baseFee),
+    miner: block.header.coinbase.toString(),
     stateRoot: bufferToRpcData(block.header.stateRoot),
-    receiptsRoot: bufferToRpcData(block.header.receiptTrie),
-    miner: bufferToRpcData(block.header.coinbase),
-    difficulty: numberToRpcQuantity(new BN(block.header.difficulty)),
-    totalDifficulty: numberToRpcQuantity(totalDifficulty),
-    extraData: bufferToRpcData(block.header.extraData),
-    size: numberToRpcQuantity(block.serialize().length),
-    gasLimit: numberToRpcQuantity(new BN(block.header.gasLimit)),
-    gasUsed: numberToRpcQuantity(new BN(block.header.gasUsed)),
-    timestamp: numberToRpcQuantity(new BN(block.header.timestamp)),
-    transactions: block.transactions.map((tx: any, index: number) =>
-      getRpcTransaction(tx, block, index, !includeTransactions)
+    transactionsRoot: bufferToRpcData(block.header.transactionsRoot),
+    receiptsRoot: bufferToRpcData(block.header.receiptsRoot),
+    logsBloom: bufferToRpcData(block.header.logsBloom),
+    transactions: includeTransactions
+      ? block.transactions.map((tx, index) =>
+          getRpcTransaction(
+            tx,
+            block,
+            index,
+            false,
+            block.receipts[index]?.from
+          )
+        )
+      : block.transactions.map((tx) => bufferToRpcData(tx.hash())),
+    receipts: block.receipts.map((receipt) =>
+      getRpcTransactionReceipt(receipt)
     ),
-    uncles: block.uncleHeaders.map((uh: any) => bufferToRpcData(uh.hash())),
   };
 }
 
 export function getRpcTransaction(
-  tx: Transaction,
-  block?: Block,
-  index?: number
+  tx: QrlTransactionLike,
+  block?: QrlBlockLike,
+  index?: number,
+  txHashOnly?: false,
+  from?: QrlAddressLike
 ): RpcTransactionOutput;
 
 export function getRpcTransaction(
-  tx: Transaction,
-  block?: Block,
+  tx: QrlTransactionLike,
+  block: QrlBlockLike | undefined,
+  index: number | undefined,
+  txHashOnly: true,
+  from?: QrlAddressLike
+): string;
+
+export function getRpcTransaction(
+  tx: QrlTransactionLike,
+  block?: QrlBlockLike,
   index?: number,
-  txHashOnly?: boolean
+  txHashOnly?: boolean,
+  from?: QrlAddressLike
 ): string | RpcTransactionOutput;
 
 export function getRpcTransaction(
-  tx: Transaction,
-  block?: Block,
+  tx: QrlTransactionLike,
+  block?: QrlBlockLike,
   index?: number,
-  txHashOnly = false
+  txHashOnly = false,
+  from?: QrlAddressLike
 ): string | RpcTransactionOutput {
   if (txHashOnly) {
-    return bufferToRpcData(tx.hash(true));
+    return bufferToRpcData(tx.hash());
   }
 
   return {
-    blockHash: block !== undefined ? bufferToRpcData(block.hash()) : null,
-    blockNumber:
-      block !== undefined
-        ? numberToRpcQuantity(new BN(block.header.number))
-        : null,
-    from: bufferToRpcData(tx.getSenderAddress()),
-    gas: numberToRpcQuantity(new BN(tx.gasLimit)),
-    gasPrice: numberToRpcQuantity(new BN(tx.gasPrice)),
-    hash: bufferToRpcData(tx.hash(true)),
+    hash: bufferToRpcData(tx.hash()),
+    type: numberToRpcQuantity(tx.type),
+    chainId: numberToRpcQuantity(tx.chainId),
+    nonce: numberToRpcQuantity(tx.nonce),
+    from: from?.toString(),
+    to: tx.to?.toString(),
+    gas: numberToRpcQuantity(tx.gasLimit),
+    gasLimit: numberToRpcQuantity(tx.gasLimit),
+    gasFeeCap: numberToRpcQuantity(tx.gasFeeCap),
+    gasTipCap: numberToRpcQuantity(tx.gasTipCap),
+    maxFeePerGas: numberToRpcQuantity(tx.gasFeeCap),
+    maxPriorityFeePerGas: numberToRpcQuantity(tx.gasTipCap),
+    value: numberToRpcQuantity(tx.value),
     input: bufferToRpcData(tx.data),
-    nonce: numberToRpcQuantity(new BN(tx.nonce)),
-    to: tx.to.length === 0 ? null : bufferToRpcData(tx.to),
-    transactionIndex: index !== undefined ? numberToRpcQuantity(index) : null,
-    value: numberToRpcQuantity(new BN(tx.value)),
-    v: numberToRpcQuantity(new BN(tx.v)),
-    r: numberToRpcQuantity(new BN(tx.s)),
-    s: numberToRpcQuantity(new BN(tx.r)),
+    data: bufferToRpcData(tx.data),
+    blockHash: block === undefined ? undefined : bufferToRpcData(block.hash()),
+    blockNumber:
+      block === undefined
+        ? undefined
+        : numberToRpcQuantity(block.header.number),
+    transactionIndex:
+      index === undefined ? undefined : numberToRpcQuantity(index),
   };
 }
 
 export function getRpcTransactionReceipt(
-  tx: Transaction,
-  block: Block,
-  index: number,
-  txBlockResults: TxBlockResult[]
+  receipt: QrlReceiptLike
 ): RpcTransactionReceiptOutput {
-  const cumulativeGasUsed: BN = txBlockResults
-    .map((txbr) => txbr.receipt)
-    .filter((r, i) => i <= index)
-    .reduce((gas, r) => gas.add(new BN(r.gasUsed)), new BN(0));
-
-  const receipt = txBlockResults[index].receipt;
-  const createdAddress = txBlockResults[index].createAddresses;
-
   return {
-    transactionHash: bufferToRpcData(tx.hash()),
-    transactionIndex: numberToRpcQuantity(index),
-    blockHash: bufferToRpcData(block.hash()),
-    blockNumber: numberToRpcQuantity(new BN(block.header.number)),
-    from: bufferToRpcData(tx.getSenderAddress()),
-    to: tx.to.length === 0 ? null : bufferToRpcData(tx.to),
-    cumulativeGasUsed: numberToRpcQuantity(cumulativeGasUsed),
-    gasUsed: numberToRpcQuantity(new BN(receipt.gasUsed)),
-    contractAddress:
-      createdAddress !== undefined ? bufferToRpcData(createdAddress) : null,
-    logs: receipt.logs,
-    logsBloom: bufferToRpcData(txBlockResults[index].bloomBitvector),
+    transactionHash: bufferToRpcData(receipt.txHash),
+    blockHash:
+      receipt.blockHash === undefined
+        ? undefined
+        : bufferToRpcData(receipt.blockHash),
+    blockNumber:
+      receipt.blockNumber === undefined
+        ? undefined
+        : numberToRpcQuantity(receipt.blockNumber),
+    transactionIndex:
+      receipt.transactionIndex === undefined
+        ? undefined
+        : numberToRpcQuantity(receipt.transactionIndex),
+    from: receipt.from.toString(),
+    to: receipt.to?.toString(),
+    contractAddress: receipt.createdAddress?.toString(),
     status: numberToRpcQuantity(receipt.status),
+    gasUsed: numberToRpcQuantity(receipt.gasUsed),
+    cumulativeGasUsed: numberToRpcQuantity(receipt.cumulativeGasUsed),
+    effectiveGasPrice:
+      receipt.effectiveGasPrice === undefined
+        ? undefined
+        : numberToRpcQuantity(receipt.effectiveGasPrice),
+    logsBloom: bufferToRpcData(receipt.logsBloom),
+    logs: receipt.logs.map((log) => getRpcLog(log)),
   };
 }
 
-export function getRpcLog(
-  log: any[],
-  tx: Transaction,
-  block?: Block,
-  transactionIndex?: number,
-  logIndex?: number
-): RpcLogOutput {
+export function getRpcLog(log: QrlLogLike): RpcLogOutput {
   return {
-    removed: false,
-    logIndex: logIndex !== undefined ? numberToRpcQuantity(logIndex) : null,
-    transactionIndex:
-      transactionIndex !== undefined
-        ? numberToRpcQuantity(transactionIndex)
-        : null,
-    transactionHash: block !== undefined ? bufferToRpcData(tx.hash()) : null,
-    blockHash: block !== undefined ? bufferToRpcData(block.hash()) : null,
+    address: log.address.toString(),
+    topics: log.topics.map((topic) => bufferToRpcData(topic)),
+    data: bufferToRpcData(log.data),
     blockNumber:
-      block !== undefined
-        ? numberToRpcQuantity(new BN(block.header.number))
-        : null,
-    address: bufferToRpcData(log[0]),
-    data: bufferToRpcData(log[2]),
-    topics: log[1].map((topic: Buffer) => bufferToRpcData(topic)),
+      log.blockNumber === undefined
+        ? undefined
+        : numberToRpcQuantity(log.blockNumber),
+    transactionHash:
+      log.txHash === undefined ? undefined : bufferToRpcData(log.txHash),
+    transactionIndex:
+      log.txIndex === undefined ? undefined : numberToRpcQuantity(log.txIndex),
+    blockHash:
+      log.blockHash === undefined ? undefined : bufferToRpcData(log.blockHash),
+    logIndex:
+      log.index === undefined ? undefined : numberToRpcQuantity(log.index),
+    removed: log.removed,
   };
+}
+
+export function getRpcDebugTrace(
+  result: { gasUsed: bigint; returnValue: Uint8Array; failed: boolean },
+  steps: QrlRawStructLogOutputInput[],
+  opcodeName: (opcode: number) => string
+): RpcDebugTraceOutput {
+  return {
+    gas: Number(result.gasUsed),
+    failed: result.failed,
+    returnValue: Buffer.from(result.returnValue).toString("hex"),
+    structLogs: steps.map((step) => {
+      const output: RpcStructLogOutput = {
+        pc: step.pc,
+        op: opcodeName(step.opcode),
+        gas: Number(step.gasLeft),
+        gasCost: Number(step.gasCost),
+        depth: step.depth + 1,
+      };
+      if (step.stack !== undefined) {
+        output.stack = step.stack.map(
+          (value) => `0x${(value as any).toString(16)}`
+        );
+      }
+      if (step.memory !== undefined) {
+        output.memory = getRpcTraceMemory(step.memory);
+      }
+      return output;
+    }),
+  };
+}
+
+function getRpcTraceMemory(memory: Uint8Array): string[] {
+  const words: string[] = [];
+  for (let offset = 0; offset < memory.length; offset += 64) {
+    words.push(
+      Buffer.from(memory.slice(offset, offset + 64))
+        .toString("hex")
+        .padEnd(128, "0")
+    );
+  }
+  return words;
 }

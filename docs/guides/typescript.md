@@ -1,200 +1,168 @@
-# TypeScript Support
+# TypeScript projects
 
-In this guide, we will go through the steps to get a Buidler project working with TypeScript. This means that you can write your Buidler config, tasks, scripts and tests in [TypeScript](https://www.typescriptlang.org/). For a general overview of using Buidler refer to the [Getting started guide](../getting-started).
+QRL Hardhat can load TypeScript config files, discover TypeScript tests, and run
+TypeScript scripts when `typescript` and `ts-node` are installed in the project.
+This support is for QRL and Hyperion workflows; it does not add Ethers, Waffle,
+Truffle, Solidity, or Ethereum-specific plugins.
 
-## Installing dependencies
+## Install TypeScript support
 
-Buidler detects if `typescript` and `ts-node` are installed in its npm project,
-and automatically enables TypeScript support.
+Install QRL Hardhat together with TypeScript and ts-node:
 
-To install them, open your terminal, go to your Buidler project, and run:
+~~~sh
+npm install --save-dev @theqrl/hardhat typescript ts-node
+~~~
 
-```
-npm install --save-dev ts-node typescript
-```
+Add Node.js and Mocha types if your config, tests, or scripts use Node
+globals such as `process`, or Mocha globals such as `describe` and `it`:
 
-You also need these packages:
+~~~sh
+npm install --save-dev @types/node @types/mocha
+~~~
 
-```
-npm install --save-dev chai @types/node @types/mocha @types/chai
-```
+TypeScript support is detected from the local project installation. Do not rely
+on a global Hardhat installation for TypeScript projects.
 
-## Configuration
+## tsconfig.json
 
-Let's get started with a fresh Buidler project. Run `npx buidler` and go through the steps to create a sample project. When you're done your project directory should look like this:
+A small project config is enough for Hardhat config files, tests, and scripts:
 
-```
-$ ls -l
-total 400
--rw-r--r--    1 fzeoli  staff     195 Jul 30 15:27 buidler.config.js
-drwxr-xr-x    3 fzeoli  staff      96 Jul 30 15:27 contracts
-drwxr-xr-x  502 fzeoli  staff   16064 Jul 30 15:31 node_modules
--rw-r--r--    1 fzeoli  staff  194953 Jul 30 15:31 package-lock.json
--rw-r--r--    1 fzeoli  staff     365 Jul 30 15:31 package.json
-drwxr-xr-x    3 fzeoli  staff      96 Jul 30 15:27 scripts
-drwxr-xr-x    3 fzeoli  staff      96 Jul 30 15:27 test
-```
-
-Now we are going to rename the config file from `buidler.config.js` to `buidler.config.ts`, run:
-
-```
-mv buidler.config.js buidler.config.ts
-```
-
-We also need to adapt it to explicitly import the Buidler config DSL, and use the [Buidler Runtime Environment] explicitly.
-
-For example, the sample project's config turns from this
-```js{5,13}
-usePlugin("@nomiclabs/buidler-waffle");
-
-// This is a sample Buidler task. To learn how to create your own go to
-// https://buidler.dev/guides/create-task.html
-task("accounts", "Prints the list of accounts", async () => {
-  const accounts = await ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(await account.getAddress());
-  }
-});
-
-module.exports = {};
-``` 
-
-into this
-
-```typescript{1,7,8,15}
-import { task, usePlugin } from "@nomiclabs/buidler/config";
-
-usePlugin("@nomiclabs/buidler-waffle");
-
-// This is a sample Buidler task. To learn how to create your own go to
-// https://buidler.dev/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, bre) => {
-  const accounts = await bre.ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(await account.getAddress());
-  }
-});
-
-export default {};
-```
-
-
-Next, create a file `tsconfig.json` in your project directory and put the following in it:
-
-```json
+~~~json
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2019",
     "module": "commonjs",
-    "strict": true,
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "outDir": "dist"
+    "resolveJsonModule": true,
+    "strict": true,
+    "types": ["node", "mocha"]
   },
-  "include": ["./scripts", "./test"],
-  "files": [
-    "./buidler.config.ts"
-  ]
+  "include": ["hardhat.config.ts", "scripts", "test"]
 }
-```
+~~~
 
-And that's really all it takes. Now the configuration file will be run as TypeScript.
+QRL Hardhat sets `TS_NODE_FILES=true` when it loads TypeScript support, so
+`ts-node` reads files from `tsconfig.json` during config, task, and script
+execution.
 
-## Type-safe configuration
+## hardhat.config.ts
 
-One of the advantages of using TypeScript, is that you can have an type-safe configuration, and avoid typos and other common errors.
+Use `hardhat.config.ts` instead of `hardhat.config.js`:
 
-To do that, you have to write your config in TypeScript in this way:
+~~~ts
+import { task } from "@theqrl/hardhat/config";
 
-```ts
-import { BuidlerConfig } from "@nomiclabs/buidler/config";
+const localAccountAddress = "Q" + "01".repeat(64);
+const accounts =
+  process.env.QRL_ACCOUNT_SEED === undefined
+    ? []
+    : [process.env.QRL_ACCOUNT_SEED];
 
-const config: BuidlerConfig = {
-  // Your type-safe config goes here
-};
-
-export default config;
-```
-
-## Plugin type extensions
-
-Some Buidler plugins, like [buidler-waffle](https://github.com/nomiclabs/buidler/tree/master/packages/buidler-waffle) and [buidler-ethers](https://github.com/nomiclabs/buidler/tree/master/packages/buidler-ethers), add new properties to the [Buidler Runtime Environment]. To keep everything type-safe and make using them with TypeScript possible, they provide type extension files.
-
-For these to be taken into account, you'll need to add the type extension files to the `files` field in your `tsconfig.json`, like this:
-
-```json
-"files": [
-  "./buidler.config.ts",
-  "./node_modules/@nomiclabs/buidler-ethers/src/type-extensions.d.ts",
-  "./node_modules/@nomiclabs/buidler-waffle/src/type-extensions.d.ts"
-]
-```
-
-Plugins that include type extensions should have documentation detailing their existance and the path to the type extension file.
-
-## Writing tests and scripts
-
-To write your smart contract tests and scripts you'll most likely need access to an Ethereum library to interact with your smart contracts. This will probably be one of [buidler-ethers](https://github.com/nomiclabs/buidler/tree/master/packages/buidler-ethers) or [buidler-web3](https://github.com/nomiclabs/buidler/tree/master/packages/buidler-web3), all of which inject instances into the [Buidler Runtime Environment].
-
-When using JavaScript, all the properties in the BRE are injected into the global scope, and are also available by getting the BRE explicitly. When using TypeScript nothing will be available in the global scope and you will need to import everything explicitly.
-
-An example for tests:
-
-```typescript
-import { ethers } from "@nomiclabs/buidler";
-
-describe("Token", function() {
-  let accounts: string[];
-
-  beforeEach(async function() {
-    accounts = await ethers.eth.getSigners();
-  });
-
-  it("should do something right", async function() {
-    // Do something with the accounts
-  });
+task("accounts", "Prints QRL accounts", async (_, { network }) => {
+  const qrlAccounts = await network.provider.send("qrl_accounts");
+  for (const address of qrlAccounts) {
+    console.log(address);
+  }
 });
 
-```
+export default {
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
+  networks: {
+    hardhatqrlvm: {
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [
+        {
+          address: localAccountAddress,
+          balance: "1000000000000000000000000",
+        },
+      ],
+      blockGasLimit: 30000000,
+    },
+    qrl: {
+      url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
+      accounts,
+    },
+  },
+};
+~~~
 
-An example for scripts:
+QRL Hardhat looks for `hardhat.config.ts` before `hardhat.config.js` when
+TypeScript support is available.
 
-```typescript
-import { run, ethers } from "@nomiclabs/buidler";
+## TypeScript tests
+
+The `test` task discovers both `.js` and `.ts` files under the configured tests
+path:
+
+~~~text
+test/
+  sample-test.ts
+~~~
+
+For type-checked tests, import the runtime object explicitly:
+
+~~~ts
+import { strict as assert } from "assert";
+import hre from "@theqrl/hardhat";
+
+describe("network", function () {
+  it("returns QRL accounts", async function () {
+    const accounts = await hre.network.provider.send("qrl_accounts");
+    assert.ok(Array.isArray(accounts));
+  });
+});
+~~~
+
+Run it like any other QRL Hardhat test:
+
+~~~sh
+npx hardhat test --network hardhatqrlvm
+~~~
+
+Hardhat also injects runtime globals such as `network` and `qrl` when tests
+run, but explicit `hre` imports are easier to type-check in strict projects.
+
+## TypeScript scripts
+
+TypeScript scripts can be run with `hardhat run`:
+
+~~~ts
+import hre from "@theqrl/hardhat";
 
 async function main() {
-  await run("compile");
+  const Sample = await hre.qrl.getContractFactory("Sample");
+  const sample = await Sample.deploy();
 
-  const accounts = await ethers.eth.getSigners();
-
-  console.log("Accounts:", accounts);
+  console.log("Contract:", sample.address);
+  console.log("Transaction:", sample.deployTransactionHash);
 }
 
 main()
   .then(() => process.exit(0))
-  .catch(error => {
+  .catch((error) => {
     console.error(error);
     process.exit(1);
   });
-```
+~~~
 
-## Performance optimizations
+Run the script with the selected QRL network:
 
-Under the hood, Buidler uses [ts-node](https://www.npmjs.com/package/ts-node) to support TypeScript. By default, it
-will recompile and type-check everything on every run. Depending on your project's size, this can get slow.
+~~~sh
+npx hardhat run scripts/deploy.ts --network hardhatqrlvm
 
-You can make Buidler run faster by preventing `ts-node` from type-checking your project. This is done by setting the
-`TS_NODE_TRANSPILE_ONLY` en variable to `1`. For example, you can run your TypeScript-based tests faster like this
-`TS_NODE_TRANSPILE_ONLY=1 npx buidler test`.
-
-## `ts-node` support
-
-When running Buidler scripts without the CLI, you need to use `ts-node`'s [`--files` flag](https://www.npmjs.com/package/ts-node#help-my-types-are-missing).
-This can also be enabled with `TS_NODE_FILES=true`. 
+QRL_RPC_URL=http://127.0.0.1:33462 \
+QRL_ACCOUNT_SEED=<qrl-extended-seed> \
+npx hardhat run scripts/deploy.ts --network qrl
+~~~
 
 ## Limitations
 
-To use Buidler with TypeScript you need to be able to import Buidler from your project to access the [Buidler Runtime Environment], and this wouldn't be possible with a global installation. Because of this Buidler only supports TypeScript on local installations.
-
-[Buidler runtime environment]: ../advanced/buidler-runtime-environment.md
+- TypeScript support depends on local `typescript` and `ts-node` packages.
+- The global Hardhat execution mode does not enable TypeScript project support.
+- This fork does not provide Ethereum plugin type extensions such as Ethers or
+  Waffle helpers.
+- QRL contract helpers live under `hre.qrl` and use QRL addresses and `qrl_*`
+  JSON-RPC methods.

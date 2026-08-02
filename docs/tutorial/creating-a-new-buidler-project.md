@@ -1,76 +1,110 @@
-# 3. Creating a new Buidler project
+# 3. Creating a new QRL Hardhat project
 
-We'll install **Buidler** using the npm CLI. The **N**ode.js **p**ackage **m**anager is a package manager and an online repository for JavaScript code.
+We will install QRL Hardhat using the npm CLI. The Node.js package manager is
+used to create the project and install JavaScript dependencies.
 
 Open a new terminal and run these commands:
 
-```
-mkdir buidler-tutorial 
-cd buidler-tutorial 
-npm init --yes 
-npm install --save-dev @nomiclabs/buidler 
+```sh
+mkdir qrl-hardhat-tutorial
+cd qrl-hardhat-tutorial
+npm init --yes
+npm install --save-dev @theqrl/hardhat
 ```
 
 ::: tip
-Installing **Buidler** will install some Ethereum JavaScript dependencies, so be patient.
+Installing QRL Hardhat may install native and QRL JavaScript dependencies, so be
+patient.
 :::
 
-In the same directory where you installed **Buidler** run:
+Create a `hardhat.config.js` file in the project root:
 
+```js
+task("accounts", "Prints QRL accounts", async (_, { network }) => {
+  const accounts = await network.provider.send("qrl_accounts");
+  for (const address of accounts) {
+    console.log(address);
+  }
+});
+
+const accounts =
+  process.env.QRL_ACCOUNT_SEED === undefined
+    ? []
+    : [process.env.QRL_ACCOUNT_SEED];
+
+const localAccounts = [
+  { address: "Q" + "01".repeat(64), balance: "1000000000000" },
+  { address: "Q" + "02".repeat(64), balance: "1000000000000" },
+  { address: "Q" + "03".repeat(64), balance: "1000000000000" },
+];
+
+module.exports = {
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
+  networks: {
+    hardhatqrlvm: {
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccounts[0].address,
+      accounts: localAccounts,
+      blockGasLimit: 30000000,
+    },
+    qrl: {
+      url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
+      accounts,
+    },
+  },
+};
 ```
-npx buidler
-```
 
-Select `Create an empty buidler.config.js` with your keyboard and hit enter.
+When QRL Hardhat is run, it searches for the closest `hardhat.config.js` file
+starting from the current working directory. This file normally lives in the
+root of your project and contains your tasks, compiler settings, and network
+configuration.
 
+## QRL Hardhat's architecture
 
-```{15}
-$ npx buidler
-888               d8b      888 888
-888               Y8P      888 888
-888                        888 888
-88888b.  888  888 888  .d88888 888  .d88b.  888d888
-888 "88b 888  888 888 d88" 888 888 d8P  Y8b 888P"
-888  888 888  888 888 888  888 888 88888888 888
-888 d88P Y88b 888 888 Y88b 888 888 Y8b.     888
-88888P"   "Y88888 888  "Y88888 888  "Y8888  888
-
-👷 Welcome to Buidler v1.0.0 👷‍‍
-
-? What do you want to do? …
-  Create a sample project
-❯ Create an empty buidler.config.js
-  Quit
-```
-
-When **Buidler** is run, it searches for the closest `buidler.config.js` file starting from the current working directory. This file normally lives in the root of your project and an empty `buidler.config.js` is enough for **Buidler** to work. The entirety of your setup is contained in this file.
-
-## Buidler's architecture
-
-**Buidler** is designed around the concepts of **tasks** and **plugins**. The bulk of **Buidler**'s functionality comes from plugins, which as a developer [you're free to choose](/plugins/) the ones you want to use. 
+QRL Hardhat is designed around the concepts of **tasks**, the **Hardhat Runtime
+Environment**, and QRL network providers.
 
 ### Tasks
-Every time you're running **Buidler** from the CLI you're running a task. e.g. `npx buidler compile` is running the `compile` task. To see the currently available tasks in your project, run `npx buidler`. Feel free to explore any task by running `npx buidler help [task]`. 
+
+Every time you run QRL Hardhat from the CLI you are running a task. For example,
+`npx hardhat compile` runs the `compile` task. To see the currently available
+tasks in your project, run:
+
+```sh
+npx hardhat
+```
+
+You can inspect a task with:
+
+```sh
+npx hardhat help compile
+```
 
 ::: tip
-You can create your own tasks. Check out the [Creating a task](/guides/create-task.md) guide.
+You can create your own tasks. Check out the
+[Creating a task](../guides/create-task.md) guide.
 :::
 
-### Plugins
-**Buidler** is unopinionated in terms of what tools you end up using, but it does come with some built-in defaults. All of which can be overriden. Most of the time the way to use a given tool is by consuming a plugin that integrates it into **Buidler**.
+### Runtime helpers
 
-For this tutorial we are going to use the Ethers.js and Waffle plugins. They'll allow you to interact with Ethereum and to test your contracts. We'll explain how they're used later on. To install them, in your project directory run:
+QRL Hardhat exposes QRL-specific helpers through the Hardhat Runtime
+Environment. In tests, scripts, and tasks you will use `qrl` to deploy
+contracts, get contract instances, encode calls, and wait for transaction
+receipts.
 
-```
-npm install --save-dev @nomiclabs/buidler-ethers ethers @nomiclabs/buidler-waffle ethereum-waffle chai
-```
+The most common helpers are:
 
-Add the highlighted line to your `buidler.config.js` so that it looks like this:
-
-```js {1}
-usePlugin("@nomiclabs/buidler-waffle");
-
-module.exports = {};
+```js
+const Factory = await qrl.getContractFactory("Token");
+const token = await Factory.deploy();
+console.log(token.address);
 ```
 
-We're only invoking `buidler-waffle` here because it depends on `buidler-ethers` so adding both isn't necessary.
+`deploy()` waits for the deployment receipt and returns a ready-to-use
+contract wrapper. To connect to an already deployed contract, use
+`qrl.getContractAt("Token", address)`.
+
+You will use these helpers throughout the rest of the tutorial.
+

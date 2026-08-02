@@ -1,0 +1,12 @@
+pragma hyperion >=0.0;
+
+import "@theqrl/hardhat/console.hyp";
+
+contract C {
+
+  function test() public {
+    console.log(1);
+    require(false, "req");
+  }
+
+}

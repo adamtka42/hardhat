@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C"
     },
     {
@@ -14,7 +14,7 @@
           "type": "FUNCTION_NOT_PAYABLE_ERROR",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "a",
             "line": 6
           },

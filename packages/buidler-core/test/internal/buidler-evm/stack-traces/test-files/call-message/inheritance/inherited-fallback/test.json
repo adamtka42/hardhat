@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C"
     },
     {
@@ -12,7 +12,7 @@
           "message": "inherited fallback",
           "sourceReference": {
             "contract": "C",
-            "file": "d.sol",
+            "file": "d.hyp",
             "function": "<fallback>",
             "line": 6
           }

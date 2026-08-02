@@ -1,239 +1,158 @@
-import { bufferToHex, bufferToInt, fromSigned } from "ethereumjs-util";
-import util from "util";
+import { keccak_256 } from "js-sha3";
 
-import {
-  AddressTy,
-  BoolTy,
-  Bytes10Ty,
-  Bytes11Ty,
-  Bytes12Ty,
-  Bytes13Ty,
-  Bytes14Ty,
-  Bytes15Ty,
-  Bytes16Ty,
-  Bytes17Ty,
-  Bytes18Ty,
-  Bytes19Ty,
-  Bytes1Ty,
-  Bytes20Ty,
-  Bytes21Ty,
-  Bytes22Ty,
-  Bytes23Ty,
-  Bytes24Ty,
-  Bytes25Ty,
-  Bytes26Ty,
-  Bytes27Ty,
-  Bytes28Ty,
-  Bytes29Ty,
-  Bytes2Ty,
-  Bytes30Ty,
-  Bytes31Ty,
-  Bytes32Ty,
-  Bytes3Ty,
-  Bytes4Ty,
-  Bytes5Ty,
-  Bytes6Ty,
-  Bytes7Ty,
-  Bytes8Ty,
-  Bytes9Ty,
-  BytesTy,
-  ByteTy,
-  ConsoleLogs,
-  IntTy,
-  StringTy,
-  UintTy,
-} from "./logger";
-import {
-  CallMessageTrace,
-  EvmMessageTrace,
-  isCallTrace,
-  isEvmStep,
-  isPrecompileTrace,
-  MessageTrace,
-} from "./message-trace";
+import { decodeQrlFunctionResult, getFunctionSignature } from "../../qrl/abi";
 
-const CONSOLE_ADDRESS = "0x000000000000000000636F6e736F6c652e6c6f67"; // toHex("console.log")
-const REGISTER_SIZE = 32;
+import { CONSOLE_LOG_SIGNATURES } from "./logger";
 
-interface ConsoleLogArray extends Array<ConsoleLogEntry> {}
+/** Address observed by Hardhat for calls emitted from `console.hyp`. */
+export const QRL_CONSOLE_LOG_ADDRESS = `Q${"0".repeat(
+  98
+)}71726c2e636f6e736f6c652e6c6f67`;
 
-export type ConsoleLogEntry = string | ConsoleLogArray;
+interface QrlConsoleCallFrame {
+  kind: string;
+  target?: { toString(): string };
+  input: Uint8Array;
+  value: bigint;
+}
 
-export type ConsoleLogs = ConsoleLogEntry[];
-
-export class ConsoleLogger {
-  private readonly _consoleLogs: {
-    [key: number]: string[];
-  } = {};
-
-  constructor() {
-    this._consoleLogs = ConsoleLogs;
+/**
+ * Builds a Hardhat-owned observer on top of qrljs's generic frame events.
+ * The VM still executes the empty-account call normally; this only surfaces
+ * its calldata to local development tooling.
+ */
+export function createQrlConsoleLogTraceListener(
+  listener: ((input: Uint8Array) => void) | undefined
+): any | undefined {
+  if (listener === undefined) {
+    return undefined;
   }
 
-  public getLogMessages(maybeDecodedMessageTrace: MessageTrace): string[] {
-    return this.getExecutionLogs(maybeDecodedMessageTrace).map((log) => {
-      if (log === undefined) {
-        return "";
-      }
-
-      return util.format(log[0], ...log.slice(1));
-    });
-  }
-
-  public getExecutionLogs(
-    maybeDecodedMessageTrace: MessageTrace
-  ): ConsoleLogs[] {
-    if (isPrecompileTrace(maybeDecodedMessageTrace)) {
-      return [];
-    }
-
-    const logs: ConsoleLogs[] = [];
-    this._collectExecutionLogs(maybeDecodedMessageTrace, logs);
-    return logs;
-  }
-
-  private _collectExecutionLogs(trace: EvmMessageTrace, logs: ConsoleLogs) {
-    for (const messageTrace of trace.steps) {
-      if (isEvmStep(messageTrace) || isPrecompileTrace(messageTrace)) {
-        continue;
-      }
-
+  return {
+    enterFrame: (frame: QrlConsoleCallFrame) => {
       if (
-        isCallTrace(messageTrace) &&
-        bufferToHex(messageTrace.address) === CONSOLE_ADDRESS.toLowerCase()
+        (frame.kind === "call" || frame.kind === "staticcall") &&
+        frame.value === (global as any).BigInt(0) &&
+        frame.target?.toString().toLowerCase() ===
+          QRL_CONSOLE_LOG_ADDRESS.toLowerCase()
       ) {
-        const log = this._maybeConsoleLog(messageTrace);
-        if (log !== undefined) {
-          logs.push(log);
+        try {
+          listener(frame.input);
+        } catch {
+          // Development logging must never affect contract execution.
         }
-
-        continue;
       }
+    },
+  };
+}
 
-      this._collectExecutionLogs(messageTrace, logs);
-    }
+// The selector map is GENERATED together with console.hyp from one type
+// matrix (scripts/console-library-generator.js), so the library and the
+// decoder cannot drift apart. A unit test regenerates and compares both.
+const CONSOLE_LOG_TYPE_SETS: string[][] = CONSOLE_LOG_SIGNATURES.map(
+  ([, types]) => types
+);
+
+// Synthetic ABI reusing the standard QRL ABI machinery: the log argument
+// types double as outputs so `decodeQrlFunctionResult` can decode the call
+// body, while the inputs make `getFunctionSignature` produce the canonical
+// `log(...)` signature the selectors are derived from.
+const CONSOLE_LOG_ABI = CONSOLE_LOG_TYPE_SETS.map((types) => ({
+  type: "function",
+  name: "log",
+  inputs: types.map((type, index) => ({ name: `p${index}`, type })),
+  outputs: types.map((type, index) => ({ name: `p${index}`, type })),
+  stateMutability: "view",
+}));
+
+interface ConsoleLogEntry {
+  signature: string;
+  types: string[];
+}
+
+const SELECTOR_TO_ENTRY: Map<string, ConsoleLogEntry> = new Map(
+  CONSOLE_LOG_ABI.map((fragment, index) => {
+    const signature = getFunctionSignature(fragment);
+    const selector = keccak_256(signature).slice(0, 8);
+    return [selector, { signature, types: CONSOLE_LOG_TYPE_SETS[index] }];
+  })
+);
+
+export function getConsoleLogSelectors(): Map<string, ConsoleLogEntry> {
+  return new Map(SELECTOR_TO_ENTRY);
+}
+
+function formatConsoleLogValue(type: string, value: any): string {
+  if (type === "string") {
+    return String(value);
   }
 
-  private _maybeConsoleLog(call: CallMessageTrace): ConsoleLogs | undefined {
-    const sig = bufferToInt(call.calldata.slice(0, 4));
-    const parameters = call.calldata.slice(4);
-
-    const types = this._consoleLogs[sig];
-    if (types === undefined) {
-      return;
-    }
-
-    return this._decode(parameters, types);
+  if (type === "bool") {
+    return value === true ? "true" : "false";
   }
 
-  private _decode(data: Buffer, types: string[]): ConsoleLogs {
-    return types.map((type, i) => {
-      const position = i * 32;
-      switch (types[i]) {
-        case UintTy:
-        case IntTy:
-          return fromSigned(
-            data.slice(position, position + REGISTER_SIZE)
-          ).toString();
-
-        case BoolTy:
-          if (data[position + 31] !== 0) {
-            return "true";
-          }
-          return "false";
-
-        case StringTy:
-          const sStart = bufferToInt(
-            data.slice(position, position + REGISTER_SIZE)
-          );
-          const sLen = bufferToInt(data.slice(sStart, sStart + REGISTER_SIZE));
-          return data
-            .slice(sStart + REGISTER_SIZE, sStart + REGISTER_SIZE + sLen)
-            .toString();
-
-        case AddressTy:
-          return bufferToHex(
-            data.slice(position + 12, position + REGISTER_SIZE)
-          );
-
-        case BytesTy:
-          const bStart = bufferToInt(
-            data.slice(position, position + REGISTER_SIZE)
-          );
-          const bLen = bufferToInt(data.slice(bStart, bStart + REGISTER_SIZE));
-          return bufferToHex(
-            data.slice(bStart + REGISTER_SIZE, bStart + REGISTER_SIZE + bLen)
-          );
-
-        case ByteTy:
-        case Bytes1Ty:
-          return bufferToHex(data.slice(position, position + 1));
-        case Bytes2Ty:
-          return bufferToHex(data.slice(position, position + 2));
-        case Bytes3Ty:
-          return bufferToHex(data.slice(position, position + 3));
-        case Bytes4Ty:
-          return bufferToHex(data.slice(position, position + 4));
-        case Bytes5Ty:
-          return bufferToHex(data.slice(position, position + 5));
-        case Bytes6Ty:
-          return bufferToHex(data.slice(position, position + 6));
-        case Bytes7Ty:
-          return bufferToHex(data.slice(position, position + 7));
-        case Bytes8Ty:
-          return bufferToHex(data.slice(position, position + 8));
-        case Bytes9Ty:
-          return bufferToHex(data.slice(position, position + 9));
-        case Bytes10Ty:
-          return bufferToHex(data.slice(position, position + 10));
-        case Bytes11Ty:
-          return bufferToHex(data.slice(position, position + 11));
-        case Bytes12Ty:
-          return bufferToHex(data.slice(position, position + 12));
-        case Bytes13Ty:
-          return bufferToHex(data.slice(position, position + 13));
-        case Bytes14Ty:
-          return bufferToHex(data.slice(position, position + 14));
-        case Bytes15Ty:
-          return bufferToHex(data.slice(position, position + 15));
-        case Bytes16Ty:
-          return bufferToHex(data.slice(position, position + 16));
-        case Bytes17Ty:
-          return bufferToHex(data.slice(position, position + 17));
-        case Bytes18Ty:
-          return bufferToHex(data.slice(position, position + 18));
-        case Bytes19Ty:
-          return bufferToHex(data.slice(position, position + 19));
-        case Bytes20Ty:
-          return bufferToHex(data.slice(position, position + 20));
-        case Bytes21Ty:
-          return bufferToHex(data.slice(position, position + 21));
-        case Bytes22Ty:
-          return bufferToHex(data.slice(position, position + 22));
-        case Bytes23Ty:
-          return bufferToHex(data.slice(position, position + 23));
-        case Bytes24Ty:
-          return bufferToHex(data.slice(position, position + 24));
-        case Bytes25Ty:
-          return bufferToHex(data.slice(position, position + 25));
-        case Bytes26Ty:
-          return bufferToHex(data.slice(position, position + 26));
-        case Bytes27Ty:
-          return bufferToHex(data.slice(position, position + 27));
-        case Bytes28Ty:
-          return bufferToHex(data.slice(position, position + 28));
-        case Bytes29Ty:
-          return bufferToHex(data.slice(position, position + 29));
-        case Bytes30Ty:
-          return bufferToHex(data.slice(position, position + 30));
-        case Bytes31Ty:
-          return bufferToHex(data.slice(position, position + 31));
-        case Bytes32Ty:
-          return bufferToHex(data.slice(position, position + 32));
-
-        default:
-          return "";
-      }
-    });
+  // Integers decode to BN-like values (int256 may be negative); address,
+  // bytes, and bytesN decode to their canonical string forms (checksummed
+  // Q-address / 0x-hex).
+  if (type.startsWith("uint") || type.startsWith("int")) {
+    return value.toString(10);
   }
+
+  return String(value);
+}
+
+/**
+ * Decodes the raw calldata of a contract console log call into a printable
+ * line, or returns `undefined` for unknown selectors or undecodable bodies.
+ */
+export function decodeQrlConsoleLog(data: Uint8Array): string | undefined {
+  if (data.length < 4) {
+    return undefined;
+  }
+
+  const hex = Buffer.from(data).toString("hex");
+  const entry = SELECTOR_TO_ENTRY.get(hex.slice(0, 8));
+  if (entry === undefined) {
+    return undefined;
+  }
+
+  if (entry.types.length === 0) {
+    return "";
+  }
+
+  let values: any[];
+  try {
+    values = decodeQrlFunctionResult(
+      CONSOLE_LOG_ABI,
+      entry.signature,
+      `0x${hex.slice(8)}`
+    );
+  } catch {
+    return undefined;
+  }
+
+  return values
+    .map((value, index) => formatConsoleLogValue(entry.types[index], value))
+    .join(" ");
+}
+
+/**
+ * Decodes and prints one contract console log line. Unknown selectors are
+ * surfaced as a short diagnostic instead of being silently dropped.
+ * `process.stdout.write` is used so the output escapes test-runner console
+ * wrappers.
+ */
+export function printQrlConsoleLog(data: Uint8Array): void {
+  const line = decodeQrlConsoleLog(data);
+
+  if (line === undefined) {
+    const selector =
+      data.length >= 4
+        ? `0x${Buffer.from(data.slice(0, 4)).toString("hex")}`
+        : `0x${Buffer.from(data).toString("hex")}`;
+    process.stdout.write(`console.log <unknown selector ${selector}>\n`);
+    return;
+  }
+
+  process.stdout.write(`${line}\n`);
 }

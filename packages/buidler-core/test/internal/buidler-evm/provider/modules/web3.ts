@@ -1,39 +1,52 @@
 import { assert } from "chai";
-import { keccak256, toBuffer } from "ethereumjs-util";
 
-import { bufferToRpcData } from "../../../../../src/internal/buidler-evm/provider/output";
-import { setCWD } from "../../helpers/cwd";
-import { PROVIDERS } from "../../helpers/useProvider";
+import {
+  InvalidArgumentsError,
+  MethodNotFoundError,
+} from "../../../../../src/internal/buidler-evm/provider/errors";
+import { Web3Module } from "../../../../../src/internal/buidler-evm/provider/modules/web3";
 
 describe("Web3 module", function () {
-  PROVIDERS.forEach((provider) => {
-    describe(`Provider ${provider.name}`, function () {
-      setCWD();
-      provider.useProvider();
+  const module = new Web3Module();
 
-      describe("web3_clientVersion", async function () {
-        // TODO: We skip this test for now. See the note in this call's
-        //  implementation
-        it.skip("Should return the right value", async function () {
-          const res = await this.provider.send("web3_clientVersion");
-          assert.isTrue(
-            res.startsWith("BuidlerEVM/1.0.0-beta.13/ethereumjs-vm/4")
-          );
-        });
-      });
+  it("returns the QRL compatibility client version", async function () {
+    assert.strictEqual(
+      await module.processRequest("web3_clientVersion"),
+      "QRLLocalProvider/qrljs"
+    );
+  });
 
-      describe("web3_sha3", async function () {
-        it("Should return the keccak256 of the input", async function () {
-          const data = "0x123a1b238123";
-          const hashed = bufferToRpcData(keccak256(toBuffer(data)));
+  it("returns the keccak-256 hash of decoded input data", async function () {
+    assert.strictEqual(
+      await module.processRequest("web3_sha3", ["0x"]),
+      "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+    );
+    assert.strictEqual(
+      await module.processRequest("web3_sha3", ["0x123a1b238123"]),
+      "0xc622714c5813be4d0d8a944f9efc949485b298b52cb2c240598fdbcd4e0162a6"
+    );
+  });
 
-          const res = await this.provider.send("web3_sha3", [
-            bufferToRpcData(toBuffer(data)),
-          ]);
-
-          assert.strictEqual(res, hashed);
-        });
-      });
-    });
+  it("validates input data and rejects unknown methods", async function () {
+    await assertRejects(
+      () => module.processRequest("web3_sha3", ["0x1"]),
+      InvalidArgumentsError
+    );
+    await assertRejects(
+      () => module.processRequest("web3_unknown"),
+      MethodNotFoundError
+    );
   });
 });
+
+async function assertRejects(
+  action: () => Promise<unknown>,
+  errorType: new (...args: any[]) => Error
+): Promise<void> {
+  try {
+    await action();
+    assert.fail("Expected action to reject");
+  } catch (error) {
+    assert.instanceOf(error, errorType);
+  }
+}

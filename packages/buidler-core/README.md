@@ -1,54 +1,181 @@
-![](https://user-images.githubusercontent.com/232174/75543992-f1c39e00-5a1a-11ea-8fd4-8933638b5910.png)
-[![NPM Package](https://img.shields.io/npm/v/@nomiclabs/buidler.svg?style=flat-square)](https://www.npmjs.org/package/@nomiclabs/buidler)
-![Build Status](https://github.com/nomiclabs/buidler/workflows/CI/badge.svg)
----------
-Buidler is a task runner for Ethereum smart contract developers. It facilitates performing frequent tasks, such as running tests, automatically checking code for mistakes or interacting with a smart contract. Check out the [plugin list](https://buidler.dev/plugins/) to use it with your existing tools.
+# QRL Hardhat
 
-Developed by [Nomic Labs](https://nomiclabs.io/) and funded by an Ethereum Foundation grant.
+QRL Hardhat is a QRL-only smart contract development tool based on the upstream
+Hardhat/Buidler `v1.3.3` codebase.
 
-Join our [Buidler Telegram group](http://t.me/BuidlerSupport) to stay up to date on new releases, plugins and tutorials.
-
-🚧 **For the most recently published code, look at the [`master`](https://github.com/nomiclabs/buidler/tree/master) branch** 🚧
+It targets Hyperion `.hyp` contracts, QRL addresses, `qrl_*` JSON-RPC methods, local
+in-process tests through `hardhatqrlvm`, and live go-qrl HTTP networks.
 
 ## Installation
 
-### Local installation (recommended)
+~~~sh
+npm install --save-dev @theqrl/hardhat
+~~~
 
-The recommended way of using Buidler is through a local installation in your project. This way your environment will be reproducible and you will avoid future version conflicts. To use it in this way you will need to prepend `npx` to run it (i.e. `npx buidler`). To install locally initialize your `npm` project using `npm init` and follow the instructions. Once ready run:
+## Getting Started
 
-    npm install --save-dev @nomiclabs/buidler
+See the documentation index:
 
-### Global installation
+~~~text
+docs/README.md
+~~~
 
-Be careful about inconsistent behavior across different projects that use different Buidler versions.
+See the repository guide:
 
-    npm install --global @nomiclabs/buidler
-    
-If you choose to install Buidler globally, you have to do the same for its plugins and their dependencies.
+~~~text
+docs/getting-started.md
+~~~
 
-## Documentation
+The guide covers:
 
-On [Buidler's website](https://buidler.dev) you will find:
+- prerequisites and installation,
+- project layout,
+- `hardhatqrlvm` configuration,
+- HTTP go-qrl network configuration,
+- Hyperion `.hyp` compilation,
+- tests and deployment scripts,
+- `hre.qrl` runtime helpers,
+- overloaded function signatures,
+- common troubleshooting.
 
-- [Guides to get started](https://buidler.dev/getting-started/)
-- [Buidler EVM](https://buidler.dev/buidler-evm/)
-- [Plugin list](https://buidler.dev/plugins/)
-- [API docs](https://buidler.dev/api/)
+For the full configuration reference, see:
 
+~~~text
+docs/config/README.md
+~~~
 
-## Contributing
+For project setup, see:
 
-Contributions are always welcome! Feel free to open any issue or send a pull request.
+~~~text
+docs/guides/project-setup.md
+~~~
 
-Go to [CONTRIBUTING.md](./CONTRIBUTING.md) to learn about how to set up Buidler's development environment. 
+For hardhatqrlvm details, see:
 
-## Feedback, help and news
+~~~text
+docs/hardhat-qrlvm/README.md
+~~~
 
-[Buidler Support Telegram group](http://t.me/BuidlerSupport): for questions and feedback.
+For compile details, see:
 
-[Follow Nomic Labs on Twitter.](https://twitter.com/nomiclabs)
+~~~text
+docs/guides/compile-contracts.md
+~~~
 
+For deployment details, see:
 
-## Happy buidling!
+~~~text
+docs/guides/deploying.md
+~~~
 
-👷‍♀️👷‍♂️👷‍♀️👷‍♂️👷‍♀️👷‍♂️👷‍♀️👷‍♂️👷‍♀️👷‍♂️👷‍♀️👷‍♂️👷‍♀️👷‍♂️
+For script usage, see:
+
+~~~text
+docs/guides/scripts.md
+~~~
+
+For the interactive console, see:
+
+~~~text
+docs/guides/buidler-console.md
+~~~
+
+For TypeScript projects, see:
+
+~~~text
+docs/guides/typescript.md
+~~~
+
+For VS Code debugging, see:
+
+~~~text
+docs/guides/vscode-tests.md
+~~~
+
+For task automation, see:
+
+~~~text
+docs/guides/create-task.md
+~~~
+
+For plugin creation, see:
+
+~~~text
+docs/guides/create-plugin.md
+~~~
+
+For plugin development, see:
+
+~~~text
+docs/advanced/building-plugins.md
+~~~
+
+For plugin status and compatibility notes, see:
+
+~~~text
+docs/plugins/README.md
+~~~
+
+For troubleshooting, see:
+
+~~~text
+docs/troubleshooting/common-problems.md
+~~~
+
+For error codes, see:
+
+~~~text
+docs/troubleshooting/error-codes.md
+~~~
+
+For verbose logging, see:
+
+~~~text
+docs/troubleshooting/verbose-logging.md
+~~~
+
+For runtime helper details, see:
+
+~~~text
+docs/advanced/hardhat-runtime-environment.md
+~~~
+
+## Minimal Configuration
+
+~~~js
+const accounts =
+  process.env.QRL_ACCOUNT_SEED === undefined
+    ? []
+    : [process.env.QRL_ACCOUNT_SEED];
+
+const localAccountAddress = "Q" + "01".repeat(64);
+
+module.exports = {
+  defaultNetwork: process.env.HARDHAT_DEFAULT_NETWORK || "hardhatqrlvm",
+  networks: {
+    hardhatqrlvm: {
+      chainId: 1,
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      from: localAccountAddress,
+      accounts: [{ address: localAccountAddress, balance: "1000000000000" }],
+      blockGasLimit: 30000000,
+    },
+    qrl: {
+      url: process.env.QRL_RPC_URL || "http://127.0.0.1:33462",
+      accounts,
+    },
+  },
+};
+~~~
+
+Run tasks with:
+
+~~~sh
+npx hardhat compile
+npx hardhat test --network hardhatqrlvm
+npx hardhat run scripts/deploy.js --network qrl
+~~~
+
+Local signing uses QRL extended seeds and ML-DSA-87 via
+`@theqrl/web3-qrl-accounts`. Legacy mnemonic and raw-key account configs are
+intentionally unsupported.

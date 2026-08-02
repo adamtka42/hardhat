@@ -1,14 +1,14 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "stackTrace": [
         {
           "type": "RETURNDATA_SIZE_ERROR",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "constructor",
             "line": 9
           }

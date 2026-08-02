@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C"
     },
     {
@@ -13,7 +13,7 @@
           "type": "REVERT_ERROR",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "test",
             "line": 9
           }

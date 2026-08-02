@@ -1,6 +1,7 @@
-import { BN, isValidAddress, toBuffer } from "ethereumjs-util";
 import * as t from "io-ts";
 import { PathReporter } from "io-ts/lib/PathReporter";
+
+import { isValidQrlAddress, qrlAddressToBytes } from "../../qrl/address";
 
 import { InvalidArgumentsError } from "./errors";
 
@@ -16,46 +17,74 @@ function optional<TypeT, OutputT>(
   );
 }
 
-const isRpcQuantityString = (u: unknown) =>
+const isRpcQuantityString = (u: unknown): u is string =>
   typeof u === "string" &&
   u.match(/^0x(?:0|(?:[1-9a-fA-F][0-9a-fA-F]*))$/) !== null;
 
-const isRpcDataString = (u: unknown) =>
+const isRpcDataString = (u: unknown): u is string =>
   typeof u === "string" && u.match(/^0x(?:[0-9a-fA-F]{2})*$/) !== null;
 
-const isRpcHashString = (u: unknown) =>
+const isRpcHashString = (u: unknown): u is string =>
   typeof u === "string" && u.length === 66 && isRpcDataString(u);
 
-export const rpcQuantity = new t.Type<BN>(
+const isRpcTopicString = (u: unknown): u is string =>
+  typeof u === "string" && u.length === 130 && isRpcDataString(u);
+
+const rpcHexToBytes = (value: string): Uint8Array =>
+  Uint8Array.from(Buffer.from(value.slice(2), "hex"));
+
+export const rpcQuantity = new t.Type<bigint>(
   "QUANTITY",
-  BN.isBN,
+  (u): u is bigint => typeof u === "bigint",
   (u, c) =>
-    isRpcQuantityString(u) ? t.success(new BN(toBuffer(u))) : t.failure(u, c),
+    isRpcQuantityString(u)
+      ? t.success((global as any).BigInt(u))
+      : t.failure(u, c),
   t.identity
 );
 
-export const rpcData = new t.Type<Buffer>(
+export const rpcData = new t.Type<Uint8Array>(
   "DATA",
-  Buffer.isBuffer,
-  (u, c) => (isRpcDataString(u) ? t.success(toBuffer(u)) : t.failure(u, c)),
+  (u): u is Uint8Array => u instanceof Uint8Array,
+  (u, c) =>
+    isRpcDataString(u) ? t.success(rpcHexToBytes(u)) : t.failure(u, c),
   t.identity
 );
 
-export const rpcHash = new t.Type<Buffer>(
+export const rpcHash = new t.Type<Uint8Array>(
   "HASH",
-  Buffer.isBuffer,
-  (u, c) => (isRpcHashString(u) ? t.success(toBuffer(u)) : t.failure(u, c)),
+  (u): u is Uint8Array => u instanceof Uint8Array,
+  (u, c) =>
+    isRpcHashString(u) ? t.success(rpcHexToBytes(u)) : t.failure(u, c),
+  t.identity
+);
+
+export const rpcStorageKey = new t.Type<Uint8Array>(
+  "DATA_32",
+  (u): u is Uint8Array => u instanceof Uint8Array && u.length === 32,
+  (u, c) =>
+    typeof u === "string" && u.length === 66 && isRpcDataString(u)
+      ? t.success(rpcHexToBytes(u))
+      : t.failure(u, c),
+  t.identity
+);
+
+export const rpcTopic = new t.Type<Uint8Array>(
+  "TOPIC",
+  (u): u is Uint8Array => u instanceof Uint8Array,
+  (u, c) =>
+    isRpcTopicString(u) ? t.success(rpcHexToBytes(u)) : t.failure(u, c),
   t.identity
 );
 
 export const rpcUnknown = t.unknown;
 
-export const rpcAddress = new t.Type<Buffer>(
+export const rpcAddress = new t.Type<Uint8Array>(
   "ADDRESS",
-  Buffer.isBuffer,
+  (u): u is Uint8Array => u instanceof Uint8Array,
   (u, c) =>
-    typeof u === "string" && isValidAddress(u)
-      ? t.success(toBuffer(u))
+    typeof u === "string" && isValidQrlAddress(u)
+      ? t.success(qrlAddressToBytes(u))
       : t.failure(u, c),
   t.identity
 );
@@ -69,33 +98,42 @@ export const logAddress = t.union([
 export type LogAddress = t.TypeOf<typeof logAddress>;
 
 export const logTopics = t.union([
-  t.array(t.union([t.null, rpcHash, t.array(t.union([t.null, rpcHash]))])),
+  t.array(t.union([t.null, rpcTopic, t.array(t.union([t.null, rpcTopic]))])),
   t.undefined,
 ]);
 
 export type LogTopics = t.TypeOf<typeof logTopics>;
 
-export const optionalBlockTag = t.union([
+export const blockTag = t.union([
   rpcQuantity,
   t.keyof({
     earliest: null,
     latest: null,
     pending: null,
   }),
-  t.undefined,
 ]);
 
+export type BlockTag = t.TypeOf<typeof blockTag>;
+
+export const optionalBlockTag = t.union([blockTag, t.undefined]);
+
 export type OptionalBlockTag = t.TypeOf<typeof optionalBlockTag>;
+
+export const optionalBoolean = optional(t.boolean);
 
 export const rpcTransactionRequest = t.type(
   {
     from: rpcAddress,
     to: optional(rpcAddress),
     gas: optional(rpcQuantity),
+    gasLimit: optional(rpcQuantity),
     gasPrice: optional(rpcQuantity),
+    maxFeePerGas: optional(rpcQuantity),
+    maxPriorityFeePerGas: optional(rpcQuantity),
     value: optional(rpcQuantity),
     data: optional(rpcData),
     nonce: optional(rpcQuantity),
+    chainId: optional(rpcQuantity),
   },
   "RpcTransactionRequest"
 );
@@ -104,10 +142,14 @@ export interface RpcTransactionRequestInput {
   from: string;
   to?: string;
   gas?: string;
+  gasLimit?: string;
   gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
   value?: string;
   data?: string;
   nonce?: string;
+  chainId?: string;
 }
 
 export type RpcTransactionRequest = t.TypeOf<typeof rpcTransactionRequest>;
@@ -117,7 +159,10 @@ export const rpcCallRequest = t.type(
     from: optional(rpcAddress),
     to: optional(rpcAddress),
     gas: optional(rpcQuantity),
+    gasLimit: optional(rpcQuantity),
     gasPrice: optional(rpcQuantity),
+    maxFeePerGas: optional(rpcQuantity),
+    maxPriorityFeePerGas: optional(rpcQuantity),
     value: optional(rpcQuantity),
     data: optional(rpcData),
   },
@@ -128,7 +173,10 @@ export interface RpcCallRequestInput {
   from?: string;
   to: string;
   gas?: string;
+  gasLimit?: string;
   gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
   value?: string;
   data?: string;
 }
@@ -178,22 +226,52 @@ export function validateParams(
   params: any[],
   addr: typeof rpcAddress,
   data: typeof rpcData
-): [Buffer, Buffer];
+): [Uint8Array, Uint8Array];
 
 export function validateParams(
   params: any[],
   addr: typeof rpcAddress,
   block: typeof optionalBlockTag
-): [Buffer, OptionalBlockTag];
+): [Uint8Array, OptionalBlockTag];
+
+export function validateParams(
+  params: any[],
+  addr: typeof rpcAddress,
+  slot: typeof rpcStorageKey,
+  block: typeof optionalBlockTag
+): [Uint8Array, Uint8Array, OptionalBlockTag];
+
+export function validateParams(
+  params: any[],
+  hash: typeof rpcHash,
+  bool: typeof optionalBoolean
+): [Uint8Array, boolean | undefined];
+
+export function validateParams(
+  params: any[],
+  tag: typeof blockTag,
+  bool: typeof optionalBoolean
+): [BlockTag, boolean | undefined];
+
+export function validateParams(params: any[], tag: typeof blockTag): [BlockTag];
+
+export function validateParams(
+  params: any[],
+  value: typeof rpcHash | typeof rpcData
+): [Uint8Array];
+
+export function validateParams(
+  params: any[],
+  tag: typeof blockTag,
+  num: typeof rpcQuantity
+): [BlockTag, bigint];
 
 export function validateParams(
   params: any[],
   addr: typeof rpcAddress,
   slot: typeof rpcQuantity,
   block: typeof optionalBlockTag
-): [Buffer, BN, OptionalBlockTag];
-
-export function validateParams(params: any[], data: typeof rpcData): [Buffer];
+): [Uint8Array, bigint, OptionalBlockTag];
 
 export function validateParams(
   params: any[],
@@ -218,7 +296,7 @@ export function validateParams(
   params: any[],
   hash: typeof rpcHash,
   bool: typeof t.boolean
-): [Buffer, boolean];
+): [Uint8Array, boolean];
 
 export function validateParams(
   params: any[],
@@ -230,27 +308,30 @@ export function validateParams(
   params: any[],
   num: typeof rpcQuantity,
   bool: typeof t.boolean
-): [BN, boolean];
+): [bigint, boolean];
 
-export function validateParams(params: any[], num: typeof rpcQuantity): [BN];
+export function validateParams(
+  params: any[],
+  num: typeof rpcQuantity
+): [bigint];
 
 export function validateParams(
   params: any[],
   hash: typeof rpcHash,
   num: typeof rpcQuantity
-): [Buffer, BN];
+): [Uint8Array, bigint];
 
 export function validateParams(
   params: any[],
   num1: typeof rpcQuantity,
   num2: typeof rpcQuantity
-): [BN, BN];
+): [bigint, bigint];
 
 export function validateParams(
   params: any[],
   addr: typeof rpcAddress,
   data: typeof rpcUnknown
-): [Buffer, any];
+): [Uint8Array, any];
 
 export function validateParams(
   params: any[],
@@ -259,13 +340,21 @@ export function validateParams(
 
 export function validateParams(
   params: any[],
+  topics: typeof logTopics
+): [LogTopics];
+
+export function validateParams(
+  params: any[],
+  subscribeRequest: typeof rpcSubscribeRequest
+): [RpcSubscribeRequest];
+
+export function validateParams(
+  params: any[],
   subscribeRequest: typeof rpcSubscribeRequest,
   optionalFilterRequest: typeof optionalRpcFilterRequest
 ): [RpcSubscribeRequest, OptionalRpcFilterRequest];
 
-export function validateParams(params: any[], number: typeof rpcQuantity): [BN];
-
-// tslint:disable only-buidler-error
+// tslint:disable only-hardhat-error
 
 export function validateParams(params: any[], ...types: Array<t.Type<any>>) {
   if (types === undefined && params.length > 0) {

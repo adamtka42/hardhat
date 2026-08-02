@@ -1,16 +1,16 @@
-import { IEthereumProvider } from "../../../types";
+import { IQrlProvider } from "../../../types";
 
 export function wrapSend(
-  provider: IEthereumProvider,
+  provider: IQrlProvider,
   sendWrapper: (method: string, params: any[]) => Promise<any>
-): IEthereumProvider {
+): IQrlProvider {
   const cloningSendWrapper = (method: string, params: any[] = []) => {
     const cloneDeep = require("lodash/cloneDeep");
     return sendWrapper(method, cloneDeep(params));
   };
 
   return new Proxy(provider, {
-    get(target: IEthereumProvider, p: PropertyKey, receiver: any): any {
+    get(target: IQrlProvider, p: PropertyKey, receiver: any): any {
       if (p === "send") {
         return cloningSendWrapper;
       }

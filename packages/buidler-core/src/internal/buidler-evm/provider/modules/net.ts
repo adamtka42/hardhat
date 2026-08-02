@@ -1,13 +1,11 @@
-import Common from "ethereumjs-common";
-
 import { MethodNotFoundError } from "../errors";
 import { validateParams } from "../input";
 import { numberToRpcQuantity } from "../output";
 
-// tslint:disable only-buidler-error
+// tslint:disable only-hardhat-error
 
 export class NetModule {
-  constructor(private readonly _common: Common) {}
+  constructor(private readonly _networkId: bigint) {}
 
   public async processRequest(
     method: string,
@@ -40,7 +38,7 @@ export class NetModule {
   // net_peerCount
 
   private _peerCountParams(params: any[]): [] {
-    return [];
+    return validateParams(params);
   }
 
   private async _peerCountAction(): Promise<string> {
@@ -50,11 +48,11 @@ export class NetModule {
   // net_version
 
   private _versionParams(params: any[]): [] {
-    return [];
+    return validateParams(params);
   }
 
   private async _versionAction(): Promise<string> {
     // This RPC call is an exception: it returns a number in decimal
-    return this._common.networkId().toString();
+    return this._networkId.toString();
   }
 }

@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C"
     },
     {
@@ -14,7 +14,7 @@
           "message": "asd",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "test",
             "line": 7
           }

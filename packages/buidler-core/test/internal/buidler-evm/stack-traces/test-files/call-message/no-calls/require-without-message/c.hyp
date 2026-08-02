@@ -1,0 +1,9 @@
+pragma hyperion >=0.0;
+
+contract C {
+
+  function test() public {
+    require(false);
+  }
+
+}

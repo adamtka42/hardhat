@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C"
     },
     {
@@ -12,7 +12,7 @@
           "type": "CALLSTACK_ENTRY",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "test",
             "line": 9
           }
@@ -21,7 +21,7 @@
           "type": "CALLSTACK_ENTRY",
           "sourceReference": {
             "contract": "D",
-            "file": "d.sol",
+            "file": "d.hyp",
             "function": "callE",
             "line": 10
           }
@@ -31,7 +31,7 @@
           "message": "E failed",
           "sourceReference": {
             "contract": "E",
-            "file": "e.sol",
+            "file": "e.hyp",
             "function": "fail",
             "line": 11
           }

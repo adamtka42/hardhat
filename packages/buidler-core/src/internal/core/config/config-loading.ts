@@ -1,7 +1,7 @@
 import path from "path";
 
-import { BuidlerArguments, ResolvedBuidlerConfig } from "../../../types";
-import { BuidlerContext } from "../../context";
+import { HardhatArguments, ResolvedHardhatConfig } from "../../../types";
+import { HardhatContext } from "../../context";
 import { loadPluginFile } from "../plugins";
 import { getUserConfigPath } from "../project-structure";
 
@@ -14,10 +14,10 @@ function importCsjOrEsModule(filePath: string): any {
 }
 
 export function loadConfigAndTasks(
-  buidlerArguments?: Partial<BuidlerArguments>
-): ResolvedBuidlerConfig {
+  hardhatArguments?: Partial<HardhatArguments>
+): ResolvedHardhatConfig {
   let configPath =
-    buidlerArguments !== undefined ? buidlerArguments.config : undefined;
+    hardhatArguments !== undefined ? hardhatArguments.config : undefined;
 
   if (configPath === undefined) {
     configPath = getUserConfigPath();
@@ -51,7 +51,7 @@ export function loadConfigAndTasks(
     configPath,
     defaultConfig,
     userConfig,
-    BuidlerContext.getBuidlerContext().configExtenders
+    HardhatContext.getHardhatContext().configExtenders
   );
 
   return resolved;

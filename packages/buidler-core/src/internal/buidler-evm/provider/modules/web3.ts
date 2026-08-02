@@ -1,11 +1,12 @@
-import { keccak256 } from "ethereumjs-util";
+import { keccak_256 } from "js-sha3";
 
-import { getPackageJson } from "../../../util/packageInfo";
 import { MethodNotFoundError } from "../errors";
 import { rpcData, validateParams } from "../input";
 import { bufferToRpcData } from "../output";
 
-// tslint:disable only-buidler-error
+const QRL_CLIENT_VERSION = "QRLLocalProvider/qrljs";
+
+// tslint:disable only-hardhat-error
 
 export class Web3Module {
   public async processRequest(
@@ -30,21 +31,16 @@ export class Web3Module {
   }
 
   private async _clientVersionAction(): Promise<string> {
-    // TODO: This is a temporal fix because of https://github.com/OpenZeppelin/openzeppelin-test-helpers/pull/73
-    return "EthereumJS TestRPC/v2.8.0/ethereum-js";
-
-    // const buidlerPackage = await getPackageJson();
-    // const ethereumjsVMPackage = require("@nomiclabs/ethereumjs-vm/package.json");
-    // return `BuidlerEVM/${buidlerPackage.version}/ethereumjs-vm/${ethereumjsVMPackage.version}`;
+    return QRL_CLIENT_VERSION;
   }
 
   // web3_sha3
 
-  private _sha3Params(params: any[]): [Buffer] {
+  private _sha3Params(params: any[]): [Uint8Array] {
     return validateParams(params, rpcData);
   }
 
-  private async _sha3Action(buffer: Buffer): Promise<string> {
-    return bufferToRpcData(keccak256(buffer));
+  private async _sha3Action(buffer: Uint8Array): Promise<string> {
+    return bufferToRpcData(new Uint8Array(keccak_256.arrayBuffer(buffer)));
   }
 }

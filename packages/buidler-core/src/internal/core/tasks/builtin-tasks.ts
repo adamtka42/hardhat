@@ -32,6 +32,10 @@ export default function () {
   );
 
   loadPluginFile(
+    path.join(__dirname, "..", "..", "..", "builtin-tasks", "qrl")
+  );
+
+  loadPluginFile(
     path.join(__dirname, "..", "..", "..", "builtin-tasks", "test")
   );
 }

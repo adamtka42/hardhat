@@ -2,11 +2,9 @@ import * as t from "io-ts";
 import { Context, getFunctionName, ValidationError } from "io-ts/lib";
 import { Reporter } from "io-ts/lib/Reporter";
 
-import {
-  BUIDLEREVM_NETWORK_NAME,
-  BUIDLEREVM_SUPPORTED_HARDFORKS,
-} from "../../constants";
-import { BuidlerError } from "../errors";
+import { HARDHAT_QRLVM_NETWORK_NAME } from "../../constants";
+import { isValidQrlAddress } from "../../qrl/address";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 function stringify(v: any): string {
@@ -75,34 +73,6 @@ function optional<TypeT, OutputT>(
 
 // IMPORTANT: This t.types MUST be kept in sync with the actual types.
 
-const BuidlerNetworkAccount = t.type({
-  privateKey: t.string,
-  balance: t.string,
-});
-
-const BuidlerNetworkConfig = t.type({
-  hardfork: optional(t.string),
-  chainId: optional(t.number),
-  from: optional(t.string),
-  gas: optional(t.union([t.literal("auto"), t.number])),
-  gasPrice: optional(t.union([t.literal("auto"), t.number])),
-  gasMultiplier: optional(t.number),
-  accounts: optional(t.array(BuidlerNetworkAccount)),
-  blockGasLimit: optional(t.number),
-  throwOnTransactionFailures: optional(t.boolean),
-  throwOnCallFailures: optional(t.boolean),
-  loggingEnabled: optional(t.boolean),
-  allowUnlimitedContractSize: optional(t.boolean),
-  initialDate: optional(t.string),
-});
-
-const HDAccountsConfig = t.type({
-  mnemonic: t.string,
-  initialIndex: optional(t.number),
-  count: optional(t.number),
-  path: optional(t.string),
-});
-
 const OtherAccountsConfig = t.type({
   type: t.string,
 });
@@ -110,9 +80,11 @@ const OtherAccountsConfig = t.type({
 const NetworkConfigAccounts = t.union([
   t.literal("remote"),
   t.array(t.string),
-  HDAccountsConfig,
   OtherAccountsConfig,
 ]);
+
+const QRL_EXTENDED_SEED_REGEX = /^0x[0-9a-fA-F]{102}$/;
+const HARDHAT_QRLVM_BALANCE_REGEX = /^(0x[0-9a-fA-F]+|[0-9]+)$/;
 
 const HttpHeaders = t.record(t.string, t.string, "httpHeaders");
 
@@ -122,12 +94,39 @@ const HttpNetworkConfig = t.type({
   gas: optional(t.union([t.literal("auto"), t.number])),
   gasPrice: optional(t.union([t.literal("auto"), t.number])),
   gasMultiplier: optional(t.number),
+  consoleLog: optional(t.boolean),
   url: optional(t.string),
   accounts: optional(NetworkConfigAccounts),
   httpHeaders: optional(HttpHeaders),
 });
 
-const NetworkConfig = t.union([BuidlerNetworkConfig, HttpNetworkConfig]);
+const HardhatQrlvmAccountConfig = t.type({
+  address: t.string,
+  balance: optional(t.union([t.string, t.number])),
+  seed: optional(t.string),
+  nonce: optional(t.number),
+});
+
+const HardhatQrlvmNetworkConfig = t.type({
+  chainId: optional(t.number),
+  from: optional(t.string),
+  gas: optional(t.union([t.literal("auto"), t.number])),
+  gasPrice: optional(t.union([t.literal("auto"), t.number])),
+  gasMultiplier: optional(t.number),
+  accounts: optional(t.array(HardhatQrlvmAccountConfig)),
+  automine: optional(t.boolean),
+  loggingEnabled: optional(t.boolean),
+  consoleLog: optional(t.boolean),
+  blockGasLimit: optional(t.number),
+  initialDate: optional(t.string),
+  throwOnTransactionFailures: optional(t.boolean),
+  throwOnCallFailures: optional(t.boolean),
+  allowUnlimitedContractSize: optional(t.boolean),
+  stackTraces: optional(t.boolean),
+  qrlJsMonorepoPath: optional(t.string),
+});
+
+const NetworkConfig = t.union([HttpNetworkConfig, HardhatQrlvmNetworkConfig]);
 
 const Networks = t.record(t.string, NetworkConfig);
 
@@ -139,36 +138,30 @@ const ProjectPaths = t.type({
   tests: optional(t.string),
 });
 
-const EVMVersion = t.string;
-
-const SolcOptimizerConfig = t.type({
+const HyperionOptimizerConfig = t.type({
   enabled: optional(t.boolean),
   runs: optional(t.number),
 });
 
-const SolcConfig = t.type({
+const HyperionConfig = t.type({
   version: optional(t.string),
-  optimizer: optional(SolcOptimizerConfig),
-  evmVersion: optional(EVMVersion),
+  compilerPath: optional(t.string),
+  compilerRepositoryUrl: optional(t.string),
+  optimizer: optional(HyperionOptimizerConfig),
 });
 
-const AnalyticsConfig = t.type({
-  enabled: optional(t.boolean),
-});
-
-const BuidlerConfig = t.type(
+const HardhatConfig = t.type(
   {
     defaultNetwork: optional(t.string),
     networks: optional(Networks),
     paths: optional(ProjectPaths),
-    solc: optional(SolcConfig),
-    analytics: optional(AnalyticsConfig),
+    hyperion: optional(HyperionConfig),
   },
-  "BuidlerConfig"
+  "HardhatConfig"
 );
 
 /**
- * Validates the config, throwing a BuidlerError if invalid.
+ * Validates the config, throwing a HardhatError if invalid.
  * @param config
  */
 export function validateConfig(config: any) {
@@ -181,7 +174,7 @@ export function validateConfig(config: any) {
   let errorList = errors.join("\n  * ");
   errorList = `  * ${errorList}`;
 
-  throw new BuidlerError(ERRORS.GENERAL.INVALID_CONFIG, { errors: errorList });
+  throw new HardhatError(ERRORS.GENERAL.INVALID_CONFIG, { errors: errorList });
 }
 
 export function getValidationErrors(config: any): string[] {
@@ -189,166 +182,131 @@ export function getValidationErrors(config: any): string[] {
 
   // These can't be validated with io-ts
   if (config !== undefined && typeof config.networks === "object") {
-    const buidlerNetwork = config.networks[BUIDLEREVM_NETWORK_NAME];
-    if (buidlerNetwork !== undefined) {
-      if (
-        buidlerNetwork.hardfork !== undefined &&
-        !BUIDLEREVM_SUPPORTED_HARDFORKS.includes(buidlerNetwork.hardfork)
-      ) {
-        errors.push(
-          `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.hardfork is not supported. Use one of ${BUIDLEREVM_SUPPORTED_HARDFORKS.join(
-            ", "
-          )}`
-        );
-      }
-
-      if (
-        buidlerNetwork.allowUnlimitedContractSize !== undefined &&
-        typeof buidlerNetwork.allowUnlimitedContractSize !== "boolean"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.allowUnlimitedContractSize`,
-            buidlerNetwork.allowUnlimitedContractSize,
-            "boolean | undefined"
-          )
-        );
-      }
-
-      if (
-        buidlerNetwork.initialDate !== undefined &&
-        typeof buidlerNetwork.initialDate !== "string"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.initialDate`,
-            buidlerNetwork.initialDate,
-            "string | undefined"
-          )
-        );
-      }
-
-      if (
-        buidlerNetwork.throwOnTransactionFailures !== undefined &&
-        typeof buidlerNetwork.throwOnTransactionFailures !== "boolean"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.throwOnTransactionFailures`,
-            buidlerNetwork.throwOnTransactionFailures,
-            "boolean | undefined"
-          )
-        );
-      }
-
-      if (
-        buidlerNetwork.throwOnCallFailures !== undefined &&
-        typeof buidlerNetwork.throwOnCallFailures !== "boolean"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.throwOnCallFailures`,
-            buidlerNetwork.throwOnCallFailures,
-            "boolean | undefined"
-          )
-        );
-      }
-
-      if (buidlerNetwork.url !== undefined) {
-        errors.push(
-          `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME} can't have an url`
-        );
-      }
-
-      if (
-        buidlerNetwork.blockGasLimit !== undefined &&
-        typeof buidlerNetwork.blockGasLimit !== "number"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.blockGasLimit`,
-            buidlerNetwork.blockGasLimit,
-            "number | undefined"
-          )
-        );
-      }
-
-      if (
-        buidlerNetwork.chainId !== undefined &&
-        typeof buidlerNetwork.chainId !== "number"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.chainId`,
-            buidlerNetwork.chainId,
-            "number | undefined"
-          )
-        );
-      }
-
-      if (
-        buidlerNetwork.loggingEnabled !== undefined &&
-        typeof buidlerNetwork.loggingEnabled !== "boolean"
-      ) {
-        errors.push(
-          getErrorMessage(
-            `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.loggingEnabled`,
-            buidlerNetwork.loggingEnabled,
-            "boolean | undefined"
-          )
-        );
-      }
-
-      if (buidlerNetwork.accounts !== undefined) {
-        if (Array.isArray(buidlerNetwork.accounts)) {
-          for (const account of buidlerNetwork.accounts) {
-            if (typeof account.privateKey !== "string") {
-              errors.push(
-                getErrorMessage(
-                  `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.accounts[].privateKey`,
-                  account.privateKey,
-                  "string"
-                )
-              );
-            }
-
-            if (typeof account.balance !== "string") {
-              errors.push(
-                getErrorMessage(
-                  `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.accounts[].balance`,
-                  account.balance,
-                  "string"
-                )
-              );
-            }
-          }
-        } else {
-          errors.push(
-            getErrorMessage(
-              `BuidlerConfig.networks.${BUIDLEREVM_NETWORK_NAME}.accounts`,
-              buidlerNetwork.accounts,
-              "[{privateKey: string, balance: string}] | undefined"
-            )
-          );
-        }
-      }
-    }
-
     for (const [networkName, netConfig] of Object.entries<any>(
       config.networks
     )) {
-      if (networkName === BUIDLEREVM_NETWORK_NAME) {
-        continue;
-      }
+      if (networkName === HARDHAT_QRLVM_NETWORK_NAME) {
+        if (netConfig.url !== undefined) {
+          errors.push(
+            getErrorMessage(
+              `HardhatConfig.networks.${networkName}.url`,
+              netConfig.url,
+              "undefined"
+            )
+          );
+        }
 
-      if (networkName === "localhost" && netConfig.url === undefined) {
+        if (netConfig.accounts !== undefined) {
+          if (!Array.isArray(netConfig.accounts)) {
+            errors.push(
+              getErrorMessage(
+                `HardhatConfig.networks.${networkName}.accounts`,
+                netConfig.accounts,
+                "Hardhat QRLVM account array"
+              )
+            );
+          } else {
+            for (const [
+              accountIndex,
+              account,
+            ] of netConfig.accounts.entries()) {
+              if (
+                account === undefined ||
+                account === null ||
+                typeof account !== "object"
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}`,
+                    account,
+                    "Hardhat QRLVM account"
+                  )
+                );
+                continue;
+              }
+
+              if (
+                typeof account.address !== "string" ||
+                !isValidQrlAddress(account.address)
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.address`,
+                    account.address,
+                    "64-byte QRL address"
+                  )
+                );
+              }
+
+              if (
+                account.balance !== undefined &&
+                ((typeof account.balance !== "string" &&
+                  typeof account.balance !== "number") ||
+                  (typeof account.balance === "string" &&
+                    !HARDHAT_QRLVM_BALANCE_REGEX.test(account.balance)) ||
+                  (typeof account.balance === "number" &&
+                    (!Number.isSafeInteger(account.balance) ||
+                      account.balance < 0)))
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.balance`,
+                    account.balance,
+                    "non-negative integer balance"
+                  )
+                );
+              }
+
+              if (
+                account.seed !== undefined &&
+                (typeof account.seed !== "string" ||
+                  !QRL_EXTENDED_SEED_REGEX.test(account.seed))
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.seed`,
+                    account.seed,
+                    "51-byte QRL extended seed hex string"
+                  )
+                );
+              }
+
+              if (
+                account.nonce !== undefined &&
+                (!Number.isSafeInteger(account.nonce) || account.nonce < 0)
+              ) {
+                errors.push(
+                  getErrorMessage(
+                    `HardhatConfig.networks.${networkName}.accounts.${accountIndex}.nonce`,
+                    account.nonce,
+                    "non-negative safe integer"
+                  )
+                );
+              }
+            }
+          }
+        }
+
+        if (
+          typeof netConfig.from === "string" &&
+          !isValidQrlAddress(netConfig.from)
+        ) {
+          errors.push(
+            getErrorMessage(
+              `HardhatConfig.networks.${networkName}.from`,
+              netConfig.from,
+              "64-byte QRL address"
+            )
+          );
+        }
+
         continue;
       }
 
       if (typeof netConfig.url !== "string") {
         errors.push(
           getErrorMessage(
-            `BuidlerConfig.networks.${networkName}.url`,
+            `HardhatConfig.networks.${networkName}.url`,
             netConfig.url,
             "string"
           )
@@ -359,23 +317,52 @@ export function getValidationErrors(config: any): string[] {
       if (netConfigResult.isLeft()) {
         errors.push(
           getErrorMessage(
-            `BuidlerConfig.networks.${networkName}`,
+            `HardhatConfig.networks.${networkName}`,
             netConfig,
             "HttpNetworkConfig"
+          )
+        );
+      }
+
+      if (Array.isArray(netConfig.accounts)) {
+        for (const [accountIndex, account] of netConfig.accounts.entries()) {
+          if (
+            typeof account === "string" &&
+            !QRL_EXTENDED_SEED_REGEX.test(account)
+          ) {
+            errors.push(
+              getErrorMessage(
+                `HardhatConfig.networks.${networkName}.accounts.${accountIndex}`,
+                account,
+                "51-byte QRL extended seed hex string"
+              )
+            );
+          }
+        }
+      }
+
+      if (
+        typeof netConfig.from === "string" &&
+        !isValidQrlAddress(netConfig.from)
+      ) {
+        errors.push(
+          getErrorMessage(
+            `HardhatConfig.networks.${networkName}.from`,
+            netConfig.from,
+            "64-byte QRL address"
           )
         );
       }
     }
   }
 
-  // io-ts can get confused if there are errors that it can't understand.
-  // Especially around BuidlerEVM's config. It will treat it as an HTTPConfig,
-  // and may give a loot of errors.
+  // io-ts can get confused by unsupported legacy network configs and report
+  // noisy HTTPConfig errors. Return the clearer QRL-only error instead.
   if (errors.length > 0) {
     return errors;
   }
 
-  const result = BuidlerConfig.decode(config);
+  const result = HardhatConfig.decode(config);
 
   if (result.isRight()) {
     return errors;

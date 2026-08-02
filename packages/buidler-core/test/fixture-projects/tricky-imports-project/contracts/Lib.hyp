@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+library TrickyLib {
+    function id(uint256 value) internal pure returns (uint256) {
+        return value;
+    }
+}

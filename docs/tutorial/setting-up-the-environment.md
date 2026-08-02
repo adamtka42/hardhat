@@ -4,100 +4,97 @@ prev: false
 
 # 1. Setting up the environment
 
-Most Ethereum libraries and tools are written in JavaScript, and so is **Buidler**. If you're not familiar with Node.js, it's a JavaScript runtime built on Chrome's V8 JavaScript engine. It's the most popular solution to run JavaScript outside of a web browser and **Buidler** is built on top of it.
+Most smart contract development tooling is written in JavaScript, and so is QRL
+Hardhat. If you are not familiar with Node.js, it is a JavaScript runtime used
+to run JavaScript outside of a web browser.
 
 ## Installing Node.js
 
-You can [skip](#checking-your-environment) this section if you already have a working Node.js `>=10.0` installation. If not, here's how to install it on Ubuntu, MacOS and Windows.
-
+You can skip this section if you already have a working Node.js 20 or later
+installation. If not, install Node.js with your operating system package
+manager or with a version manager such as `nvm`.
 
 ### Linux
 
-#### Ubuntu
+On Ubuntu, install the basic development tools first:
 
-Copy and paste these commands in a terminal:
-
-```
+```sh
 sudo apt update
-sudo apt install curl git
-sudo apt install build-essential # We need this to build native dependencies
-curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
-sudo apt install nodejs
+sudo apt install curl git build-essential
 ```
+
+Then install Node.js 20 or later using your preferred distribution package or
+NodeSource setup.
 
 ### MacOS
 
-Make sure you have `git` installed. Otherwise, follow [these instructions](https://www.atlassian.com/git/tutorials/install-git).
+Make sure you have git installed. You can install Node.js with `nvm`:
 
-There are multiple ways of installing Node.js on MacOS. We will be using [Node Version Manager (nvm)](http://github.com/creationix/nvm). Copy and paste these commands in a terminal:
-
+```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+nvm install 20
+nvm use 20
+nvm alias default 20
+npm install npm --global
 ```
-curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.35.2/install.sh | bash
-nvm install 10
-nvm use 10
-nvm alias default 10
-npm install npm --global # Upgrade npm to the latest version
-npm install -g node-gyp # Make sure we have node-gyp installed
-# This next setp is needed to build native dependencies.
-# A popup will appear and you have to proceed with an installation.
-# It will take some time, and may download a few GB of data.
+
+If native dependencies fail to build, install the Xcode command-line tools:
+
+```sh
 xcode-select --install
 ```
 
 ### Windows
 
-Installing Node.js on Windows requires a few manual steps. We'll install git, Node.js 10.x and NPM's Windows Build Tools. Download and run these:
-1. [Git's installer for Windows](https://git-scm.com/download/win)
-2. `node-v10.XX.XX-x64.msi` from [here](https://nodejs.org/dist/latest-v10.x)
-
-Then [open your terminal as Administrator](https://www.howtogeek.com/194041/how-to-open-the-command-prompt-as-administrator-in-windows-8.1/) and run the following command: 
-```
-npm install --global --production windows-build-tools
-```
-
-It will take several minutes and may download a few GB of data.
-
+Install Git for Windows and Node.js 20 or later from the official Node.js
+download page. Use PowerShell, Windows Terminal, or WSL for the commands in
+this tutorial.
 
 ## Checking your environment
 
-To make sure your development environment is ready, copy and paste these commands in a new terminal:
+To make sure your development environment is ready, run:
 
+```sh
+node --version
+npm --version
+git --version
 ```
-git clone https://github.com/nomiclabs/ethereum-hackathon-setup-checker.git
-cd ethereum-hackathon-setup-checker
+
+Node.js should report version 20 or later.
+
+QRL Hardhat compiles Hyperion `.hyp` contracts. Make sure the Hyperion compiler
+required by your checkout is available before compiling a project.
+
+Installed packages include the QRL VM runtime, so local in-process tests need
+no extra setup. Only when developing qrljs itself, build a checkout and expose
+it as an override:
+
+```sh
+cd /path/to/qrljs-monorepo
 npm install
+npm run build --workspaces --if-present
+npm run tsc
 ```
 
-If this is succesful you should see a confirmation message meaning that your development environment is ready. Feel free to delete the repository directory and move on to [Creating a new Buidler project](creating-a-new-buidler-project.md).
+Then expose it to QRL Hardhat:
 
-If any of them failed, your environment is not properly setup. Make sure you have `git` and Node.js `>=10.0` installed. If you're seeing errors mentioning "node-gyp", make sure you installed the build tools mentioned before.
+```sh
+export QRLJS_MONOREPO_PATH=/path/to/qrljs-monorepo
+```
 
-If you have an older version of Node.js, please refer to the next section.
+For HTTP/private-network tests you need a running go-qrl JSON-RPC endpoint and,
+when using local signing, a QRL extended seed in `QRL_ACCOUNT_SEED`.
 
 ## Upgrading your Node.js installation
 
-If your version of Node.js is older than `10.0` follow the instructions below to upgrade. After you are done, go back to [Checking your environment](#checking-your-environment).
+If your Node.js version is older than 20, upgrade it before continuing. With
+`nvm`, this is:
 
-### Linux
-
-#### Ubuntu
-
-1. Run `sudo apt remove nodejs` in a terminal to remove Node.js.
-2. Find the version of Node.js that you want to install [here](https://github.com/nodesource/distributions#debinstall) and follow the instructions.
-3. Run `sudo apt update && sudo apt install nodejs` in a terminal to install Node.js again.
-
-### MacOS
-
-You can change your Node.js version using [nvm](http://github.com/creationix/nvm). To upgrade to Node.js `12.x` run these in a terminal:
-
-```
-nvm install 12
-nvm use 12
-nvm alias default 12
-npm install npm --global # Upgrade npm to the latest version
-npm install -g node-gyp # Make sure we have node-gyp installed
+```sh
+nvm install 20
+nvm use 20
+nvm alias default 20
 ```
 
-### Windows
+After upgrading, go back to [Checking your environment](#checking-your-environment).
 
-You need to follow the [same installation instructions](#windows) as before but choose a different version. You can check the list of all available versions [here](https://nodejs.org/en/download/releases/).

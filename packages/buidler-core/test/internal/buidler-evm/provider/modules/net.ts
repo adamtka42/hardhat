@@ -1,38 +1,49 @@
 import { assert } from "chai";
 
+import {
+  InvalidArgumentsError,
+  MethodNotFoundError,
+} from "../../../../../src/internal/buidler-evm/provider/errors";
+import { NetModule } from "../../../../../src/internal/buidler-evm/provider/modules/net";
 import { numberToRpcQuantity } from "../../../../../src/internal/buidler-evm/provider/output";
-import { setCWD } from "../../helpers/cwd";
-import { PROVIDERS } from "../../helpers/useProvider";
+
+const bigint = (value: number): bigint => (global as any).BigInt(value);
 
 describe("Net module", function () {
-  PROVIDERS.forEach((provider) => {
-    describe(`Provider ${provider.name}`, function () {
-      setCWD();
-      provider.useProvider();
+  const module = new NetModule(bigint(1337));
 
-      describe("net_listening", async function () {
-        it("Should return true", async function () {
-          assert.isTrue(await this.provider.send("net_listening"));
-        });
-      });
+  it("returns local network status", async function () {
+    assert.isTrue(await module.processRequest("net_listening"));
+    assert.strictEqual(
+      await module.processRequest("net_peerCount"),
+      numberToRpcQuantity(0)
+    );
+  });
 
-      describe("net_peerCount", async function () {
-        it("Should return 0", async function () {
-          assert.strictEqual(
-            await this.provider.send("net_peerCount"),
-            numberToRpcQuantity(0)
-          );
-        });
-      });
+  it("returns the network id as a decimal string", async function () {
+    assert.strictEqual(await module.processRequest("net_version"), "1337");
+  });
 
-      describe("net_version", async function () {
-        it("Should return the network id as a decimal string, not QUANTITY", async function () {
-          assert.strictEqual(
-            await this.provider.send("net_version"),
-            this.common.networkId().toString()
-          );
-        });
-      });
-    });
+  it("validates parameters and rejects unknown methods", async function () {
+    await assertRejects(
+      () => module.processRequest("net_peerCount", ["unexpected"]),
+      InvalidArgumentsError
+    );
+    await assertRejects(
+      () => module.processRequest("net_unknown"),
+      MethodNotFoundError
+    );
   });
 });
+
+async function assertRejects(
+  action: () => Promise<unknown>,
+  errorType: new (...args: any[]) => Error
+): Promise<void> {
+  try {
+    await action();
+    assert.fail("Expected action to reject");
+  } catch (error) {
+    assert.instanceOf(error, errorType);
+  }
+}

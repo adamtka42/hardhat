@@ -9,7 +9,7 @@ import {
 } from "../../src/internal/artifacts";
 import { ERRORS } from "../../src/internal/core/errors-list";
 import { Artifact } from "../../src/types";
-import { expectBuidlerError, expectBuidlerErrorAsync } from "../helpers/errors";
+import { expectHardhatError, expectHardhatErrorAsync } from "../helpers/errors";
 import { useTmpDir } from "../helpers/fs";
 
 describe("Artifacts utils", function () {
@@ -17,7 +17,7 @@ describe("Artifacts utils", function () {
     it("Should always return a bytecode, linkReference, deployedBytecode and deployedLinkReferences", function () {
       const artifact = getArtifactFromContractOutput("Interface", {
         ...COMPILER_OUTPUTS.Interface,
-        evm: undefined,
+        bytecodeOutput: undefined,
       });
 
       const expectedArtifact: Artifact = {
@@ -33,7 +33,7 @@ describe("Artifacts utils", function () {
 
       const artifact2 = getArtifactFromContractOutput("Interface", {
         ...COMPILER_OUTPUTS.Interface,
-        evm: {},
+        bytecodeOutput: {},
       });
 
       const expectedArtifact2: Artifact = {
@@ -49,7 +49,7 @@ describe("Artifacts utils", function () {
 
       const artifact3 = getArtifactFromContractOutput("Interface", {
         ...COMPILER_OUTPUTS.Interface,
-        evm: { bytecode: {} },
+        bytecodeOutput: { bytecode: {} },
       });
 
       const expectedArtifact3: Artifact = {
@@ -91,9 +91,9 @@ describe("Artifacts utils", function () {
       const expectedArtifact: Artifact = {
         contractName: "Lib",
         abi: COMPILER_OUTPUTS.Lib.abi,
-        bytecode: `0x${COMPILER_OUTPUTS.Lib.evm.bytecode.object}`,
+        bytecode: `0x${COMPILER_OUTPUTS.Lib.bytecodeOutput.bytecode.object}`,
         linkReferences: {},
-        deployedBytecode: `0x${COMPILER_OUTPUTS.Lib.evm.deployedBytecode.object}`,
+        deployedBytecode: `0x${COMPILER_OUTPUTS.Lib.bytecodeOutput.deployedBytecode.object}`,
         deployedLinkReferences: {},
       };
 
@@ -109,9 +109,9 @@ describe("Artifacts utils", function () {
       const expectedArtifact: Artifact = {
         contractName: "WithBytecodeNoLibs",
         abi: COMPILER_OUTPUTS.WithBytecodeNoLibs.abi,
-        bytecode: `0x${COMPILER_OUTPUTS.WithBytecodeNoLibs.evm.bytecode.object}`,
+        bytecode: `0x${COMPILER_OUTPUTS.WithBytecodeNoLibs.bytecodeOutput.bytecode.object}`,
         linkReferences: {},
-        deployedBytecode: `0x${COMPILER_OUTPUTS.WithBytecodeNoLibs.evm.deployedBytecode.object}`,
+        deployedBytecode: `0x${COMPILER_OUTPUTS.WithBytecodeNoLibs.bytecodeOutput.deployedBytecode.object}`,
         deployedLinkReferences: {},
       };
 
@@ -127,12 +127,13 @@ describe("Artifacts utils", function () {
       const expectedArtifact: Artifact = {
         contractName: "WithBytecodeAndLibs",
         abi: COMPILER_OUTPUTS.WithBytecodeAndLibs.abi,
-        bytecode: `0x${COMPILER_OUTPUTS.WithBytecodeAndLibs.evm.bytecode.object}`,
+        bytecode: `0x${COMPILER_OUTPUTS.WithBytecodeAndLibs.bytecodeOutput.bytecode.object}`,
         linkReferences:
-          COMPILER_OUTPUTS.WithBytecodeAndLibs.evm.bytecode.linkReferences,
-        deployedBytecode: `0x${COMPILER_OUTPUTS.WithBytecodeAndLibs.evm.deployedBytecode.object}`,
+          COMPILER_OUTPUTS.WithBytecodeAndLibs.bytecodeOutput.bytecode
+            .linkReferences,
+        deployedBytecode: `0x${COMPILER_OUTPUTS.WithBytecodeAndLibs.bytecodeOutput.deployedBytecode.object}`,
         deployedLinkReferences:
-          COMPILER_OUTPUTS.WithBytecodeAndLibs.evm.deployedBytecode
+          COMPILER_OUTPUTS.WithBytecodeAndLibs.bytecodeOutput.deployedBytecode
             .linkReferences,
       };
 
@@ -148,9 +149,9 @@ describe("Artifacts utils", function () {
       const expectedArtifact: Artifact = {
         contractName: "WithoutBytecodeNoLibs",
         abi: COMPILER_OUTPUTS.WithoutBytecodeNoLibs.abi,
-        bytecode: `0x${COMPILER_OUTPUTS.WithoutBytecodeNoLibs.evm.bytecode.object}`,
+        bytecode: `0x${COMPILER_OUTPUTS.WithoutBytecodeNoLibs.bytecodeOutput.bytecode.object}`,
         linkReferences: {},
-        deployedBytecode: `0x${COMPILER_OUTPUTS.WithoutBytecodeNoLibs.evm.deployedBytecode.object}`,
+        deployedBytecode: `0x${COMPILER_OUTPUTS.WithoutBytecodeNoLibs.bytecodeOutput.deployedBytecode.object}`,
         deployedLinkReferences: {},
       };
 
@@ -168,11 +169,12 @@ describe("Artifacts utils", function () {
         abi: COMPILER_OUTPUTS.WithoutBytecodeWithLibs.abi,
         bytecode: "0x",
         linkReferences:
-          COMPILER_OUTPUTS.WithoutBytecodeWithLibs.evm.bytecode.linkReferences,
+          COMPILER_OUTPUTS.WithoutBytecodeWithLibs.bytecodeOutput.bytecode
+            .linkReferences,
         deployedBytecode: "0x",
         deployedLinkReferences:
-          COMPILER_OUTPUTS.WithoutBytecodeWithLibs.evm.deployedBytecode
-            .linkReferences,
+          COMPILER_OUTPUTS.WithoutBytecodeWithLibs.bytecodeOutput
+            .deployedBytecode.linkReferences,
       };
 
       assert.deepEqual(artifact, expectedArtifact);
@@ -218,14 +220,14 @@ describe("Artifacts utils", function () {
     });
 
     it("Should throw when reading a non-existent contract (async)", async function () {
-      await expectBuidlerErrorAsync(
+      await expectHardhatErrorAsync(
         () => readArtifact(this.tmpDir, "NonExistent"),
         ERRORS.ARTIFACTS.NOT_FOUND
       );
     });
 
     it("Should throw when reading a non-existent contract (sync)", async function () {
-      expectBuidlerError(
+      expectHardhatError(
         () => readArtifactSync(this.tmpDir, "NonExistent"),
         ERRORS.ARTIFACTS.NOT_FOUND
       );
@@ -233,8 +235,8 @@ describe("Artifacts utils", function () {
   });
 });
 
-// TODO: All of these outputs have their evm.bytecode duplicated as
-//  evm.deployedBytecode. This should be corrected, using the actual output
+// TODO: All of these outputs have their bytecodeOutput.bytecode duplicated as
+//  bytecodeOutput.deployedBytecode. This should be corrected, using the actual output
 const COMPILER_OUTPUTS = {
   Interface: {
     abi: [
@@ -253,7 +255,7 @@ const COMPILER_OUTPUTS = {
         type: "function",
       },
     ],
-    evm: {
+    bytecodeOutput: {
       bytecode: {
         linkReferences: {},
         object: "",
@@ -290,7 +292,7 @@ const COMPILER_OUTPUTS = {
         type: "function",
       },
     ],
-    evm: {
+    bytecodeOutput: {
       bytecode: {
         linkReferences: {},
         object:
@@ -333,10 +335,10 @@ const COMPILER_OUTPUTS = {
         type: "function",
       },
     ],
-    evm: {
+    bytecodeOutput: {
       bytecode: {
         linkReferences: {
-          "contracts/Greeter.sol": {
+          "contracts/Greeter.hyp": {
             Lib: [
               {
                 length: 20,
@@ -354,7 +356,7 @@ const COMPILER_OUTPUTS = {
       },
       deployedBytecode: {
         linkReferences: {
-          "contracts/Greeter.sol": {
+          "contracts/Greeter.hyp": {
             Lib: [
               {
                 length: 20,
@@ -374,7 +376,7 @@ const COMPILER_OUTPUTS = {
   },
   WithBytecodeNoLibs: {
     abi: [],
-    evm: {
+    bytecodeOutput: {
       bytecode: {
         linkReferences: {},
         object:
@@ -431,7 +433,7 @@ const COMPILER_OUTPUTS = {
         type: "function",
       },
     ],
-    evm: {
+    bytecodeOutput: {
       bytecode: {
         linkReferences: {},
         object: "",
@@ -463,7 +465,7 @@ const COMPILER_OUTPUTS = {
         type: "function",
       },
     ],
-    evm: {
+    bytecodeOutput: {
       bytecode: {
         linkReferences: {},
         object: "",

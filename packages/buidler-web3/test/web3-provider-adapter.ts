@@ -1,5 +1,6 @@
+import { QrlProvider } from "@theqrl/hardhat/types";
 import { assert } from "chai";
-import Web3 from "web3";
+import { EventEmitter } from "events";
 
 import {
   JsonRpcRequest,
@@ -23,14 +24,56 @@ function createJsonRpcRequest(
   };
 }
 
+function sendSingle(
+  provider: Web3HTTPProviderAdapter,
+  request: JsonRpcRequest
+): Promise<JsonRpcResponse> {
+  return new Promise((resolve, reject) => {
+    provider.send(request, (error, response) => {
+      if (error !== null) {
+        reject(error);
+        return;
+      }
+
+      resolve(response!);
+    });
+  });
+}
+
+function sendBatch(
+  provider: Web3HTTPProviderAdapter,
+  requests: JsonRpcRequest[]
+): Promise<JsonRpcResponse[]> {
+  return new Promise((resolve, reject) => {
+    provider.send(requests, (error, responses) => {
+      if (error !== null) {
+        reject(error);
+        return;
+      }
+
+      resolve(responses!);
+    });
+  });
+}
+
+class FakeQrlProvider extends EventEmitter implements QrlProvider {
+  constructor(
+    private readonly _handler: (method: string, params: any[]) => Promise<any>
+  ) {
+    super();
+  }
+
+  public async send(method: string, params: any[] = []): Promise<any> {
+    return this._handler(method, params);
+  }
+}
+
 describe("Web3 provider adapter", function () {
-  let realWeb3Provider: any;
   let adaptedProvider: Web3HTTPProviderAdapter;
 
   useEnvironment(__dirname);
 
   beforeEach(function () {
-    realWeb3Provider = new Web3.providers.HttpProvider("http://localhost:8545");
     adaptedProvider = new Web3HTTPProviderAdapter(this.env.network.provider);
   });
 
@@ -38,107 +81,133 @@ describe("Web3 provider adapter", function () {
     assert.isTrue(adaptedProvider.isConnected());
   });
 
-  it("Should return the same as the real provider for sigle requests", function (done) {
-    const request = createJsonRpcRequest("eth_accounts");
-    realWeb3Provider.send(
-      request,
-      (error: Error | null, response?: JsonRpcResponse) => {
-        adaptedProvider.send(request, (error2, response2) => {
-          assert.deepEqual(error2, error);
-          assert.deepEqual(response2, response);
-          done();
-        });
-      }
-    );
+  it("delegates a single QRL request and returns a JSON-RPC envelope", async function () {
+    const request = createJsonRpcRequest("qrl_accounts");
+    const expected = await this.env.network.provider.send(request.method, []);
+    const response = await sendSingle(adaptedProvider, request);
+
+    assert.strictEqual(response.id, request.id);
+    assert.strictEqual(response.jsonrpc, "2.0");
+    assert.deepEqual(response.result, expected);
   });
 
-  it("Should return the same as the real provider for batched requests", function (done) {
+  it("returns successful batch responses in request order", async function () {
     const requests = [
-      createJsonRpcRequest("eth_accounts"),
-      createJsonRpcRequest("net_version"),
-      createJsonRpcRequest("eth_accounts"),
+      createJsonRpcRequest("qrl_accounts"),
+      createJsonRpcRequest("qrl_chainId"),
+      createJsonRpcRequest("qrl_blockNumber"),
+    ];
+    const expected = await Promise.all(
+      requests.map((request) =>
+        this.env.network.provider.send(request.method, request.params)
+      )
+    );
+
+    const responses = await sendBatch(adaptedProvider, requests);
+
+    assert.lengthOf(responses, requests.length);
+    responses.forEach((response, index) => {
+      assert.strictEqual(response.id, requests[index].id);
+      assert.strictEqual(response.jsonrpc, "2.0");
+      assert.deepEqual(response.result, expected[index]);
+    });
+  });
+
+  it("returns the provider's JSON-RPC error", async function () {
+    const response = await sendSingle(
+      adaptedProvider,
+      createJsonRpcRequest("qrl_methodThatDoesNotExist")
+    );
+
+    assert.isDefined(response.error);
+    assert.isNumber(response.error!.code);
+    assert.isString(response.error!.message);
+  });
+
+  it("completes every batch request when one request fails", async function () {
+    const requests = [
+      createJsonRpcRequest("qrl_accounts"),
+      createJsonRpcRequest("qrl_methodThatDoesNotExist"),
+      createJsonRpcRequest("qrl_blockNumber"),
     ];
 
-    realWeb3Provider.send(
-      requests,
-      (error: Error | null, response?: JsonRpcResponse[]) => {
-        adaptedProvider.send(requests, (error2, response2) => {
-          assert.deepEqual(error2, error);
-          assert.deepEqual(response2, response);
-          done();
-        });
-      }
+    const responses = await sendBatch(adaptedProvider, requests);
+
+    assert.lengthOf(responses, requests.length);
+    assert.deepEqual(
+      responses.map((response) => response.id),
+      requests.map((request) => request.id)
     );
+    assert.isDefined(responses[0].result);
+    assert.isDefined(responses[1].error);
+    assert.isNumber(responses[1].error!.code);
+    assert.isDefined(responses[2].result);
   });
 
-  it("Should return the same on error", function (done) {
-    // We disable this test for RskJ
-    // See: https://github.com/rsksmart/rskj/issues/876
-    this.env.network.provider
-      .send("web3_clientVersion")
-      .then((version) => {
-        if (version.includes("RskJ")) {
-          done();
-          return;
-        }
+  it("preserves error.data and converts a numeric string code", async function () {
+    const provider = new FakeQrlProvider(async () => {
+      throw {
+        code: "-32000",
+        data: "0x08c379a0",
+        message: "execution reverted",
+      };
+    });
+    const adapter = new Web3HTTPProviderAdapter(provider);
 
-        const request = createJsonRpcRequest("error_please");
+    const response = await sendSingle(
+      adapter,
+      createJsonRpcRequest("qrl_call")
+    );
 
-        return realWeb3Provider.send(
-          request,
-          (error: Error | null, response?: JsonRpcResponse) => {
-            adaptedProvider.send(request, (error2, response2) => {
-              assert.deepEqual(error2, error);
-              assert.equal(response2!.error!.message, response!.error!.message);
-              done();
-            });
-          }
-        );
-      })
-      .then(
-        () => {},
-        () => {}
-      );
+    assert.deepEqual(response.error, {
+      code: -32000,
+      data: "0x08c379a0",
+      message: "execution reverted",
+    });
   });
 
-  it("Should let all requests complete, even if one of them fails", function (done) {
-    const requests = [
-      createJsonRpcRequest("eth_accounts"),
-      createJsonRpcRequest("error_please"),
-      createJsonRpcRequest("eth_accounts"),
-    ];
+  it("passes an ordinary JavaScript error to the callback", function (done) {
+    const transportError = new Error("transport failed");
+    const provider = new FakeQrlProvider(async () => {
+      throw transportError;
+    });
+    const adapter = new Web3HTTPProviderAdapter(provider);
 
-    realWeb3Provider.send(
-      requests,
-      (error: Error | null, response?: JsonRpcResponse[]) => {
-        adaptedProvider.send(requests, (error2, response2) => {
-          assert.deepEqual(error2, error);
-          assert.deepEqual(response2![0], response![0]);
-          assert.equal(
-            response2![1].error!.message,
-            response![1].error!.message
-          );
+    adapter.send(createJsonRpcRequest("qrl_accounts"), (error, response) => {
+      assert.strictEqual(error, transportError);
+      assert.isUndefined(response);
+      done();
+    });
+  });
 
-          // Ganache doesn't return a value for requests after the failing one,
-          // so we don't either. Otherwise, this should be tested.
-          // assert.lengthOf(response2!, response!.length);
-          // assert.isUndefined(responseFromAdapted![2]);![2]);
+  it("translates hardhatqrlvm notifications into Web3 data events", function (done) {
+    const provider = new FakeQrlProvider(async () => undefined);
+    const adapter = new Web3HTTPProviderAdapter(provider, true);
+    const notification = {
+      result: { number: "0x1" },
+      subscription: "0x123",
+    };
 
-          // We disable this test for RskJ
-          // See: https://github.com/rsksmart/rskj/issues/876
-          this.env.network.provider
-            .send("web3_clientVersion")
-            .then((version) => {
-              if (version.includes("RskJ")) {
-                assert.equal(
-                  response2![1].error!.message,
-                  response![1].error!.message
-                );
-              }
-            })
-            .then(done, done);
-        });
-      }
-    );
+    adapter.once("data", (data) => {
+      assert.deepEqual(data, {
+        jsonrpc: "2.0",
+        method: "qrl_subscription",
+        params: notification,
+      });
+      adapter.disconnect();
+      assert.strictEqual(provider.listenerCount("notification"), 0);
+      done();
+    });
+
+    assert.isTrue(adapter.supportsSubscriptions());
+    provider.emit("notification", notification);
+  });
+
+  it("does not advertise subscriptions for HTTP providers", function () {
+    const provider = new FakeQrlProvider(async () => undefined);
+    const adapter = new Web3HTTPProviderAdapter(provider);
+
+    assert.isFalse(adapter.supportsSubscriptions());
+    assert.strictEqual(provider.listenerCount("notification"), 0);
   });
 });

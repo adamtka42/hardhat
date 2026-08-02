@@ -1,86 +1,180 @@
 # Creating a plugin
 
-In this guide, we will explore the creation of plugins for Buidler, which are the key component for integrating other tools and extending the built-in functionality.
+Plugins are reusable QRL Hardhat configuration. They are useful when a task,
+runtime helper, or config extension should be shared across multiple projects.
 
-### What exactly are plugins in Buidler?
+This guide creates a small QRL-compatible plugin that:
 
-Plugins in Buidler are essentially reusable bits of configuration, which are defined programmatically using a DSL. When developing a plugin the main tools available to integrate new functionality are extending the [Buidler Runtime Environment], extending the Buidler config, defining new tasks and overriding existing ones, which are all configuration actions achieved through code.
+- adds a task,
+- reads QRL accounts through `qrl_accounts`,
+- adds a helper to the Hardhat Runtime Environment.
 
-Some examples of things you could achieve by creating a plugin are running a linter when the `check` task runs, using different compiler versions for different files or generating an UML diagram for your contracts.
+For a deeper reference, see [Building plugins](../advanced/building-plugins.md).
 
-Let’s go through the process of creating a plugin to inject ethers.js to the [Buidler Runtime Environment].
+## Start in your config
 
-The environment is configured through a queue of extension functions that you can add to using the `extendEnvironment()` function. It receives one parameter which is an async function which will be executed after the required initialization is done, in order.
+Before publishing a plugin, prototype the behavior in `hardhat.config.js`:
 
-For example, adding the following to `buidler.config.js`:
+~~~js
+task("qrl-accounts", "Prints QRL accounts").setAction(async (_, { network }) => {
+  const accounts = await network.provider.send("qrl_accounts");
 
-```js
-extendEnvironment(bre => {
-  bre.hi = "Hello, Buidler!";
-});
-```
-
-Will make `hi` available everywhere where the environment is accessible.
-
-```js
-extendEnvironment(bre => {
-  bre.hi = "Hello, Buidler!";
+  for (const account of accounts) {
+    console.log(account);
+  }
 });
 
-task("envtest", (args, bre) => {
-  console.log(bre.hi);
-});
+module.exports = {
+  defaultNetwork: "hardhatqrlvm",
+};
+~~~
 
-module.exports = {};
-```
+Run it with:
 
-Will yield:
+~~~sh
+npx hardhat qrl-accounts --network hardhatqrlvm
+~~~
 
-```
-$ npx buidler envtest
-Hello, Buidler!
-```
+If the behavior is useful in more than one project, move it into a plugin.
 
-This is literally all it takes to put together a plugin for Buidler. Injecting an ethers.js instance into the environment would look like this:
+## Create the package
 
-```js
-extendEnvironment(bre => {
-  const wrapper = new EthersProviderWrapper(bre.network.provider);
+Create a new package:
 
-  bre.ethers = {
-    provider: wrapper,
+~~~sh
+mkdir qrl-hardhat-example-plugin
+cd qrl-hardhat-example-plugin
+npm init --yes
+~~~
 
-    getContract: async function(name) {
-      const artifact = await readArtifact(bre.config.paths.artifacts, name);
-      const bytecode = artifact.bytecode;
-      const signers = await bre.ethers.signers();
+Add QRL Hardhat as a peer dependency and development dependency:
 
-      return new ethers.ContractFactory(artifact.abi, bytecode, signers[0]);
-    },
+~~~json
+{
+  "name": "qrl-hardhat-example-plugin",
+  "version": "0.1.0",
+  "main": "index.js",
+  "peerDependencies": {
+    "@theqrl/hardhat": "^1.3.3"
+  },
+  "devDependencies": {
+    "@theqrl/hardhat": "^1.3.3"
+  }
+}
+~~~
 
-    signers: async function() {
-      const accounts = await bre.network.provider.send("eth_accounts");
+## Add a plugin entrypoint
 
-      return accounts.map(account => wrapper.getSigner(account));
+Create `index.js`:
+
+~~~js
+const { extendEnvironment, task } = require("@theqrl/hardhat/config");
+
+module.exports = function qrlExamplePlugin() {
+  task("qrl-accounts", "Prints QRL accounts").setAction(
+    async (_, { network }) => {
+      const accounts = await network.provider.send("qrl_accounts");
+
+      for (const account of accounts) {
+        console.log(account);
+      }
     }
-  };
+  );
+
+  extendEnvironment((hre) => {
+    hre.qrlExample = {
+      async accounts() {
+        return hre.network.provider.send("qrl_accounts");
+      },
+    };
+  });
+};
+~~~
+
+The exported function is called when the plugin is loaded with `usePlugin()`.
+
+## Load the plugin
+
+Install the plugin in a QRL Hardhat project and load it from
+`hardhat.config.js`:
+
+~~~js
+usePlugin("qrl-hardhat-example-plugin");
+
+module.exports = {
+  defaultNetwork: "hardhatqrlvm",
+  networks: {
+    hardhatqrlvm: {
+      qrlJsMonorepoPath: process.env.QRLJS_MONOREPO_PATH,
+      accounts: [{ address: "Q" + "01".repeat(64), balance: "1000000000000" }],
+    },
+  },
+};
+~~~
+
+Run the plugin task:
+
+~~~sh
+npx hardhat qrl-accounts --network hardhatqrlvm
+~~~
+
+Use the runtime helper from a task, script, test, or console:
+
+~~~js
+const accounts = await qrlExample.accounts();
+~~~
+
+## Add parameters
+
+Plugins can use the same task parameter API as project configs:
+
+~~~js
+const { task, types } = require("@theqrl/hardhat/config");
+
+task("qrl-balance", "Prints a QRL account balance")
+  .addParam("account", "QRL address")
+  .addOptionalParam("block", "Block tag", "latest", types.string)
+  .setAction(async ({ account, block }, { network }) => {
+    const [balance] = await network.provider.send("qrl_getBalance", [
+      account,
+      block,
+    ]);
+
+    console.log(balance);
+  });
+~~~
+
+Run it with:
+
+~~~sh
+npx hardhat qrl-balance --account Q... --network qrl
+~~~
+
+## Official environment extension example
+
+`@theqrl/hardhat-web3` is an official plugin that extends the HRE with the
+`Web3` constructor and a connected `web3` instance. Its network API is available
+under `web3.qrl`.
+
+~~~js
+usePlugin("@theqrl/hardhat-web3");
+
+task("web3-accounts", "Prints QRL accounts", async (_, { web3 }) => {
+  console.log(await web3.qrl.getAccounts());
 });
+~~~
 
-module.exports = {};
-```
+## Keep it QRL-compatible
 
-Full functional code [here](https://gist.github.com/fzeoli/9cdd9c1182b9636829bf71bfacb82c43).
+QRL-compatible plugins should prefer:
 
-And that’s it. Ethers.js is now fully available to be used in the Buidler console, your tasks, tests and other plugins.
+- `qrl_*` JSON-RPC methods,
+- `hre.qrl` helpers,
+- Hyperion `.hyp` artifacts,
+- QRL addresses,
+- hardhatqrlvm and HTTP go-qrl networks.
 
-Now, this is just injecting from the config file, which by itself can be useful if that’s all you care about, but this can also be packaged as a reusable plugin that you can publish for others to benefit as well. You only need to wrap everything in a function, and export it in the plugin's main file.
+Avoid assuming Ethereum private keys, Ethers.js signers, or Ethereum Web3
+providers, Ganache, Truffle, Waffle, Buidler EVM, or Solidity-only compiler behavior unless
+your plugin explicitly implements and documents a compatibility layer.
 
-You can use the [plugin boilerplate repository](https://github.com/nomiclabs/buidler-ts-plugin-boilerplate) as a starting point to create an npm package for your plugin. We highly recommend using TypeScript for your plugins, especially if you’re looking to inject objects into the [Buidler Runtime Environment]. This way, types can be exported and text editors can autocomplete for your users.
-
-For a fully functional ethers.js plugin written in TypeScript take a look at [nomiclabs/buidler-ethers](https://github.com/nomiclabs/buidler-ethers) on Github.
-
-Take a look at the [plugin best practices documentation](../advanced/building-plugins.md) and if you end up publishing a plugin, send us a pull request to add it to our [plugins section](../plugins/README.md).
-
-For any questions or feedback you may have, you can find us in the [Buidler Support Telegram group](http://t.me/BuidlerSupport).
-
-[Buidler runtime environment]: ../advanced/buidler-runtime-environment.md

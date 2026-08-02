@@ -1,0 +1,5 @@
+pragma hyperion >=0.0;
+
+import "@scope/package/contracts/nested/dir/Importer.hyp";
+
+contract ImportNested {}

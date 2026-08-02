@@ -1,47 +1,47 @@
 import chalk from "chalk";
 import debug from "debug";
-import { BN, bufferToHex, privateToAddress, toBuffer } from "ethereumjs-util";
 
 import {
   JsonRpcServer,
   JsonRpcServerConfig,
 } from "../internal/buidler-evm/jsonrpc/server";
-import { BUIDLEREVM_NETWORK_NAME } from "../internal/constants";
+import { HARDHAT_QRLVM_NETWORK_NAME } from "../internal/constants";
 import { task, types } from "../internal/core/config/config-env";
-import { BuidlerError } from "../internal/core/errors";
+import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
 import { createProvider } from "../internal/core/providers/construction";
 import { lazyObject } from "../internal/util/lazy";
 import {
-  BuidlerNetworkConfig,
-  EthereumProvider,
-  ResolvedBuidlerConfig,
+  HardhatQrlvmNetworkConfig,
+  IQrlProvider,
+  ResolvedHardhatConfig,
 } from "../types";
 
 import { TASK_NODE } from "./task-names";
 
 const log = debug("buidler:core:tasks:node");
 
-function _createBuidlerEVMProvider(
-  config: ResolvedBuidlerConfig
-): EthereumProvider {
-  log("Creating BuidlerEVM Provider");
+function _createHardhatQrlvmProvider(
+  config: ResolvedHardhatConfig
+): IQrlProvider {
+  log("Creating Hardhat QRLVM Provider");
 
-  const networkName = BUIDLEREVM_NETWORK_NAME;
-  const networkConfig = config.networks[networkName] as BuidlerNetworkConfig;
+  const networkName = HARDHAT_QRLVM_NETWORK_NAME;
+  const networkConfig = config.networks[
+    networkName
+  ] as HardhatQrlvmNetworkConfig;
 
   return lazyObject(() => {
-    log(`Creating buidlerevm provider for JSON-RPC sever`);
+    log("Creating hardhatqrlvm provider for JSON-RPC server");
     return createProvider(
       networkName,
       { loggingEnabled: true, ...networkConfig },
-      config.solc.version,
       config.paths
     );
   });
 }
 
-function logBuidlerEvmAccounts(networkConfig: BuidlerNetworkConfig) {
+function logHardhatQrlvmAccounts(networkConfig: HardhatQrlvmNetworkConfig) {
   if (networkConfig.accounts === undefined) {
     return;
   }
@@ -49,21 +49,18 @@ function logBuidlerEvmAccounts(networkConfig: BuidlerNetworkConfig) {
   console.log("Accounts");
   console.log("========");
 
+  // QRL account seeds must never be printed here.
   for (const [index, account] of networkConfig.accounts.entries()) {
-    const address = bufferToHex(privateToAddress(toBuffer(account.privateKey)));
-    const privateKey = bufferToHex(toBuffer(account.privateKey));
-    const balance = new BN(account.balance)
-      .div(new BN(10).pow(new BN(18)))
-      .toString(10);
+    const address = account.address;
+    const balance = account.balance ?? "0";
 
-    console.log(`Account #${index}: ${address} (${balance} ETH)
-Private Key: ${privateKey}
+    console.log(`Account #${index}: ${address} (${balance} wei)
 `);
   }
 }
 
 export default function () {
-  task(TASK_NODE, "Starts a JSON-RPC server on top of Buidler EVM")
+  task(TASK_NODE, "Starts a JSON-RPC server on top of the local QRL network")
     .addOptionalParam(
       "hostname",
       "The host to which to bind to for new connections",
@@ -77,17 +74,17 @@ export default function () {
       types.int
     )
     .setAction(
-      async ({ hostname, port }, { network, buidlerArguments, config }) => {
+      async ({ hostname, port }, { network, hardhatArguments, config }) => {
         if (
-          network.name !== BUIDLEREVM_NETWORK_NAME &&
-          // We normally set the default network as buidlerArguments.network,
+          network.name !== HARDHAT_QRLVM_NETWORK_NAME &&
+          // We normally set the default network as hardhatArguments.network,
           // so this check isn't enough, and we add the next one. This has the
           // effect of `--network <defaultNetwork>` being a false negative, but
           // not a big deal.
-          buidlerArguments.network !== undefined &&
-          buidlerArguments.network !== config.defaultNetwork
+          hardhatArguments.network !== undefined &&
+          hardhatArguments.network !== config.defaultNetwork
         ) {
-          throw new BuidlerError(
+          throw new HardhatError(
             ERRORS.BUILTIN_TASKS.JSONRPC_UNSUPPORTED_NETWORK
           );
         }
@@ -96,7 +93,7 @@ export default function () {
           const serverConfig: JsonRpcServerConfig = {
             hostname,
             port,
-            provider: _createBuidlerEVMProvider(config),
+            provider: _createHardhatQrlvmProvider(config),
           };
 
           const server = new JsonRpcServer(serverConfig);
@@ -112,17 +109,27 @@ export default function () {
           console.log();
 
           const networkConfig = config.networks[
-            BUIDLEREVM_NETWORK_NAME
-          ] as BuidlerNetworkConfig;
-          logBuidlerEvmAccounts(networkConfig);
+            HARDHAT_QRLVM_NETWORK_NAME
+          ] as HardhatQrlvmNetworkConfig;
+          logHardhatQrlvmAccounts(networkConfig);
+
+          // Graceful shutdown: close the HTTP/WS servers and exit cleanly.
+          const shutdown = () => {
+            server
+              .close()
+              .then(() => process.exit(0))
+              .catch(() => process.exit(1));
+          };
+          process.once("SIGINT", shutdown);
+          process.once("SIGTERM", shutdown);
 
           await server.waitUntilClosed();
         } catch (error) {
-          if (BuidlerError.isBuidlerError(error)) {
+          if (HardhatError.isHardhatError(error)) {
             throw error;
           }
 
-          throw new BuidlerError(
+          throw new HardhatError(
             ERRORS.BUILTIN_TASKS.JSONRPC_SERVER_ERROR,
             {
               error: error.message,

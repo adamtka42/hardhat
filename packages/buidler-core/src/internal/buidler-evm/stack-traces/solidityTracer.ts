@@ -1,1100 +1,928 @@
-import semver from "semver";
+import { getFunctionSignature } from "../../qrl/abi";
 
-import { getUserConfigPath } from "../../core/project-structure";
-
-import { ContractsIdentifier } from "./contracts-identifier";
-import { printMessageTrace } from "./debug";
+import { QrlContractDebugInfo } from "./compiler-to-model";
 import {
-  DecodedCallMessageTrace,
-  DecodedCreateMessageTrace,
-  DecodedEvmMessageTrace,
-  EvmMessageTrace,
-  EvmStep,
-  isCreateTrace,
-  isDecodedCallTrace,
-  isDecodedCreateTrace,
-  isEvmStep,
-  isPrecompileTrace,
-  MessageTrace,
-  PrecompileMessageTrace,
-} from "./message-trace";
-import {
-  Bytecode,
-  ContractFunction,
-  ContractFunctionType,
-  ContractType,
-  Instruction,
-  JumpType,
-  SourceLocation,
-} from "./model";
-import { isCall, isCreate, Opcode } from "./opcodes";
-import {
-  CallFailedErrorStackTraceEntry,
-  CallstackEntryStackTraceEntry,
-  CONSTRUCTOR_FUNCTION_NAME,
-  FALLBACK_FUNCTION_NAME,
-  OtherExecutionErrorStackTraceEntry,
-  RevertErrorStackTraceEntry,
-  SolidityStackTrace,
-  SolidityStackTraceEntry,
-  SourceReference,
-  StackTraceEntryType,
+  QrlStackTraceDiagnostic,
+  QrlStackTraceEntryType,
 } from "./solidity-stack-trace";
+import { QrlStackTraceDecoder } from "./vm-trace-decoder";
 
-// tslint:disable only-buidler-error
-
-export const FIRST_SOLC_VERSION_SUPPORTED = "0.5.1";
-const FIRST_SOLC_VERSION_CREATE_PARAMS_VALIDATION = "0.5.9";
-
-export class SolidityTracer {
-  public getStackTrace(
-    maybeDecodedMessageTrace: MessageTrace
-  ): SolidityStackTrace {
-    if (maybeDecodedMessageTrace.error === undefined) {
-      return [];
-    }
-
-    if (isPrecompileTrace(maybeDecodedMessageTrace)) {
-      return this._getPrecompileMessageStackTrace(maybeDecodedMessageTrace);
-    }
-
-    if (isDecodedCreateTrace(maybeDecodedMessageTrace)) {
-      return this._getCreateMessageStackTrace(maybeDecodedMessageTrace);
-    }
-
-    if (isDecodedCallTrace(maybeDecodedMessageTrace)) {
-      return this._getCallMessageStackTrace(maybeDecodedMessageTrace);
-    }
-
-    return this._getUnrecognizedMessageStackTrace(maybeDecodedMessageTrace);
+export function inferQrlStackTrace(
+  rootFrame: any,
+  decoder: QrlStackTraceDecoder
+): QrlStackTraceDiagnostic[] {
+  if (rootFrame === undefined || rootFrame.errorMessage === undefined) {
+    return [];
   }
 
-  private _getCallMessageStackTrace(
-    trace: DecodedCallMessageTrace
-  ): SolidityStackTrace {
-    if (this._isDirectLibraryCall(trace)) {
-      return this._getDirectLibraryCallErrorStackTrace(trace);
-    }
-
-    const calledFunction = trace.bytecode.contract.getFunctionFromSelector(
-      trace.calldata.slice(0, 4)
-    );
-
-    if (this._isFunctionNotPayableError(trace, calledFunction)) {
-      return [
-        {
-          type: StackTraceEntryType.FUNCTION_NOT_PAYABLE_ERROR,
-          sourceReference: this._getFunctionStartSourceReference(
-            trace,
-            calledFunction!
-          ),
-          value: trace.value,
-        },
-      ];
-    }
-
-    if (this._isMissingFunctionAndFallbackError(trace, calledFunction)) {
-      return [
-        {
-          type:
-            StackTraceEntryType.UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR,
-          sourceReference: this._getContractStartWithoutFunctionSourceReference(
-            trace
-          ),
-        },
-      ];
-    }
-
-    if (this._isFallbackNotPayableError(trace, calledFunction)) {
-      return [
-        {
-          type: StackTraceEntryType.FALLBACK_NOT_PAYABLE_ERROR,
-          sourceReference: this._getFallbackStartSourceReference(trace),
-          value: trace.value,
-        },
-      ];
-    }
-
-    return this._traceEvmExecution(trace);
+  const spine: any[] = [];
+  let current = rootFrame;
+  while (current !== undefined) {
+    spine.push(current);
+    current = propagatedFailureChild(current, decoder);
   }
 
-  private _getUnrecognizedMessageStackTrace(
-    trace: EvmMessageTrace
-  ): SolidityStackTrace {
-    const subtrace = this._getLastSubtrace(trace);
-
-    if (subtrace !== undefined) {
-      // This is not a very exact heuristic, but most of the time it will be right, as solidity
-      // reverts if a call fails, and most contracts are in solidity
-      if (
-        subtrace.error !== undefined &&
-        trace.returnData.equals(subtrace.returnData)
-      ) {
-        let unrecognizedEntry: SolidityStackTraceEntry;
-
-        if (isCreateTrace(trace)) {
-          unrecognizedEntry = {
-            type: StackTraceEntryType.UNRECOGNIZED_CREATE_CALLSTACK_ENTRY,
-          };
-        } else {
-          unrecognizedEntry = {
-            type: StackTraceEntryType.UNRECOGNIZED_CONTRACT_CALLSTACK_ENTRY,
-            address: trace.address,
-          };
+  const diagnostics: QrlStackTraceDiagnostic[] = [];
+  const reversed = spine.reverse();
+  for (let index = 0; index < reversed.length; index++) {
+    const frame = reversed[index];
+    const terminal = inferFrame(frame, decoder, index === 0);
+    const internalCallstack = inferInternalCallstack(frame, decoder);
+    if (
+      (terminal.sourceReference === undefined ||
+        terminal.sourceReference.functionName === "<unknown>") &&
+      internalCallstack.length > 0
+    ) {
+      terminal.sourceReference = internalCallstack.pop();
+    }
+    if (frame.kind === "create" || frame.kind === "create2") {
+      if (terminal.sourceReference !== undefined) {
+        for (
+          let sourceIndex = internalCallstack.length - 1;
+          sourceIndex >= 0;
+          sourceIndex--
+        ) {
+          const source = internalCallstack[sourceIndex];
+          if (
+            source.functionName === "constructor" &&
+            source.sourceName !== terminal.sourceReference.sourceName
+          ) {
+            internalCallstack.splice(sourceIndex, 1);
+          }
         }
-
-        return [unrecognizedEntry, ...this.getStackTrace(subtrace)];
+      }
+      const code = bytesToHex(frame.code ?? frame.input);
+      const implicitConstructor = decoder.decodeImplicitCreationStart(code);
+      if (
+        implicitConstructor !== undefined &&
+        terminal.sourceReference?.functionName !== "constructor" &&
+        implicitConstructor.sourceName !==
+          terminal.sourceReference?.sourceName &&
+        !internalCallstack.some(
+          (source) =>
+            source.sourceName === implicitConstructor.sourceName &&
+            source.functionName === "constructor"
+        )
+      ) {
+        internalCallstack.unshift(implicitConstructor);
       }
     }
-
-    if (isCreateTrace(trace)) {
-      return [
-        {
-          type: StackTraceEntryType.UNRECOGNIZED_CREATE_ERROR,
-          message: trace.returnData,
-        },
-      ];
+    const remaining = allowedCallsiteCounts(
+      internalCallstack,
+      terminal.sourceReference
+    );
+    diagnostics.push(terminal);
+    for (const caller of internalCallstack.reverse()) {
+      const key = sourceReferenceKey(caller);
+      const allowed = remaining.get(key) ?? 0;
+      if (allowed === 0) {
+        continue;
+      }
+      remaining.set(key, allowed - 1);
+      diagnostics.push({
+        type: QrlStackTraceEntryType.CALLSTACK_ENTRY,
+        sourceReference: caller,
+      });
     }
-
-    return [
-      {
-        type: StackTraceEntryType.UNRECOGNIZED_CONTRACT_ERROR,
-        address: trace.address,
-        message: trace.returnData,
-      },
-    ];
   }
+  return diagnostics;
+}
 
-  private _getCreateMessageStackTrace(
-    trace: DecodedCreateMessageTrace
-  ): SolidityStackTrace {
-    if (this._isConstructorNotPayableError(trace)) {
-      return [
-        {
-          type: StackTraceEntryType.FUNCTION_NOT_PAYABLE_ERROR,
-          sourceReference: this._getConstructorStartSourceReference(trace),
-          value: trace.value,
-        },
-      ];
-    }
-
-    if (this._isConstructorInvalidArgumentsError(trace)) {
-      return [
-        {
-          type: StackTraceEntryType.INVALID_PARAMS_ERROR,
-          sourceReference: this._getConstructorStartSourceReference(trace),
-        },
-      ];
-    }
-
-    return this._traceEvmExecution(trace);
-  }
-
-  private _getPrecompileMessageStackTrace(
-    trace: PrecompileMessageTrace
-  ): SolidityStackTrace {
-    return [
-      {
-        type: StackTraceEntryType.PRECOMPILE_ERROR,
-        precompile: trace.precompile,
-      },
-    ];
-  }
-
-  private _traceEvmExecution(
-    trace: DecodedEvmMessageTrace
-  ): SolidityStackTrace {
-    const stacktrace: SolidityStackTrace = [];
-
-    let subtracesSeen = 0;
-    let jumpedIntoFunction = false;
-    const functionJumpdests: Instruction[] = [];
-    let consumedAllInstructions = false;
-
-    for (let stepIndex = 0; stepIndex < trace.steps.length; stepIndex++) {
-      const step = trace.steps[stepIndex];
-      const nextStep = trace.steps[stepIndex + 1];
-
-      if (isEvmStep(step)) {
-        const inst = trace.bytecode.getInstruction(step.pc);
-
-        if (inst.jumpType === JumpType.INTO_FUNCTION) {
-          const nextEvmStep = nextStep as EvmStep; // A jump can't be followed by a subtrace
-          const nextInst = trace.bytecode.getInstruction(nextEvmStep.pc);
-
-          if (nextInst !== undefined && nextInst.opcode === Opcode.JUMPDEST) {
-            if (jumpedIntoFunction || !isDecodedCallTrace(trace)) {
-              stacktrace.push(
-                this._instructionToCallstackStackTraceEntry(
-                  trace.bytecode,
-                  inst
-                )
-              );
-            }
-
-            jumpedIntoFunction = true;
-            functionJumpdests.push(nextInst);
-          }
-        } else if (inst.jumpType === JumpType.OUTOF_FUNCTION) {
-          stacktrace.pop();
-          functionJumpdests.pop();
-        } else if (isCall(inst.opcode) || isCreate(inst.opcode)) {
-          // If a call can't be executed, we don't get an execution trace from it. We can detect
-          // this by checking if the next step is an EvmStep.
-          if (nextStep !== undefined && isEvmStep(nextStep)) {
-            if (this._isCallFailedError(trace, stepIndex, inst)) {
-              stacktrace.push(
-                this._callInstructionToCallFailedToExecuteStackTraceEntry(
-                  trace.bytecode,
-                  inst
-                )
-              );
-
-              consumedAllInstructions = true;
-              break;
-            }
-          } else {
-            stacktrace.push(
-              this._instructionToCallstackStackTraceEntry(trace.bytecode, inst)
-            );
-          }
-        } else if (
-          inst.opcode === Opcode.REVERT ||
-          inst.opcode === Opcode.INVALID
-        ) {
-          // Failures with invalid locations are handled later
-          if (inst.location === undefined) {
-            continue;
-          }
-
-          if (isDecodedCallTrace(trace) && !jumpedIntoFunction) {
-            // Failures in the prelude are resolved later.
-            continue;
-          }
-
-          // There should always be a function here, but that's not the case with optimizations.
-          //
-          // If this is a create trace, we already checked args and nonpayable failures before
-          // calling this function.
-          //
-          // If it's a call trace, we already jumped into a function. But optimizations can happen.
-          const failingFunction = inst.location.getContainingFunction();
-
-          // If the failure is in a modifier we add an entry with the function/constructor
-          if (
-            failingFunction !== undefined &&
-            failingFunction.type === ContractFunctionType.MODIFIER
-          ) {
-            stacktrace.push(
-              this._getEntryBeforeFailureInModifier(trace, functionJumpdests)
-            );
-          }
-
-          if (failingFunction !== undefined) {
-            stacktrace.push(
-              this._instructionWithinFunctionToRevertStackTraceEntry(
-                trace,
-                inst
-              )
-            );
-          } else if (isDecodedCallTrace(trace)) {
-            // This is here because of the optimizations
-            stacktrace.push({
-              type: StackTraceEntryType.REVERT_ERROR,
-              sourceReference: this._getFunctionStartSourceReference(
-                trace,
-                trace.bytecode.contract.getFunctionFromSelector(
-                  trace.calldata.slice(0, 4)
-                )!
-              ),
-              message: trace.returnData,
-            });
-          } else {
-            // This is here because of the optimizations
-            stacktrace.push({
-              type: StackTraceEntryType.REVERT_ERROR,
-              sourceReference: this._getConstructorStartSourceReference(trace),
-              message: trace.returnData,
-            });
-          }
-
-          consumedAllInstructions = true;
-          break;
+function inferInternalCallstack(
+  frame: any,
+  decoder: QrlStackTraceDecoder
+): any[] {
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  const code = bytesToHex(frame.code ?? (isCreate ? frame.input : undefined));
+  const active: any[] = [];
+  const externalCallsites: any[] = [];
+  let previousPc: number | undefined;
+  for (const step of frame.steps ?? []) {
+    if (!isPcStep(step)) {
+      if (isFrameStep(step) && previousPc !== undefined) {
+        const callsite = decoder.decodeFrame(code, previousPc, isCreate);
+        if (callsite !== undefined) {
+          externalCallsites.push(callsite);
         }
-      } else {
-        subtracesSeen += 1;
-
-        // If there are more subtraces, this one didn't terminate the execution
-        if (subtracesSeen < trace.numberOfSubtraces) {
-          stacktrace.pop();
+      }
+      continue;
+    }
+    previousPc = step.pc;
+    const location = decoder.getSourceLocation(code, step.pc, isCreate);
+    if (location?.jumpType === "i") {
+      const source = decoder.decodeFrame(code, step.pc, isCreate);
+      if (source !== undefined && source.functionName !== "<unknown>") {
+        if (source.sourceName === "@theqrl/hardhat/console.hyp") {
           continue;
         }
-
-        if (step.error === undefined) {
-          // If this is a subtrace, we pushed a stack frame pointing to the instruction that
-          // generated the subtrace.
-          const callStackFrame = stacktrace.pop()! as CallstackEntryStackTraceEntry;
-
-          if (this._isReturnDataSizeError(trace, stepIndex)) {
-            stacktrace.push({
-              type: StackTraceEntryType.RETURNDATA_SIZE_ERROR,
-              sourceReference: callStackFrame.sourceReference,
-            });
-
-            consumedAllInstructions = true;
-            break;
-          }
-        } else {
-          if (
-            this._isSubtraceErrorPropagated(trace, stepIndex) ||
-            (isDecodedCallTrace(trace) &&
-              this._isProxyErrorPropagated(trace, stepIndex))
-          ) {
-            const subTrace = this.getStackTrace(step);
-            stacktrace.push(...subTrace);
-
-            consumedAllInstructions = true;
-            break;
-          }
-
-          stacktrace.pop();
-        }
-      }
-    }
-
-    if (consumedAllInstructions) {
-      const firstEntry = stacktrace[0];
-      if (
-        firstEntry.type === StackTraceEntryType.CALLSTACK_ENTRY &&
-        firstEntry.functionType === ContractFunctionType.MODIFIER
-      ) {
-        stacktrace.unshift(
-          this._getEntryBeforeInitialModifierCallstackEntry(trace)
+        active.push(source);
+        const target = decoder.decodeInternalCallTarget(
+          location,
+          source.contractName
         );
-      }
-
-      return stacktrace;
-    }
-
-    const lastStep = trace.steps[trace.steps.length - 1];
-
-    if (!isEvmStep(lastStep)) {
-      throw new Error(
-        "This should not happen: MessageTrace ends with a subtrace"
-      );
-    }
-
-    const lastInstruction = trace.bytecode.getInstruction(lastStep.pc);
-
-    if (isDecodedCallTrace(trace) && !jumpedIntoFunction) {
-      if (this._hasFailedInsideTheFallbackFunction(trace)) {
-        return [
-          this._instructionWithinFunctionToRevertStackTraceEntry(
-            trace,
-            lastInstruction
-          ),
-        ];
-      }
-
-      // This is here because of the optimizations
-      if (lastInstruction.location !== undefined) {
-        const failingFunction = lastInstruction.location.getContainingFunction();
-        if (failingFunction !== undefined) {
-          return [
-            {
-              type: StackTraceEntryType.REVERT_ERROR,
-              sourceReference: this._getFunctionStartSourceReference(
-                trace,
-                failingFunction
-              ),
-              message: trace.returnData,
-            },
-          ];
+        if (target !== undefined && !sameSourceReference(target, source)) {
+          if (sameFunctionReference(target, source)) {
+            Object.defineProperties(source, {
+              __qrlRecursiveCall: { value: true },
+              __qrlLocationKey: {
+                value: [location.offset, location.length].join(":"),
+              },
+            });
+          }
+          active.push(target);
         }
       }
-
-      const calledFunction = trace.bytecode.contract.getFunctionFromSelector(
-        trace.calldata.slice(0, 4)
-      );
-
-      if (calledFunction !== undefined) {
-        return [
-          {
-            type: StackTraceEntryType.INVALID_PARAMS_ERROR,
-            sourceReference: this._getFunctionStartSourceReference(
-              trace,
-              calledFunction
-            ),
-          },
-        ];
-      }
-
-      return [this._getOtherErrorBeforeCalledFunctionStackTraceEntry(trace)];
+    } else if (location?.jumpType === "o" && active.length > 0) {
+      active.pop();
     }
-
-    if (this._isCalledNonContractAccountError(trace)) {
-      stacktrace.push({
-        type: StackTraceEntryType.NONCONTRACT_ACCOUNT_CALLED_ERROR,
-        // We are sure this is not undefined because there was at least a call instruction
-        sourceReference: this._getLastSourceReference(trace)!,
-      });
-    } else {
-      stacktrace.push({
-        type: StackTraceEntryType.OTHER_EXECUTION_ERROR,
-        sourceReference: this._getLastSourceReference(trace),
-      });
-    }
-
-    return stacktrace;
   }
+  return active.filter(
+    (source, index) =>
+      (!externalCallsites.some((callsite) =>
+        sameSourceReference(source, callsite)
+      ) &&
+        !decoder.isFunctionStartReference(source)) ||
+      !active
+        .slice(index + 1)
+        .some((next) => sameFunctionReference(source, next))
+  );
+}
 
-  // Heuristics
-
-  private _isSubtraceErrorPropagated(
-    trace: DecodedEvmMessageTrace,
-    callSubtraceStepIndex: number
-  ): boolean {
-    const call = trace.steps[callSubtraceStepIndex] as MessageTrace;
-
-    if (!trace.returnData.equals(call.returnData)) {
-      return false;
+function allowedCallsiteCounts(
+  sources: any[],
+  terminal: any
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const references = new Map<string, any>();
+  const recursiveLocations = new Map<string, Set<string>>();
+  for (const source of sources) {
+    const key = sourceReferenceKey(source);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    references.set(key, source);
+    if (source.__qrlRecursiveCall === true) {
+      const locations = recursiveLocations.get(key) ?? new Set<string>();
+      locations.add(source.__qrlLocationKey);
+      recursiveLocations.set(key, locations);
     }
-
-    return this._failsRightAfterCall(trace, callSubtraceStepIndex);
   }
-
-  private _isReturnDataSizeError(
-    trace: DecodedEvmMessageTrace,
-    callStepIndex: number
-  ): boolean {
-    return this._failsRightAfterCall(trace, callStepIndex);
-  }
-
-  private _failsRightAfterCall(
-    trace: DecodedEvmMessageTrace,
-    callSubtraceStepIndex: number
-  ): boolean {
-    const lastStep = trace.steps[trace.steps.length - 1];
-    if (!isEvmStep(lastStep)) {
-      return false;
-    }
-
-    const lastInst = trace.bytecode.getInstruction(lastStep.pc);
-    if (lastInst.opcode !== Opcode.REVERT) {
-      return false;
-    }
-
-    const callOpcodeStep = trace.steps[callSubtraceStepIndex - 1] as EvmStep;
-    const callInst = trace.bytecode.getInstruction(callOpcodeStep.pc);
-
-    return this._isLastLocation(
-      trace,
-      callSubtraceStepIndex + 1,
-      callInst.location! // Calls are always made from within functions
+  for (const [key, count] of counts) {
+    const reference = references.get(key);
+    const sameFunction = sameFunctionReference(reference, terminal);
+    const isRecursive = recursiveLocations.has(key);
+    counts.set(
+      key,
+      sameFunction && isRecursive
+        ? count > 2
+          ? Math.ceil(count / 2)
+          : count
+        : sameFunction
+        ? count <= 2
+          ? 0
+          : Math.floor(count / 2)
+        : Math.ceil(count / 2)
     );
   }
+  return counts;
+}
 
-  private _isCalledNonContractAccountError(
-    trace: DecodedEvmMessageTrace
-  ): boolean {
-    // We could change this to checking that the last valid location maps to a call, but
-    // it's way more complex as we need to get the ast node from that location.
+function sameFunctionReference(left: any, right: any): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    left.contractName === right.contractName &&
+    left.functionName === right.functionName &&
+    left.sourceName === right.sourceName
+  );
+}
 
-    const lastIndex = this._getLastInstructionWithValidLocationStepIndex(trace);
-    if (lastIndex === undefined || lastIndex === 0) {
-      return false;
-    }
+function sourceReferenceKey(source: any): string {
+  return [
+    source?.contractName,
+    source?.functionName,
+    source?.sourceName,
+    source?.line,
+  ].join(":");
+}
 
-    const lastStep = trace.steps[lastIndex] as EvmStep; // We know this is an EVM step
-    const lastInst = trace.bytecode.getInstruction(lastStep.pc);
-    if (lastInst.opcode !== Opcode.ISZERO) {
-      return false;
-    }
+function sameSourceReference(left: any, right: any): boolean {
+  return sameFunctionReference(left, right) && left.line === right.line;
+}
 
-    const prevStep = trace.steps[lastIndex - 1] as EvmStep; // We know this is an EVM step
-    const prevInst = trace.bytecode.getInstruction(prevStep.pc);
-    return prevInst.opcode === Opcode.EXTCODESIZE;
-  }
-
-  private _isCallFailedError(
-    trace: DecodedEvmMessageTrace,
-    instIndex: number,
-    callInstruction: Instruction
-  ): boolean {
-    const callLocation = callInstruction.location!; // Calls are always made from within functions
-    return this._isLastLocation(trace, instIndex, callLocation);
-  }
-
-  private _hasFailedInsideTheFallbackFunction(
-    trace: DecodedCallMessageTrace
-  ): boolean {
-    const contract = trace.bytecode.contract;
-
-    if (contract.fallback === undefined) {
-      return false;
-    }
-
-    const lastStep = trace.steps[trace.steps.length - 1] as EvmStep;
-    const lastInstruction = trace.bytecode.getInstruction(lastStep.pc);
-
-    return (
-      lastInstruction.location !== undefined &&
-      lastInstruction.opcode === Opcode.REVERT &&
-      contract.fallback.location.contains(lastInstruction.location)
-    );
-  }
-
-  private _isProxyErrorPropagated(
-    trace: DecodedCallMessageTrace,
-    callSubtraceStepIndex: number
-  ): boolean {
-    const callStep = trace.steps[callSubtraceStepIndex - 1];
-    if (!isEvmStep(callStep)) {
-      return false;
-    }
-
-    const callInst = trace.bytecode.getInstruction(callStep.pc);
-    if (callInst.opcode !== Opcode.DELEGATECALL) {
-      return false;
-    }
-
-    const subtrace = trace.steps[callSubtraceStepIndex];
-    if (isEvmStep(subtrace)) {
-      return false;
-    }
-
-    if (isPrecompileTrace(subtrace)) {
-      return false;
-    }
-
-    // If we can't recognize the implementation we'd better don't consider it as such
-    if (subtrace.bytecode === undefined) {
-      return false;
-    }
-
-    if (subtrace.bytecode.contract.type === ContractType.LIBRARY) {
-      return false;
-    }
-
-    if (!trace.returnData.equals(subtrace.returnData)) {
-      return false;
-    }
-
-    for (let i = callSubtraceStepIndex + 1; i < trace.steps.length; i++) {
-      const step = trace.steps[i];
-      if (!isEvmStep(step)) {
-        return false;
-      }
-
-      const inst = trace.bytecode.getInstruction(step.pc);
-
-      // All the remaining locations should be valid, as they are part of the inline asm
-      if (inst.location === undefined) {
-        return false;
-      }
-
-      if (
-        inst.jumpType === JumpType.INTO_FUNCTION ||
-        inst.jumpType === JumpType.OUTOF_FUNCTION
-      ) {
-        return false;
-      }
-    }
-
-    const lastStep = trace.steps[trace.steps.length - 1] as EvmStep;
-    const lastInst = trace.bytecode.getInstruction(lastStep.pc);
-
-    return lastInst.opcode === Opcode.REVERT;
-  }
-
-  private _isConstructorNotPayableError(
-    trace: DecodedCreateMessageTrace
-  ): boolean {
-    // This error doesn't return data
-    if (trace.returnData.length > 0) {
-      return false;
-    }
-
-    const constructor = trace.bytecode.contract.constructorFunction;
-
-    // This function is only matters with contracts that have constructors defined. The ones that
-    // don't are abstract contracts, or their constructor doesn't take any argument.
-    if (constructor === undefined) {
-      return false;
-    }
-
-    return (
-      trace.value.gtn(0) &&
-      (constructor.isPayable === undefined || !constructor.isPayable)
-    );
-  }
-
-  private _isConstructorInvalidArgumentsError(
-    trace: DecodedCreateMessageTrace
-  ): boolean {
-    // This error doesn't return data
-    if (trace.returnData.length > 0) {
-      return false;
-    }
-
-    const contract = trace.bytecode.contract;
-    const constructor = contract.constructorFunction;
-
-    // This function is only matters with contracts that have constructors defined. The ones that
-    // don't are abstract contracts, or their constructor doesn't take any argument.
-    if (constructor === undefined) {
-      return false;
-    }
-
-    if (
-      semver.lt(
-        trace.bytecode.compilerVersion,
-        FIRST_SOLC_VERSION_CREATE_PARAMS_VALIDATION
-      )
-    ) {
-      return false;
-    }
-
-    const lastStep = trace.steps[trace.steps.length - 1];
-    if (!isEvmStep(lastStep)) {
-      return false;
-    }
-
-    const lastInst = trace.bytecode.getInstruction(lastStep.pc);
-    if (lastInst.opcode !== Opcode.REVERT || lastInst.location !== undefined) {
-      return false;
-    }
-
-    // tslint:disable-next-line prefer-for-of
-    for (let stepIndex = 0; stepIndex < trace.steps.length; stepIndex++) {
-      const step = trace.steps[stepIndex];
-      if (!isEvmStep(step)) {
-        return false;
-      }
-
-      const inst = trace.bytecode.getInstruction(step.pc);
-
-      if (
-        inst.location !== undefined &&
-        !contract.location.equals(inst.location) &&
-        !constructor.location.equals(inst.location)
-      ) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  private _isDirectLibraryCall(trace: DecodedCallMessageTrace): boolean {
-    return (
-      trace.depth === 0 && trace.bytecode.contract.type === ContractType.LIBRARY
-    );
-  }
-
-  private _isFunctionNotPayableError(
-    trace: DecodedCallMessageTrace,
-    calledFunction: ContractFunction | undefined
-  ): boolean {
-    if (calledFunction === undefined) {
-      return false;
-    }
-
-    // This error doesn't return data
-    if (trace.returnData.length > 0) {
-      return false;
-    }
-
-    if (trace.value.lten(0)) {
-      return false;
-    }
-
-    // Libraries don't have a nonpayable check
-    if (trace.bytecode.contract.type === ContractType.LIBRARY) {
-      return false;
-    }
-
-    return calledFunction.isPayable === undefined || !calledFunction.isPayable;
-  }
-
-  private _isMissingFunctionAndFallbackError(
-    trace: DecodedCallMessageTrace,
-    calledFunction: ContractFunction | undefined
-  ): boolean {
-    // This error doesn't return data
-    if (trace.returnData.length > 0) {
-      return false;
-    }
-
-    return (
-      calledFunction === undefined &&
-      trace.bytecode.contract.fallback === undefined
-    );
-  }
-
-  private _isFallbackNotPayableError(
-    trace: DecodedCallMessageTrace,
-    calledFunction: ContractFunction | undefined
-  ): boolean {
-    if (calledFunction !== undefined) {
-      return false;
-    }
-
-    // This error doesn't return data
-    if (trace.returnData.length > 0) {
-      return false;
-    }
-
-    if (trace.value.lten(0)) {
-      return false;
-    }
-
-    if (trace.bytecode.contract.fallback === undefined) {
-      return false;
-    }
-
-    const isPayable = trace.bytecode.contract.fallback.isPayable;
-
-    return isPayable === undefined || !isPayable;
-  }
-
-  // Stack trace entry factories
-
-  private _getDirectLibraryCallErrorStackTrace(
-    trace: DecodedCallMessageTrace
-  ): SolidityStackTrace {
-    const func = trace.bytecode.contract.getFunctionFromSelector(
-      trace.calldata.slice(0, 4)
-    );
-
-    if (func !== undefined) {
-      return [
-        {
-          type: StackTraceEntryType.DIRECT_LIBRARY_CALL_ERROR,
-          sourceReference: this._getFunctionStartSourceReference(trace, func),
-        },
-      ];
-    }
-
-    return [
-      {
-        type: StackTraceEntryType.DIRECT_LIBRARY_CALL_ERROR,
-        sourceReference: this._getContractStartWithoutFunctionSourceReference(
-          trace
-        ),
-      },
-    ];
-  }
-
-  private _getOtherErrorBeforeCalledFunctionStackTraceEntry(
-    trace: DecodedCallMessageTrace
-  ): OtherExecutionErrorStackTraceEntry {
+function inferFrame(
+  frame: any,
+  decoder: QrlStackTraceDecoder,
+  isFailureOrigin: boolean
+): QrlStackTraceDiagnostic {
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  if (frame.precompile !== undefined) {
     return {
-      type: StackTraceEntryType.OTHER_EXECUTION_ERROR,
-      sourceReference: this._getContractStartWithoutFunctionSourceReference(
-        trace
-      ),
+      type: QrlStackTraceEntryType.PRECOMPILE_ERROR,
+      precompile: frame.precompile.toString(),
     };
   }
 
-  private _instructionToCallstackStackTraceEntry(
-    bytecode: Bytecode,
-    inst: Instruction
-  ): CallstackEntryStackTraceEntry {
-    const func = inst.location!.getContainingFunction();
+  const code = bytesToHex(frame.code ?? (isCreate ? frame.input : undefined));
+  const contract = decoder.identifyContract(code, isCreate);
+  let sourceReference =
+    typeof frame.lastPc === "number"
+      ? decoder.decodeFrame(code, frame.lastPc, isCreate)
+      : undefined;
 
-    if (func !== undefined) {
+  if (contract === undefined) {
+    return {
+      type: isFailureOrigin
+        ? isCreate
+          ? QrlStackTraceEntryType.UNRECOGNIZED_CREATE_ERROR
+          : QrlStackTraceEntryType.UNRECOGNIZED_CONTRACT_ERROR
+        : isCreate
+        ? QrlStackTraceEntryType.UNRECOGNIZED_CREATE_CALLSTACK_ENTRY
+        : QrlStackTraceEntryType.UNRECOGNIZED_CONTRACT_CALLSTACK_ENTRY,
+      address: frame.target?.toString(),
+      message: frame.returnValue,
+    };
+  }
+
+  if (
+    !isCreate &&
+    (sourceReference === undefined ||
+      sourceReference.functionName === "<unknown>")
+  ) {
+    const fragment = findCalledFunction(frame, contract);
+    const fallback =
+      contract.abi.find(
+        (candidate) =>
+          candidate.type ===
+          (bytes(frame.input).length === 0 ? "receive" : "fallback")
+      ) ?? contract.abi.find((candidate) => candidate.type === "fallback");
+    const identifier =
+      fragment !== undefined ? getFunctionSignature(fragment) : fallback?.type;
+    if (identifier !== undefined) {
+      sourceReference =
+        decoder.decodeContractStart(contract, identifier) ?? sourceReference;
+    }
+  }
+
+  if (!isFailureOrigin) {
+    return {
+      type: QrlStackTraceEntryType.CALLSTACK_ENTRY,
+      sourceReference:
+        decodeLastFailedChildCallsite(frame, decoder) ?? sourceReference,
+    };
+  }
+
+  const dispatchError = inferDispatchError(
+    frame,
+    contract,
+    sourceReference,
+    decoder
+  );
+  if (dispatchError !== undefined) {
+    return dispatchError;
+  }
+
+  const orderedSteps = Array.isArray(frame.steps) ? frame.steps : [];
+  const executionSourceReference =
+    sourceReference !== undefined &&
+    decoder.isFunctionStartReference(sourceReference)
+      ? decoder.decodeLastMappedStatement(code, orderedSteps, isCreate) ??
+        sourceReference
+      : sourceReference;
+  const lastChildIndex = findLastChildIndex(orderedSteps);
+  const lastChild =
+    lastChildIndex === undefined ? undefined : orderedSteps[lastChildIndex];
+  if (
+    lastChild !== undefined &&
+    lastChild.errorMessage === undefined &&
+    failsImmediatelyAfterChild(frame, orderedSteps, lastChildIndex!, decoder)
+  ) {
+    if (byteLength(lastChild.code) === 0) {
       return {
-        type: StackTraceEntryType.CALLSTACK_ENTRY,
-        sourceReference: this._sourceLocationToSourceReference(
-          bytecode,
-          inst.location
-        )!,
-        functionType: func.type,
+        type: QrlStackTraceEntryType.NONCONTRACT_ACCOUNT_CALLED_ERROR,
+        sourceReference: executionSourceReference,
+        address: lastChild.target?.toString(),
       };
     }
-
     return {
-      type: StackTraceEntryType.CALLSTACK_ENTRY,
-      sourceReference: {
-        function: undefined,
-        contract: bytecode.contract.name,
-        fileGlobalName: inst.location!.file.globalName,
-        line: inst.location!.getStartingLineNumber(),
-      },
-      functionType: ContractFunctionType.FUNCTION,
+      type: QrlStackTraceEntryType.RETURNDATA_SIZE_ERROR,
+      sourceReference: executionSourceReference,
     };
   }
 
-  private _callInstructionToCallFailedToExecuteStackTraceEntry(
-    bytecode: Bytecode,
-    callInst: Instruction
-  ): CallFailedErrorStackTraceEntry {
-    // Calls only happen within functions
-    return {
-      type: StackTraceEntryType.CALL_FAILED_ERROR,
-      sourceReference: this._sourceLocationToSourceReference(
-        bytecode,
-        callInst.location
-      )!,
-    };
-  }
-
-  private _instructionWithinFunctionToRevertStackTraceEntry(
-    trace: DecodedEvmMessageTrace,
-    inst: Instruction
-  ): RevertErrorStackTraceEntry {
-    return {
-      type: StackTraceEntryType.REVERT_ERROR,
-      sourceReference: this._sourceLocationToSourceReference(
-        trace.bytecode,
-        inst.location
-      )!,
-      message: trace.returnData,
-    };
-  }
-
-  private _getEntryBeforeFailureInModifier(
-    trace: DecodedEvmMessageTrace,
-    functionJumpdests: Instruction[]
-  ): CallstackEntryStackTraceEntry {
-    // If there's a jumpdest, this modifier belongs to the last function that it represents
-    if (functionJumpdests.length > 0) {
-      return this._instructionToCallstackStackTraceEntry(
-        trace.bytecode,
-        functionJumpdests[functionJumpdests.length - 1]
-      );
-    }
-
-    // This function is only called after we jumped into the initial function in call traces, so
-    // there should always be at least a function jumpdest.
-    if (!isDecodedCreateTrace(trace)) {
-      throw new Error(
-        "This shouldn't happen: a call trace has no functionJumpdest but has already jumped into a function"
-      );
-    }
-
-    // If there's no jump dest, we point to the constructor.
-    return {
-      type: StackTraceEntryType.CALLSTACK_ENTRY,
-      sourceReference: this._getConstructorStartSourceReference(trace),
-      functionType: ContractFunctionType.CONSTRUCTOR,
-    };
-  }
-
-  private _getEntryBeforeInitialModifierCallstackEntry(
-    trace: DecodedEvmMessageTrace
-  ): SolidityStackTraceEntry {
-    if (isDecodedCreateTrace(trace)) {
-      return {
-        type: StackTraceEntryType.CALLSTACK_ENTRY,
-        sourceReference: this._getConstructorStartSourceReference(trace),
-        functionType: ContractFunctionType.CONSTRUCTOR,
-      };
-    }
-
-    const calledFunction = trace.bytecode.contract.getFunctionFromSelector(
-      trace.calldata.slice(0, 4)
-    );
-
-    if (calledFunction !== undefined) {
-      return {
-        type: StackTraceEntryType.CALLSTACK_ENTRY,
-        sourceReference: this._getFunctionStartSourceReference(
-          trace,
-          calledFunction
-        ),
-        functionType: ContractFunctionType.FUNCTION,
-      };
-    }
-
-    // If it failed or made a call from within a modifier, and the selector doesn't match
-    // any function, it must have a fallback.
-    return {
-      type: StackTraceEntryType.CALLSTACK_ENTRY,
-      sourceReference: this._getFallbackStartSourceReference(trace),
-      functionType: ContractFunctionType.FALLBACK,
-    };
-  }
-
-  // Source reference factories
-
-  private _getContractStartWithoutFunctionSourceReference(
-    trace: DecodedEvmMessageTrace
+  if (
+    lastChild !== undefined &&
+    isCallSetupFailure(lastChild) &&
+    failsImmediatelyAfterChild(frame, orderedSteps, lastChildIndex!, decoder)
   ) {
     return {
-      fileGlobalName: trace.bytecode.contract.location.file.globalName,
-      contract: trace.bytecode.contract.name,
-      line: trace.bytecode.contract.location.getStartingLineNumber(),
+      type: QrlStackTraceEntryType.CALL_FAILED_ERROR,
+      sourceReference: executionSourceReference,
     };
   }
 
-  /**
-   * Returns a source reference pointing to the constructor if it exists, or to the contract
-   * otherwise.
-   */
-  private _getConstructorStartSourceReference(
-    trace: DecodedCreateMessageTrace
-  ): SourceReference {
-    const contract = trace.bytecode.contract;
-    const constructor = contract.constructorFunction;
-
-    const line =
-      constructor !== undefined
-        ? constructor.location.getStartingLineNumber()
-        : contract.location.getStartingLineNumber();
-
+  if (hasNonContractAccountGuardFailure(frame)) {
     return {
-      fileGlobalName: contract.location.file.globalName,
-      contract: contract.name,
-      function: CONSTRUCTOR_FUNCTION_NAME,
-      line,
+      type: QrlStackTraceEntryType.NONCONTRACT_ACCOUNT_CALLED_ERROR,
+      sourceReference: executionSourceReference,
     };
   }
 
-  private _getFallbackStartSourceReference(
-    trace: DecodedCallMessageTrace
-  ): SourceReference {
-    const func = trace.bytecode.contract.fallback;
+  if (hasFailedCallWithoutSubtrace(frame, decoder)) {
+    return {
+      type: QrlStackTraceEntryType.CALL_FAILED_ERROR,
+      sourceReference: executionSourceReference,
+    };
+  }
 
-    if (func === undefined) {
-      throw new Error(
-        "This shouldn't happen: trying to get fallback source reference from a contract without fallback"
-      );
+  let revertSourceReference = executionSourceReference;
+  if (
+    sourceReference !== undefined &&
+    decoder.isFunctionStartReference(sourceReference)
+  ) {
+    const fragment = !isCreate
+      ? findCalledFunction(frame, contract)
+      : undefined;
+    revertSourceReference =
+      decoder.decodeLastModifier(code, orderedSteps, isCreate) ??
+      (fragment !== undefined
+        ? decoder.decodeUnconditionalModifier(
+            contract,
+            getFunctionSignature(fragment)
+          )
+        : undefined) ??
+      executionSourceReference;
+  }
+
+  if (
+    lastOpcode(frame) === 0xfd ||
+    lastOpcode(frame) === 0xfe ||
+    byteLength(frame.returnValue) > 0
+  ) {
+    return {
+      type: QrlStackTraceEntryType.REVERT_ERROR,
+      sourceReference: revertSourceReference,
+      message: frame.returnValue,
+    };
+  }
+
+  if (frame.children?.some((child: any) => child.errorMessage !== undefined)) {
+    return {
+      type: QrlStackTraceEntryType.CALL_FAILED_ERROR,
+      sourceReference: executionSourceReference,
+    };
+  }
+
+  return {
+    type: QrlStackTraceEntryType.OTHER_EXECUTION_ERROR,
+    sourceReference,
+  };
+}
+
+function inferDispatchError(
+  frame: any,
+  contract: QrlContractDebugInfo,
+  sourceReference: any,
+  decoder: QrlStackTraceDecoder
+): QrlStackTraceDiagnostic | undefined {
+  if (frame.kind === "create" || frame.kind === "create2") {
+    const constructor = contract.abi.find(
+      (candidate) => candidate.type === "constructor"
+    );
+    const constructorSource =
+      decoder.decodeContractStart(contract, "constructor") ?? sourceReference;
+    const constructorValue = frame.value ?? (global as any).BigInt(0);
+    const zeroValue = (global as any).BigInt(0);
+    if (
+      constructorValue > zeroValue &&
+      constructor !== undefined &&
+      constructor.stateMutability !== "payable"
+    ) {
+      return {
+        type: QrlStackTraceEntryType.FUNCTION_NOT_PAYABLE_ERROR,
+        sourceReference: constructorSource,
+        value: constructorValue,
+      };
     }
 
-    return {
-      fileGlobalName: func.location.file.globalName,
-      contract: trace.bytecode.contract.name,
-      function: FALLBACK_FUNCTION_NAME,
-      line: func.location.getStartingLineNumber(),
-    };
-  }
-
-  private _getFunctionStartSourceReference(
-    trace: DecodedEvmMessageTrace,
-    func: ContractFunction
-  ): SourceReference {
-    return {
-      fileGlobalName: func.location.file.globalName,
-      contract: trace.bytecode.contract.name,
-      function: func.name,
-      line: func.location.getStartingLineNumber(),
-    };
-  }
-
-  private _getLastSourceReference(
-    trace: DecodedEvmMessageTrace
-  ): SourceReference | undefined {
-    for (let i = trace.steps.length - 1; i >= 0; i--) {
-      const step = trace.steps[i];
-      if (!isEvmStep(step)) {
-        continue;
+    if (constructor !== undefined && byteLength(frame.returnValue) === 0) {
+      const initCodeLength = stripHexPrefix(contract.bytecode).length / 2;
+      const constructorData = bytes(frame.input).slice(initCodeLength);
+      if (!isValidAbiData(constructor.inputs ?? [], constructorData)) {
+        return {
+          type: QrlStackTraceEntryType.INVALID_PARAMS_ERROR,
+          sourceReference: constructorSource,
+        };
       }
-
-      const inst = trace.bytecode.getInstruction(step.pc);
-
-      if (inst.location === undefined) {
-        continue;
-      }
-
-      return this._sourceLocationToSourceReference(
-        trace.bytecode,
-        inst.location
-      );
     }
-
     return undefined;
   }
 
-  private _sourceLocationToSourceReference(
-    bytecode: Bytecode,
-    location?: SourceLocation
-  ): SourceReference | undefined {
-    if (location === undefined) {
-      return undefined;
+  const input = bytes(frame.input);
+  const fragment = findCalledFunction(frame, contract);
+  const fallback =
+    input.length === 0
+      ? contract.abi.find((candidate) => candidate.type === "receive") ??
+        contract.abi.find((candidate) => candidate.type === "fallback")
+      : contract.abi.find((candidate) => candidate.type === "fallback");
+  const value = frame.value ?? (global as any).BigInt(0);
+  const zero = (global as any).BigInt(0);
+
+  if (fragment !== undefined) {
+    if (value > zero && fragment.stateMutability !== "payable") {
+      return {
+        type: QrlStackTraceEntryType.FUNCTION_NOT_PAYABLE_ERROR,
+        sourceReference:
+          decoder.decodeContractStart(
+            contract,
+            getFunctionSignature(fragment)
+          ) ?? sourceReference,
+        value,
+      };
     }
-
-    const func = location.getContainingFunction();
-
-    if (func === undefined) {
-      return undefined;
+    if (!isValidAbiData(fragment.inputs ?? [], input.slice(4))) {
+      return {
+        type: QrlStackTraceEntryType.INVALID_PARAMS_ERROR,
+        sourceReference:
+          decoder.decodeContractStart(
+            contract,
+            getFunctionSignature(fragment)
+          ) ?? sourceReference,
+      };
     }
-
-    let funcName = func.name;
-
-    if (func.type === ContractFunctionType.CONSTRUCTOR) {
-      funcName = CONSTRUCTOR_FUNCTION_NAME;
-    } else if (func.type === ContractFunctionType.FALLBACK) {
-      funcName = FALLBACK_FUNCTION_NAME;
-    }
-
-    return {
-      function: funcName,
-      contract: bytecode.contract.name,
-      fileGlobalName: func.location.file.globalName,
-      line: location.getStartingLineNumber(),
-    };
-  }
-
-  // Utils
-
-  private _getLastSubtrace(trace: EvmMessageTrace): MessageTrace | undefined {
-    if (trace.numberOfSubtraces < 1) {
-      return undefined;
-    }
-
-    let i = trace.steps.length - 1;
-
-    while (isEvmStep(trace.steps[i])) {
-      i -= 1;
-    }
-
-    return trace.steps[i] as MessageTrace;
-  }
-
-  private _getLastInstructionWithValidLocationStepIndex(
-    trace: DecodedEvmMessageTrace
-  ): number | undefined {
-    for (let i = trace.steps.length - 1; i >= 0; i--) {
-      const step = trace.steps[i];
-
-      if (!isEvmStep(step)) {
-        return undefined;
-      }
-
-      const inst = trace.bytecode.getInstruction(step.pc);
-      if (inst.location !== undefined) {
-        return i;
-      }
-    }
-
     return undefined;
   }
 
-  private _isLastLocation(
-    trace: DecodedEvmMessageTrace,
-    fromStep: number,
-    location: SourceLocation
-  ): boolean {
-    for (let i = fromStep; i < trace.steps.length; i++) {
-      const step = trace.steps[i];
+  if (fallback === undefined && byteLength(frame.returnValue) === 0) {
+    return {
+      type: QrlStackTraceEntryType.UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR,
+      sourceReference: decoder.decodeContractStart(contract) ?? sourceReference,
+    };
+  }
+  if (
+    fallback !== undefined &&
+    value > zero &&
+    fallback.stateMutability !== "payable"
+  ) {
+    return {
+      type: QrlStackTraceEntryType.FALLBACK_NOT_PAYABLE_ERROR,
+      sourceReference:
+        decoder.decodeContractStart(contract, fallback.type) ?? sourceReference,
+      value,
+    };
+  }
+  return undefined;
+}
 
-      if (!isEvmStep(step)) {
-        return false;
-      }
+function findCalledFunction(
+  frame: any,
+  contract: QrlContractDebugInfo
+): any | undefined {
+  const input = bytes(frame.input);
+  const selector = input.length >= 4 ? toHex(input.slice(0, 4)) : undefined;
+  const signature = Object.keys(contract.methodIdentifiers).find(
+    (candidate) =>
+      normalizeSelector(contract.methodIdentifiers[candidate]) === selector
+  );
+  return signature === undefined
+    ? undefined
+    : contract.abi.find(
+        (candidate) =>
+          candidate.type === "function" &&
+          getFunctionSignature(candidate) === signature
+      );
+}
 
-      const stepInst = trace.bytecode.getInstruction(step.pc);
+function isValidAbiData(inputs: any[], data: Uint8Array): boolean {
+  if (data.length % 64 !== 0) {
+    return false;
+  }
+  return validateParameterHead(inputs, data, 0);
+}
 
-      if (stepInst.location === undefined) {
-        continue;
-      }
+function validateParameterHead(
+  inputs: any[],
+  data: Uint8Array,
+  base: number
+): boolean {
+  const headWords = inputs.reduce(
+    (total: number, input: any) => total + staticSlotWords(input),
+    0
+  );
+  const headLength = headWords * 64;
+  if (base + headLength > data.length) {
+    return false;
+  }
 
-      if (!location.equals(stepInst.location)) {
+  let cursor = base;
+  for (const input of inputs) {
+    if (isDynamicParam(input)) {
+      const relativeOffset = readWordNumber(data, cursor);
+      if (
+        relativeOffset === undefined ||
+        relativeOffset < headLength ||
+        relativeOffset % 64 !== 0 ||
+        !validateDynamicValue(input, data, base + relativeOffset)
+      ) {
         return false;
       }
     }
+    cursor += staticSlotWords(input) * 64;
+  }
+  return true;
+}
 
+function validateDynamicValue(
+  input: any,
+  data: Uint8Array,
+  offset: number
+): boolean {
+  const type = String(input.type ?? "");
+  if (type === "string" || type === "bytes") {
+    const length = readWordNumber(data, offset);
+    return (
+      length !== undefined &&
+      offset + 64 + Math.ceil(length / 64) * 64 <= data.length
+    );
+  }
+
+  const dynamicArray = type.match(/^(.*)\[\]$/);
+  if (dynamicArray !== null) {
+    const length = readWordNumber(data, offset);
+    if (length === undefined) {
+      return false;
+    }
+    const element = { ...input, type: dynamicArray[1] };
+    const elementsBase = offset + 64;
+    if (isDynamicParam(element)) {
+      const synthetic = new Array(length).fill(element);
+      return validateParameterHead(synthetic, data, elementsBase);
+    }
+    return elementsBase + length * staticSlotWords(element) * 64 <= data.length;
+  }
+
+  const fixedArray = type.match(/^(.*)\[(\d+)\]$/);
+  if (fixedArray !== null) {
+    const element = { ...input, type: fixedArray[1] };
+    return validateParameterHead(
+      new Array(parseInt(fixedArray[2], 10)).fill(element),
+      data,
+      offset
+    );
+  }
+
+  if (type.startsWith("tuple")) {
+    return validateParameterHead(input.components ?? [], data, offset);
+  }
+  return false;
+}
+
+function staticSlotWords(input: any): number {
+  if (isDynamicParam(input)) {
+    return 1;
+  }
+  const type = String(input.type ?? "");
+  const array = type.match(/^(.*)\[(\d+)\]$/);
+  if (array !== null) {
+    return (
+      staticSlotWords({ ...input, type: array[1] }) * parseInt(array[2], 10)
+    );
+  }
+  if (type.startsWith("tuple")) {
+    return (input.components ?? []).reduce(
+      (total: number, component: any) => total + staticSlotWords(component),
+      0
+    );
+  }
+  return 1;
+}
+
+function isDynamicParam(input: any): boolean {
+  const type = String(input.type ?? "");
+  if (type === "string" || type === "bytes" || /\[\]$/.test(type)) {
     return true;
   }
+  const fixedArray = type.match(/^(.*)\[\d+\]$/);
+  if (fixedArray !== null) {
+    return isDynamicParam({ ...input, type: fixedArray[1] });
+  }
+  return (
+    type.startsWith("tuple") &&
+    (input.components ?? []).some((component: any) => isDynamicParam(component))
+  );
+}
+
+function readWordNumber(data: Uint8Array, offset: number): number | undefined {
+  if (offset < 0 || offset + 64 > data.length) {
+    return undefined;
+  }
+  let value = 0;
+  for (let index = offset; index < offset + 64; index++) {
+    value = value * 256 + data[index];
+    if (!Number.isSafeInteger(value)) {
+      return undefined;
+    }
+  }
+  return value;
+}
+
+function propagatedFailureChild(
+  frame: any,
+  decoder: QrlStackTraceDecoder
+): any | undefined {
+  const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  const code = bytesToHex(frame.code ?? (isCreate ? frame.input : undefined));
+  const recognized = decoder.identifyContract(code, isCreate) !== undefined;
+  let hasOrderedChildren = false;
+  for (let index = steps.length - 1; index >= 0; index--) {
+    const child = steps[index];
+    if (!isFrameStep(child)) {
+      continue;
+    }
+    hasOrderedChildren = true;
+    if (
+      child.errorMessage !== undefined &&
+      !isCallSetupFailure(child) &&
+      bytesEqual(child.returnValue, frame.returnValue) &&
+      (forwardsReturnDataAfterChild(frame, steps, index) ||
+        ((byteLength(child.returnValue) === 0 || !recognized) &&
+          failsImmediatelyAfterChild(frame, steps, index, decoder)))
+    ) {
+      return child;
+    }
+  }
+
+  // Backward-compatible degradation for an older qrljs runtime that has no
+  // ordered frame steps. Empty payloads remain undecidable in that format.
+  if (!hasOrderedChildren) {
+    const children = (frame.children ?? []).filter(
+      (child: any) => child.errorMessage !== undefined
+    );
+    for (let index = children.length - 1; index >= 0; index--) {
+      const child = children[index];
+      if (
+        byteLength(child.returnValue) > 0 &&
+        bytesEqual(child.returnValue, frame.returnValue)
+      ) {
+        return child;
+      }
+    }
+  }
+  return undefined;
+}
+
+function findLastChildIndex(steps: any[]): number | undefined {
+  for (let index = steps.length - 1; index >= 0; index--) {
+    if (isFrameStep(steps[index])) {
+      return index;
+    }
+  }
+  return undefined;
+}
+
+function decodeLastFailedChildCallsite(
+  frame: any,
+  decoder: QrlStackTraceDecoder
+): any | undefined {
+  const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  const code = bytesToHex(frame.code);
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  for (let childIndex = steps.length - 1; childIndex >= 0; childIndex--) {
+    const child = steps[childIndex];
+    if (!isFrameStep(child) || child.errorMessage === undefined) {
+      continue;
+    }
+    for (let pcIndex = childIndex - 1; pcIndex >= 0; pcIndex--) {
+      if (isPcStep(steps[pcIndex])) {
+        return decoder.decodeFrame(code, steps[pcIndex].pc, isCreate);
+      }
+    }
+  }
+  return undefined;
+}
+
+function isCallSetupFailure(frame: any): boolean {
+  return (
+    byteLength(frame.code) === 0 &&
+    typeof frame.errorMessage === "string" &&
+    /balance underflow|insufficient funds/i.test(frame.errorMessage)
+  );
+}
+
+function forwardsReturnDataAfterChild(
+  frame: any,
+  steps: any[],
+  childIndex: number
+): boolean {
+  const code = bytes(frame.code);
+  const after = steps.slice(childIndex + 1);
+  let lastCopyIndex = -1;
+  for (let index = 0; index < after.length; index++) {
+    const step = after[index];
+    if (isPcStep(step) && code[step.pc] === 0x3e) {
+      lastCopyIndex = index;
+    }
+  }
+  if (lastCopyIndex === -1) {
+    return false;
+  }
+  const tail = after.slice(lastCopyIndex + 1);
+  return (
+    tail.some((step) => isPcStep(step) && code[step.pc] === 0xfd) &&
+    !tail.some(
+      (step) =>
+        isPcStep(step) &&
+        (code[step.pc] === 0x52 ||
+          code[step.pc] === 0x53 ||
+          isCallOrCreateOpcode(code[step.pc]))
+    )
+  );
+}
+
+function hasNonContractAccountGuardFailure(frame: any): boolean {
+  const code = bytes(frame.code);
+  const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  return (
+    (frame.children ?? []).length === 0 &&
+    lastOpcode(frame) === 0xfd &&
+    steps.some((step: any) => isPcStep(step) && code[step.pc] === 0x3b)
+  );
+}
+
+function hasFailedCallWithoutSubtrace(
+  frame: any,
+  decoder: QrlStackTraceDecoder
+): boolean {
+  const steps = Array.isArray(frame.steps) ? frame.steps : [];
+  const code = bytes(frame.code);
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  for (let index = steps.length - 1; index >= 0; index--) {
+    const step = steps[index];
+    if (!isPcStep(step) || !isCallOrCreateOpcode(code[step.pc])) {
+      continue;
+    }
+    if (isFrameStep(steps[index + 1])) {
+      continue;
+    }
+    const after = steps.slice(index + 1);
+    const last = after[after.length - 1];
+    if (after.length === 0 || !isPcStep(last) || code[last.pc] !== 0xfd) {
+      continue;
+    }
+    const callLocation = decoder.getSourceLocation(
+      bytesToHex(code),
+      step.pc,
+      isCreate
+    );
+    if (callLocation === undefined) {
+      continue;
+    }
+    if (
+      after.every((candidate: any) => {
+        if (!isPcStep(candidate)) {
+          return false;
+        }
+        const location = decoder.getSourceLocation(
+          bytesToHex(code),
+          candidate.pc,
+          isCreate
+        );
+        return location === undefined || sameLocation(location, callLocation);
+      })
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isCallOrCreateOpcode(opcode: number | undefined): boolean {
+  return (
+    opcode === 0xf0 ||
+    opcode === 0xf1 ||
+    opcode === 0xf2 ||
+    opcode === 0xf4 ||
+    opcode === 0xf5 ||
+    opcode === 0xfa
+  );
+}
+
+function failsImmediatelyAfterChild(
+  frame: any,
+  steps: any[],
+  childIndex: number,
+  decoder: QrlStackTraceDecoder
+): boolean {
+  const code = bytes(frame.code);
+  const isCreate = frame.kind === "create" || frame.kind === "create2";
+  const after = steps.slice(childIndex + 1);
+  if (after.length === 0 || after.some((step) => isFrameStep(step))) {
+    return false;
+  }
+  const last = after[after.length - 1];
+  if (!isPcStep(last) || code[last.pc] !== 0xfd) {
+    return false;
+  }
+
+  let callPc: number | undefined;
+  for (let index = childIndex - 1; index >= 0; index--) {
+    if (isPcStep(steps[index])) {
+      callPc = steps[index].pc;
+      break;
+    }
+  }
+  if (callPc === undefined) {
+    return false;
+  }
+  const callLocation = decoder.getSourceLocation(
+    bytesToHex(code),
+    callPc,
+    isCreate
+  );
+  if (callLocation === undefined) {
+    return true;
+  }
+
+  for (const step of after) {
+    if (!isPcStep(step)) {
+      return false;
+    }
+    const location = decoder.getSourceLocation(
+      bytesToHex(code),
+      step.pc,
+      isCreate
+    );
+    if (location !== undefined && !sameLocation(location, callLocation)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isFrameStep(step: any): boolean {
+  return (
+    step !== null && typeof step === "object" && typeof step.kind === "string"
+  );
+}
+
+function isPcStep(step: any): step is { pc: number } {
+  return (
+    step !== null && typeof step === "object" && typeof step.pc === "number"
+  );
+}
+
+function sameLocation(left: any, right: any): boolean {
+  return (
+    left.sourceName === right.sourceName &&
+    left.offset === right.offset &&
+    left.length === right.length
+  );
+}
+
+function lastOpcode(frame: any): number | undefined {
+  const code = bytes(frame.code);
+  return typeof frame.lastPc === "number" ? code[frame.lastPc] : undefined;
+}
+
+function normalizeSelector(value: string): string {
+  return value.toLowerCase().replace(/^0x/, "");
+}
+
+function byteLength(value: unknown): number {
+  return value instanceof Uint8Array ? value.length : 0;
+}
+
+function bytes(value: unknown): Uint8Array {
+  return value instanceof Uint8Array ? value : new Uint8Array(0);
+}
+
+function bytesEqual(a: unknown, b: unknown): boolean {
+  const left = bytes(a);
+  const right = bytes(b);
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function stripHexPrefix(value: string): string {
+  return value.startsWith("0x") || value.startsWith("0X")
+    ? value.slice(2)
+    : value;
+}
+
+function bytesToHex(value: unknown): string {
+  return toHex(bytes(value));
+}
+
+function toHex(value: Uint8Array): string {
+  let result = "";
+  for (const byte of value) {
+    result += byte.toString(16).padStart(2, "0");
+  }
+  return result;
 }

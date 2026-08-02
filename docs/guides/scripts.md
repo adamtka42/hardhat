@@ -1,92 +1,304 @@
-# Writing scripts with Buidler
+# Writing scripts
 
-In this guide we will go through the steps of creating a script with Buidler. For a general overview of using Buidler refer to the [Getting started guide].
+Scripts are regular JavaScript files that use the Hardhat Runtime Environment to
+compile, deploy, query, and maintain QRL contracts. They are useful for
+deployments, admin actions, migrations, smoke tests, and one-off network checks.
 
-You can write your custom scripts that can use all of Buidler's functionality. A classic use case is writing a deployment script for your smart contracts. 
+The recommended way to run a script is through QRL Hardhat:
 
-There are two ways of writing a script that accesses the [Buidler Runtime Environment].
+~~~sh
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
+~~~
 
-## Buidler CLI dependant
+or against an HTTP go-qrl network:
 
-You can write scripts that access the [Buidler Runtime Environment]'s properties
-as global variables.
+~~~sh
+QRL_RPC_URL=http://127.0.0.1:33462 \
+QRL_ACCOUNT_SEED=<qrl-extended-seed> \
+npx hardhat run scripts/deploy.js --network qrl
+~~~
 
-These scripts must be run through Buidler: `npx buidler run script.js`. 
+`hardhat run` compiles the project first, creates the selected network provider,
+and injects the runtime fields into the script global scope.
 
-This makes it easy to port scripts that were developed for other tools that inject variables into the global state. 
+## Script structure
 
-## Standalone scripts: using Buidler as a library
+A script should usually define an async `main` function and exit explicitly:
 
-The second option leverages Buidler's architecture to allow for more flexibility. Buidler has been designed as a library, allowing you to get creative and build standalone CLI tools that access your development environment. This means that by simply requiring it:
+~~~js
+async function main() {
+  const [from] = await network.provider.send("qrl_accounts");
+  console.log("Deploying from:", from);
+}
 
-```js
-const bre = require("@nomiclabs/buidler");
-```
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+~~~
 
-You can get access to all your tasks and plugins. To run these scripts you simply go through node: `node script.js`.
+When run through `hardhat run`, these globals are available:
 
-To try this out, let's look at a fresh Buidler project. Run `npx buidler` and go through the steps to create a sample project. When you're done your project directory should look like this:
+- `config`
+- `hardhatArguments`
+- `network`
+- `run`
+- `tasks`
+- `qrl`
 
-```
-$ ls -l
-total 400
--rw-r--r--    1 fzeoli  staff     195 Jul 30 15:27 buidler.config.js
-drwxr-xr-x    3 fzeoli  staff      96 Jul 30 15:27 contracts
-drwxr-xr-x  502 fzeoli  staff   16064 Jul 30 15:31 node_modules
--rw-r--r--    1 fzeoli  staff  194953 Jul 30 15:31 package-lock.json
--rw-r--r--    1 fzeoli  staff     365 Jul 30 15:31 package.json
-drwxr-xr-x    3 fzeoli  staff      96 Jul 30 15:27 scripts
-drwxr-xr-x    3 fzeoli  staff      96 Jul 30 15:27 test
-```
+For explicit style, import the runtime instead:
 
-Inside `scripts/` you will find `sample-script.js`. Read through its comments to have a better idea of what it does.
-
-<<< @/../packages/buidler-core/sample-project/scripts/sample-script.js
-
-Done? Before running the script with `node` you need to declare `ethers`. This is needed because Buidler won't be injecting it on the global scope as it does when calling the `run` task.
-
-```js{2}
-const bre = require("@nomiclabs/buidler");
-const ethers = bre.ethers;
+~~~js
+const hre = require("@theqrl/hardhat");
 
 async function main() {
-  //...
+  const [from] = await hre.network.provider.send("qrl_accounts");
+  console.log("Deploying from:", from);
 }
-```
+~~~
 
-Now you're ready to run the script:
+## Deploying a contract
 
-```
-$ node scripts/sample-script.js
-Greeter address: 0x7c2C195CD6D34B8F845992d380aADB2730bB9C6F
-```
+Create `scripts/deploy.js`:
 
-By accessing the [Buidler Runtime Environment] at the top, you are allowed to run the script in a standalone fashion. Buidler always runs the compile task when running scripts through it. But in a standalone fashion you may want to call compile manually to make sure everything is compiled. This is done by calling `bre.run('compile')`. Uncomment the following line out and re-run the script with `node`:
+~~~js
+async function main() {
+  const Sample = await qrl.getContractFactory("Sample");
+  const sample = await Sample.deploy();
 
-```js
-await bre.run("compile");
-```
+  console.log("Transaction:", sample.deployTransactionHash);
+  console.log("Contract:", sample.address);
+}
 
-```
-$ node scripts/sample-script.js
-All contracts have already been compiled, skipping compilation.
-Greeter address: 0x7c2C195CD6D34B8F845992d380aADB2730bB9C6F
-```
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+~~~
 
-### Buidler arguments
+`deploy()` waits for the deployment receipt and returns a ready-to-use
+contract wrapper. The sender defaults to the network's `from` config or the
+first `qrl_accounts` account.
 
-You can still pass arguments to Buidler when using it as a library. This is done
-by setting environment variables. These are: 
+Run it on `hardhatqrlvm`:
 
-* `BUIDLER_NETWORK`: Sets the network to connect to.
+~~~sh
+npx hardhat run scripts/deploy.js --network hardhatqrlvm
+~~~
 
-* `BUIDLER_SHOW_STACK_TRACES`: Enables JavaScript stack traces of expected errors.
+Run it on an HTTP network:
 
-* `BUIDLER_VERBOSE`: Enables Buidler verbose logging.
+~~~sh
+QRL_RPC_URL=http://127.0.0.1:33462 \
+QRL_ACCOUNT_SEED=<qrl-extended-seed> \
+npx hardhat run scripts/deploy.js --network qrl
+~~~
 
-* `BUIDLER_MAX_MEMORY`: Sets the maximum amount of memory that Buidler can use.
+`deploy` takes transaction overrides first and constructor arguments second.
+The second argument is either constructor arguments or pre-encoded constructor
+data. For a constructor with arguments:
 
-   
+~~~js
+const token = await Token.deploy(
+  { gas: 15000000 },
+  ["Example Token", "EXT", 18],
+  { timeoutMs: 300000 }
+);
+~~~
 
-[Buidler Runtime Environment]: ../advanced/buidler-runtime-environment.md
-[Getting started guide]: ../getting-started/README.md
+## Calling a deployed contract
+
+Attach to a deployed contract with `qrl.getContractAt`:
+
+~~~js
+async function main() {
+  const [from] = await network.provider.send("qrl_accounts");
+  const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS);
+
+  const name = await token.name();
+  const balance = await token.balanceOf(from);
+
+  console.log("Name:", name);
+  console.log("Balance:", balance.toString(10));
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+~~~
+
+Read-only method aliases perform a call and unwrap a single output to a
+scalar. The explicit `callStatic` map remains the low-level simulation layer;
+it always returns a decoded array and must not persist state changes.
+
+## Sending a transaction
+
+Call state-changing methods directly on the contract wrapper. They send a
+transaction and return a transaction response with a receipt-polling `wait()`:
+
+~~~js
+async function main() {
+  const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS);
+
+  const tx = await token.transfer(process.env.RECIPIENT, 100, {
+    gas: 15000000,
+  });
+
+  const receipt = await tx.wait(300000);
+  console.log("Transfer mined in transaction:", receipt.transactionHash);
+}
+~~~
+
+Aliases accept the ABI arguments followed by an optional transaction overrides
+object, and resolve a default sender from the network's `from` config or the
+first `qrl_accounts` account.
+
+The explicit maps remain the low-level layer and do not resolve a default
+sender. Use `contract.functions` for hash-returning state-changing calls,
+`contract.send` if you always want to send a transaction, even for ABI
+functions that look read-only, and `contract.callStatic` if you always want a
+simulation.
+
+## Raw transaction and call helpers
+
+For lower-level scripts, encode calldata yourself and use `qrl.sendTransaction`
+or `qrl.call`:
+
+~~~js
+async function main() {
+  const [from] = await network.provider.send("qrl_accounts");
+  const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS);
+
+  const data = token.encodeFunctionData("transfer", [process.env.RECIPIENT, 1]);
+  const txHash = await qrl.sendTransaction({
+    from,
+    to: token.address,
+    data,
+    gas: 15000000,
+  });
+
+  await qrl.waitForTransaction(txHash, 300000);
+}
+~~~
+
+For read-only calls:
+
+~~~js
+const data = token.encodeFunctionData("balanceOf", [from]);
+const result = await qrl.call({ to: token.address, data }, "latest");
+const [balance] = token.decodeFunctionResult("balanceOf", result);
+~~~
+
+## Running tasks from scripts
+
+Use `run` to invoke another Hardhat task:
+
+~~~js
+async function main() {
+  await run("compile");
+  const [from] = await network.provider.send("qrl_accounts");
+  console.log(from);
+}
+~~~
+
+`hardhat run` already runs compile before the script. Calling `run("compile")`
+can still be useful in standalone scripts that import `@theqrl/hardhat`
+directly.
+
+## Standalone scripts
+
+You can execute a script with `node` if it imports QRL Hardhat explicitly:
+
+~~~js
+const hre = require("@theqrl/hardhat");
+
+async function main() {
+  await hre.run("compile");
+
+  const Sample = await hre.qrl.getContractFactory("Sample");
+  const sample = await Sample.deploy();
+
+  console.log(sample.address);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+~~~
+
+Run it with:
+
+~~~sh
+node scripts/deploy-standalone.js
+~~~
+
+Use `HARDHAT_DEFAULT_NETWORK` or the config default to select the network when
+not using the Hardhat CLI.
+
+## Network environment
+
+Common environment variables for scripts:
+
+- `QRL_RPC_URL`: HTTP go-qrl endpoint.
+- `QRL_ACCOUNT_SEED`: local QRL extended seed used to sign HTTP network
+  transactions.
+- `QRLJS_MONOREPO_PATH`: optional development override — a built
+  `qrljs-monorepo` checkout replacing the runtime bundled with the package.
+- `HYPERION_HYPC_PATH`: local Hyperion compiler binary.
+- `HYPERION_COMPILER_REPOSITORY_URL`: optional HTTP(S) Hyperion compiler
+  repository.
+- `HARDHAT_DEFAULT_NETWORK`: default network override if your config uses it.
+
+Private devnets often expose dynamic Docker or Kurtosis ports. Check the current
+host port and pass it with `QRL_RPC_URL` instead of hardcoding a machine-specific
+port in committed config.
+
+Do not commit real QRL extended seeds. Keep them in environment variables or a
+local secret manager.
+
+## Overloaded functions
+
+If a contract has overloaded ABI functions, use the full canonical signature:
+
+~~~js
+await resolver.functions["setAddr(bytes32,address)"](node, recipient, {
+  from,
+});
+
+const [resolved] = await resolver.callStatic["addr(bytes32)"](node);
+~~~
+
+Unambiguous functions are also available by name.
+
+## Timeouts
+
+HTTP/private QRL networks can be slower than `hardhatqrlvm`. Pass a larger timeout
+when waiting for deployment or transaction receipts:
+
+~~~js
+const sample = await Sample.deploy({}, [], { timeoutMs: 300000 });
+const receipt = await tx.wait(300000);
+const rawReceipt = await qrl.waitForTransaction(txHash, 300000);
+~~~
+
+Mocha tests use `mocha.timeout` from config, but scripts should pass explicit
+wait timeouts where needed.
+
+## What not to use
+
+Old upstream Buidler examples often use Ethers.js, Web3.js, Waffle, Truffle,
+Ganache, Solidity contracts, Ethereum addresses, and `eth_*` JSON-RPC methods.
+Those examples are not the QRL Hardhat scripting surface.
+
+Use Hyperion `.hyp` contracts, QRL addresses, QRL extended seeds, `hre.qrl`, and
+`qrl_*` JSON-RPC methods instead.

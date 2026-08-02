@@ -1,1600 +1,2174 @@
-import VM from "@nomiclabs/ethereumjs-vm";
-import Bloom from "@nomiclabs/ethereumjs-vm/dist/bloom";
-import { EVMResult, ExecResult } from "@nomiclabs/ethereumjs-vm/dist/evm/evm";
-import { ERROR } from "@nomiclabs/ethereumjs-vm/dist/exceptions";
-import { RunBlockResult } from "@nomiclabs/ethereumjs-vm/dist/runBlock";
-import { StateManager } from "@nomiclabs/ethereumjs-vm/dist/state";
-import PStateManager from "@nomiclabs/ethereumjs-vm/dist/state/promisified";
-import chalk from "chalk";
-import debug from "debug";
-import Account from "ethereumjs-account";
-import Block from "ethereumjs-block";
-import Common from "ethereumjs-common";
-import { FakeTransaction, Transaction } from "ethereumjs-tx";
-import {
-  BN,
-  bufferToHex,
-  ECDSASignature,
-  ecsign,
-  hashPersonalMessage,
-  privateToAddress,
-  toBuffer,
-} from "ethereumjs-util";
 import EventEmitter from "events";
-import Trie from "merkle-patricia-tree/secure";
 import { promisify } from "util";
 
-import { BUIDLEREVM_DEFAULT_GAS_PRICE } from "../../core/config/default-config";
-import { getUserConfigPath } from "../../core/project-structure";
+import { createQrlConsoleLogTraceListener } from "../stack-traces/consoleLogger";
+
+import { Block, Blockchain } from "./blockchain";
+import { InvalidArgumentsError, InvalidInputError } from "./errors";
 import {
-  dateToTimestampSeconds,
-  getDifferenceInSeconds,
-} from "../../util/date";
-import { createModelsAndDecodeBytecodes } from "../stack-traces/compiler-to-model";
-import { CompilerInput, CompilerOutput } from "../stack-traces/compiler-types";
-import { ConsoleLogger } from "../stack-traces/consoleLogger";
-import { ContractsIdentifier } from "../stack-traces/contracts-identifier";
-import { MessageTrace } from "../stack-traces/message-trace";
-import { decodeRevertReason } from "../stack-traces/revert-reasons";
+  collectMatchingLogs,
+  maxBigInt,
+  parseSubscriptionBound,
+  QRL_FILTER_DEADLINE_MS,
+  QRLInstalledFilter,
+  QRLLogFilter,
+  QRLSubscription,
+  resolveInstalledFilterMinimum,
+  resolveInstalledFilterStart,
+  resolveLogFilterBlock,
+} from "./filter";
 import {
-  encodeSolidityStackTrace,
-  SolidityError,
-} from "../stack-traces/solidity-errors";
-import { SolidityStackTrace } from "../stack-traces/solidity-stack-trace";
-import { SolidityTracer } from "../stack-traces/solidityTracer";
-import { VmTraceDecoder } from "../stack-traces/vm-trace-decoder";
-import { VMTracer } from "../stack-traces/vm-tracer";
+  bufferToRpcData,
+  getRpcDebugTrace,
+  getRpcLog,
+  getRpcTransaction,
+  numberToRpcQuantity,
+  RpcLogOutput,
+} from "./output";
 
-import { Blockchain } from "./blockchain";
-import {
-  InternalError,
-  InvalidInputError,
-  TransactionExecutionError,
-} from "./errors";
-import { bloomFilter, Filter, filterLogs, LATEST_BLOCK, Type } from "./filter";
-import { getRpcBlock, getRpcLog, RpcLogOutput } from "./output";
-import { getCurrentTimestamp } from "./utils";
-
-const log = debug("buidler:core:buidler-evm:node");
-
-// This library's types are wrong, they don't type check
-// tslint:disable-next-line no-var-requires
-const ethSigUtil = require("eth-sig-util");
-
-export type Block = any;
-
-export interface GenesisAccount {
-  privateKey: string;
-  balance: string | number | BN;
+export interface QrlNodeRuntime {
+  blockQrl: {
+    QRLBlock: new (data?: any) => Block;
+    genQRLTransactionsRoot: (
+      transactions: readonly any[]
+    ) => Promise<Uint8Array>;
+    genQRLReceiptsRoot: (receipts: readonly any[]) => Promise<Uint8Array>;
+  };
+  evmQrl: {
+    QRLEVM: new (options?: any) => any;
+  };
+  stateQrl: {
+    QRLStateManager: new (options?: any) => any;
+  };
+  txQrl?: {
+    QRLDynamicFeeTransaction: new (data?: any) => any;
+  };
+  vmQrl: {
+    QRLVM: new (options?: any) => any;
+    createQRLReceiptFromRunTxResult: (options: any) => any;
+    createFrameCollector?: (
+      root: QrlTraceFrame
+    ) => {
+      listener: any;
+      readonly lastError?: Error;
+    };
+    createRawStructLogCollector?: (
+      config: QrlTraceConfig
+    ) => {
+      listener: any;
+      finish: (rootExecutionGas?: any) => any[];
+    };
+    qrlOpcodeName?: (opcode: number) => string;
+  };
 }
 
-export const COINBASE_ADDRESS = toBuffer(
-  "0xc014ba5ec014ba5ec014ba5ec014ba5ec014ba5e"
-);
+export interface HardhatNodeOptions {
+  genesis?: Record<string, any>;
+  genesisHeader?: Record<string, any>;
+  context?: Record<string, any>;
+  accounts?: LocalAccount[];
+  automine?: boolean;
+  rawTransactionSigner?: QrlNodeSigner;
+  allowUnlimitedContractSize?: boolean;
+  consoleLogListener?: (input: any) => void;
+  filterNow?: () => number;
+}
+
+export interface QrlNodeSigner {
+  chainId: bigint;
+  hash: (transaction: any) => Uint8Array;
+  verify: (transaction: any) => boolean | Promise<boolean>;
+  sender: (transaction: any) => any | Promise<any>;
+}
+
+export interface LocalAccount {
+  address: any;
+  balance?: bigint | string;
+  nonce?: bigint | number;
+}
 
 export interface CallParams {
-  to: Buffer;
-  from: Buffer;
-  gasLimit: BN;
-  gasPrice: BN;
-  value: BN;
-  data: Buffer;
+  to: any;
+  from: any;
+  gasLimit: bigint;
+  gasPrice: bigint;
+  value: bigint;
+  data: Uint8Array;
 }
 
-export interface TransactionParams {
-  to: Buffer;
-  from: Buffer;
-  gasLimit: BN;
-  gasPrice: BN;
-  value: BN;
-  data: Buffer;
-  nonce: BN;
+export interface RunCallOptions {
+  usePendingState?: boolean;
+  traceListener?: any;
+  emitConsoleLogs?: boolean;
 }
 
-export interface FilterParams {
-  fromBlock: BN;
-  toBlock: BN;
-  addresses: Buffer[];
-  normalizedTopics: Array<Array<Buffer | null> | null>;
+export interface RunTransactionResult {
+  transaction: any;
+  runTxResult: any;
+  receipt?: any;
+  block?: Block;
 }
 
-export interface TxReceipt {
-  status: 0 | 1;
-  gasUsed: Buffer;
-  bitvector: Buffer;
-  logs: RpcLogOutput[];
+export interface RunTransactionInNewBlockResult {
+  transaction: any;
+  runTxResult: any;
+  receipt: any;
+  block: Block;
 }
 
-export interface TxBlockResult {
-  receipt: TxReceipt;
-  createAddresses: Buffer | undefined;
-  bloomBitvector: Buffer;
+export interface IndexedQrlTransaction {
+  transaction: any;
+  sender: any;
 }
 
-// tslint:disable only-buidler-error
-
-export interface SolidityTracerOptions {
-  solidityVersion: string;
-  compilerInput: CompilerInput;
-  compilerOutput: CompilerOutput;
+export interface MineBlockOptions {
+  timestamp?: bigint;
+  gasLimit?: bigint;
+  baseFee?: bigint;
+  coinbase?: any;
 }
 
-interface Snapshot {
-  id: number;
-  date: Date;
+export interface EstimateGasOptions {
+  usePendingState?: boolean;
+}
+
+export interface EstimateGasResult {
+  estimation: bigint;
+  runTxResult?: any;
+  error?: Error;
+}
+
+export interface QrlTraceConfig {
+  disableStack?: boolean;
+  enableMemory?: boolean;
+  limit?: number;
+}
+
+export interface QrlTransactionReplayResult {
+  gasUsed: bigint;
+  gasLimit: bigint;
+  returnValue: Uint8Array;
+  failed: boolean;
+  errorMessage?: string;
+}
+
+export interface QrlTraceFrame {
+  kind: "call" | "staticcall" | "delegatecall" | "create" | "create2";
+  depth: number;
+  from?: any;
+  target?: any;
+  createdAddress?: any;
+  precompile?: any;
+  input: Uint8Array;
+  value: bigint;
+  gasLimit: bigint;
+  code?: Uint8Array;
+  returnValue?: Uint8Array;
+  gasUsed?: bigint;
+  errorMessage?: string;
+  traceError?: string;
+  lastPc?: number;
+  steps: Array<{ pc: number } | QrlTraceFrame>;
+  children: QrlTraceFrame[];
+}
+
+interface GasEstimationExecutionContext {
+  sender: any;
+  stateManager: any;
+  vm: any;
+  context: Record<string, any>;
+}
+
+interface PendingQrlTransaction {
+  transaction: any;
+  transactionHash: Uint8Array;
+  sender: any;
+  runTxResult: any;
+}
+
+interface NodeSnapshot {
+  id: bigint;
   latestBlock: Block;
-  stateRoot: Buffer;
-  blockTimeOffsetSeconds: BN;
-  nextBlockTimestamp: BN;
-  transactionByHash: Map<string, Transaction>;
-  transactionHashToBlockHash: Map<string, string>;
-  blockHashToTxBlockResults: Map<string, TxBlockResult[]>;
-  blockHashToTotalDifficulty: Map<string, BN>;
+  stateManager: any;
+  pendingStateManager?: any;
+  pendingTransactions: PendingQrlTransaction[];
+  pendingBlockTimestamp?: bigint;
+  pendingTimeIncrease: bigint;
+  totalTimeIncrement: bigint;
+  nextBlockTimestamp?: bigint;
+  transactionsByHash: Map<string, IndexedQrlTransaction>;
+  receiptsByTransactionHash: Map<string, any>;
+  transactionHashToBlockHash: Map<string, Uint8Array>;
+  stateBeforeByBlock: Map<string, any>;
 }
 
-export class BuidlerNode extends EventEmitter {
+// tslint:disable only-hardhat-error
+
+export class HardhatNode extends EventEmitter {
   public static async create(
-    hardfork: string,
-    networkName: string,
-    chainId: number,
-    networkId: number,
-    blockGasLimit: number,
-    genesisAccounts: GenesisAccount[] = [],
-    solidityVersion?: string,
-    allowUnlimitedContractSize?: boolean,
-    initialDate?: Date,
-    compilerInput?: CompilerInput,
-    compilerOutput?: CompilerOutput
-  ): Promise<[Common, BuidlerNode]> {
-    const stateTrie = new Trie();
-    const putIntoStateTrie = promisify(stateTrie.put.bind(stateTrie));
-    for (const acc of genesisAccounts) {
-      let balance: BN;
-
-      if (
-        typeof acc.balance === "string" &&
-        acc.balance.toLowerCase().startsWith("0x")
-      ) {
-        balance = new BN(toBuffer(acc.balance));
-      } else {
-        balance = new BN(acc.balance);
-      }
-
-      const account = new Account({ balance });
-      const pk = toBuffer(acc.privateKey);
-      const address = privateToAddress(pk);
-
-      await putIntoStateTrie(address, account.serialize());
+    runtime: QrlNodeRuntime,
+    options: HardhatNodeOptions = {}
+  ): Promise<HardhatNode> {
+    const localAccounts = options.accounts ?? [];
+    const genesis: Record<string, any> = { ...options.genesis };
+    for (const account of localAccounts) {
+      genesis[account.address.toString()] = {
+        balance: account.balance,
+        nonce: account.nonce,
+      };
     }
 
-    // Mimic precompiles activation
-    for (let i = 1; i <= 8; i++) {
-      await putIntoStateTrie(
-        new BN(i).toArrayLike(Buffer, "be", 20),
-        new Account().serialize()
-      );
-    }
-
-    const initialBlockTimestamp =
-      initialDate !== undefined
-        ? dateToTimestampSeconds(initialDate)
-        : getCurrentTimestamp();
-
-    const common = Common.forCustomChain(
-      "mainnet",
-      {
-        chainId,
-        networkId,
-        name: networkName,
-        genesis: {
-          timestamp: `0x${initialBlockTimestamp.toString(16)}`,
-          hash: "0x",
-          gasLimit: blockGasLimit,
-          difficulty: 1,
-          nonce: "0x42",
-          extraData: "0x1234",
-          stateRoot: bufferToHex(stateTrie.root),
-        },
-      },
-      hardfork
-    );
-
-    const stateManager = new StateManager({
-      common: common as any, // TS error because of a version mismatch
-      trie: stateTrie,
+    const stateManager = new runtime.stateQrl.QRLStateManager({
+      genesis,
     });
-
-    const blockchain = new Blockchain();
-
-    const vm = new VM({
-      common: common as any, // TS error because of a version mismatch
-      activatePrecompiles: true,
+    const evm = new runtime.evmQrl.QRLEVM({
       stateManager,
-      blockchain: blockchain as any,
-      allowUnlimitedContractSize,
+      allowUnlimitedContractSize: options.allowUnlimitedContractSize,
+      traceListener: createQrlConsoleLogTraceListener(
+        options.consoleLogListener
+      ),
+    });
+    const vm = new runtime.vmQrl.QRLVM({
+      stateManager,
+      evm,
+      context: options.context,
+    });
+    const blockchain = new Blockchain();
+    const genesisBlock = new runtime.blockQrl.QRLBlock({
+      header: {
+        ...options.genesisHeader,
+        number: (global as any).BigInt(0),
+        stateRoot: await stateManager.getStateRoot(),
+      },
     });
 
-    const genesisBlock = new Block(null, { common });
-    genesisBlock.setGenesisParams();
-
-    await new Promise((resolve) => {
-      blockchain.putBlock(genesisBlock, () => resolve());
+    await new Promise((resolve, reject) => {
+      blockchain.putBlock(genesisBlock, (error) => {
+        if (error !== null) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
     });
 
-    const node = new BuidlerNode(
+    return new HardhatNode(
+      runtime,
       vm,
       blockchain,
-      genesisAccounts.map((acc) => toBuffer(acc.privateKey)),
-      new BN(blockGasLimit),
-      genesisBlock,
-      solidityVersion,
-      initialDate,
-      compilerInput,
-      compilerOutput
+      localAccounts,
+      options.rawTransactionSigner,
+      options.context,
+      options.automine ?? true,
+      options.consoleLogListener,
+      options.allowUnlimitedContractSize,
+      options.filterNow
     );
-
-    return [common, node];
   }
 
-  private readonly _common: Common;
-  private readonly _stateManager: PStateManager;
-
-  private readonly _accountPrivateKeys: Map<string, Buffer> = new Map();
-
-  private _blockTimeOffsetSeconds: BN = new BN(0);
-  private _nextBlockTimestamp: BN = new BN(0);
-  private _transactionByHash: Map<string, Transaction> = new Map();
-  private _transactionHashToBlockHash: Map<string, string> = new Map();
-  private _blockHashToTxBlockResults: Map<string, TxBlockResult[]> = new Map();
-  private _blockHashToTotalDifficulty: Map<string, BN> = new Map();
-
-  private _lastFilterId = new BN(0);
-  private _filters: Map<string, Filter> = new Map();
-
-  private _nextSnapshotId = 1; // We start in 1 to mimic Ganache
-  private readonly _snapshots: Snapshot[] = [];
-
-  private readonly _vmTracer: VMTracer;
-  private readonly _vmTraceDecoder?: VmTraceDecoder;
-  private readonly _solidityTracer?: SolidityTracer;
-  private readonly _consoleLogger: ConsoleLogger = new ConsoleLogger();
+  private readonly _localAccounts: Map<string, any> = new Map();
+  private readonly _transactionsByHash: Map<
+    string,
+    IndexedQrlTransaction
+  > = new Map();
+  private readonly _receiptsByTransactionHash: Map<string, any> = new Map();
+  private readonly _transactionHashToBlockHash: Map<
+    string,
+    Uint8Array
+  > = new Map();
+  private readonly _stateBeforeByBlock: Map<string, any> = new Map();
+  private _pendingTimeIncrease: bigint = (global as any).BigInt(0);
+  private _totalTimeIncrement: bigint = (global as any).BigInt(0);
+  private _nextBlockTimestamp?: bigint;
+  private _pendingStateManager?: any;
+  private _pendingVm?: any;
+  private _pendingBlockTimestamp?: bigint;
+  private readonly _pendingTransactions: PendingQrlTransaction[] = [];
+  private _nextSnapshotId: bigint = (global as any).BigInt(1);
+  private readonly _snapshots: NodeSnapshot[] = [];
+  private _nextFilterId: bigint = (global as any).BigInt(1);
+  private readonly _filters: Map<string, QRLInstalledFilter> = new Map();
+  private _filterExpiryTimer?: ReturnType<typeof setTimeout>;
+  private _nextSubscriptionId: bigint = (global as any).BigInt(1);
   private _failedStackTraces = 0;
-
+  private readonly _subscriptions: Map<string, QRLSubscription> = new Map();
+  private _vm: any;
+  private _stateManager: any;
   private readonly _getLatestBlock: () => Promise<Block>;
-  private readonly _getBlock: (hashOrNumber: Buffer | BN) => Promise<Block>;
+  private readonly _getBlock: (
+    hashOrBlockNumber: Uint8Array | bigint
+  ) => Promise<Block | undefined>;
 
   private constructor(
-    private readonly _vm: VM,
+    private readonly _runtime: QrlNodeRuntime,
+    vm: any,
     private readonly _blockchain: Blockchain,
-    localAccounts: Buffer[],
-    private readonly _blockGasLimit: BN,
-    genesisBlock: Block,
-    solidityVersion?: string,
-    initialDate?: Date,
-    compilerInput?: CompilerInput,
-    compilerOutput?: CompilerOutput
+    localAccounts: LocalAccount[],
+    private readonly _rawTransactionSigner?: QrlNodeSigner,
+    private readonly _context: Record<string, any> = {},
+    private readonly _automine: boolean = true,
+    private readonly _consoleLogListener?: (input: any) => void,
+    private readonly _allowUnlimitedContractSize?: boolean,
+    private readonly _filterNow: () => number = () => Date.now()
   ) {
     super();
-    const config = getUserConfigPath();
-    this._stateManager = new PStateManager(this._vm.stateManager);
-    this._common = this._vm._common as any; // TODO: There's a version mismatch, that's why we cast
+
     this._initLocalAccounts(localAccounts);
-
-    this._blockHashToTotalDifficulty.set(
-      bufferToHex(genesisBlock.hash()),
-      this._computeTotalDifficulty(genesisBlock)
-    );
-
+    this._vm = vm;
+    this._stateManager = this._vm.stateManager;
     this._getLatestBlock = promisify(
-      this._vm.blockchain.getLatestBlock.bind(this._vm.blockchain)
+      this._blockchain.getLatestBlock.bind(this._blockchain)
     );
-
     this._getBlock = promisify(
-      this._vm.blockchain.getBlock.bind(this._vm.blockchain)
+      this._blockchain.getBlock.bind(this._blockchain)
     );
-
-    this._vmTracer = new VMTracer(this._vm, true);
-    this._vmTracer.enableTracing();
-
-    if (initialDate !== undefined) {
-      this._blockTimeOffsetSeconds = new BN(
-        getDifferenceInSeconds(initialDate, new Date())
-      );
-    }
-
-    if (
-      solidityVersion === undefined ||
-      compilerInput === undefined ||
-      compilerOutput === undefined
-    ) {
-      return;
-    }
-
-    try {
-      const bytecodes = createModelsAndDecodeBytecodes(
-        solidityVersion,
-        compilerInput,
-        compilerOutput
-      );
-
-      const contractsIdentifier = new ContractsIdentifier();
-
-      for (const bytecode of bytecodes) {
-        contractsIdentifier.addBytecode(bytecode);
-      }
-
-      this._vmTraceDecoder = new VmTraceDecoder(contractsIdentifier);
-      this._solidityTracer = new SolidityTracer();
-    } catch (error) {
-      console.warn(
-        chalk.yellow(
-          "The Buidler EVM tracing engine could not be initialized. Run Buidler with --verbose to learn more."
-        )
-      );
-
-      log(
-        "Buidler EVM tracing disabled: ContractsIdentifier failed to be initialized. Please report this to help us improve Buidler.\n",
-        error
-      );
-    }
-  }
-
-  public async getSignedTransaction(
-    txParams: TransactionParams
-  ): Promise<Transaction> {
-    const tx = new Transaction(txParams, { common: this._common });
-
-    const pk = await this._getLocalAccountPrivateKey(txParams.from);
-    tx.sign(pk);
-
-    return tx;
-  }
-
-  public async _getFakeTransaction(
-    txParams: TransactionParams
-  ): Promise<Transaction> {
-    return new FakeTransaction(txParams, { common: this._common });
-  }
-
-  public async runTransactionInNewBlock(
-    tx: Transaction
-  ): Promise<{
-    trace: MessageTrace;
-    block: Block;
-    blockResult: RunBlockResult;
-    error?: Error;
-    consoleLogMessages: string[];
-  }> {
-    await this._validateTransaction(tx);
-    await this._saveTransactionAsReceived(tx);
-
-    const [
-      blockTimestamp,
-      offsetShouldChange,
-      newOffset,
-    ] = this._calculateTimestampAndOffset();
-
-    const block = await this._getNextBlockTemplate(blockTimestamp);
-
-    const needsTimestampIncrease = await this._timestampClashesWithPreviousBlockOne(
-      block
-    );
-
-    if (needsTimestampIncrease) {
-      await this._increaseBlockTimestamp(block);
-    }
-
-    await this._addTransactionToBlock(block, tx);
-
-    const result = await this._vm.runBlock({
-      block,
-      generate: true,
-      skipBlockValidation: true,
-    });
-
-    if (needsTimestampIncrease) {
-      await this.increaseTime(new BN(1));
-    }
-
-    await this._saveBlockAsSuccessfullyRun(block, result);
-    await this._saveTransactionAsSuccessfullyRun(tx, block);
-
-    let vmTrace = this._vmTracer.getLastTopLevelMessageTrace();
-    const vmTracerError = this._vmTracer.getLastError();
-    this._vmTracer.clearLastError();
-
-    if (this._vmTraceDecoder !== undefined) {
-      vmTrace = this._vmTraceDecoder.tryToDecodeMessageTrace(vmTrace);
-    }
-
-    const consoleLogMessages = await this._getConsoleLogMessages(
-      vmTrace,
-      vmTracerError
-    );
-
-    const error = await this._manageErrors(
-      result.results[0].execResult,
-      vmTrace,
-      vmTracerError
-    );
-
-    if (offsetShouldChange) {
-      await this.increaseTime(newOffset.sub(await this.getTimeIncrement()));
-    }
-
-    await this._resetNextBlockTimestamp();
-
-    return {
-      trace: vmTrace,
-      block,
-      blockResult: result,
-      error,
-      consoleLogMessages,
-    };
-  }
-
-  public async mineEmptyBlock(timestamp: BN) {
-    // need to check if timestamp is specified or nextBlockTimestamp is set
-    // if it is, time offset must be set to timestamp|nextBlockTimestamp - Date.now
-    // if it is not, time offset remain the same
-    const [
-      blockTimestamp,
-      offsetShouldChange,
-      newOffset,
-    ] = this._calculateTimestampAndOffset(timestamp);
-
-    const block = await this._getNextBlockTemplate(blockTimestamp);
-
-    const needsTimestampIncrease = await this._timestampClashesWithPreviousBlockOne(
-      block
-    );
-
-    if (needsTimestampIncrease) {
-      await this._increaseBlockTimestamp(block);
-    }
-
-    await promisify(block.genTxTrie.bind(block))();
-    block.header.transactionsTrie = block.txTrie.root;
-
-    const previousRoot = await this._stateManager.getStateRoot();
-
-    let result: RunBlockResult;
-    try {
-      result = await this._vm.runBlock({
-        block,
-        generate: true,
-        skipBlockValidation: true,
-      });
-
-      if (needsTimestampIncrease) {
-        await this.increaseTime(new BN(1));
-      }
-
-      await this._saveBlockAsSuccessfullyRun(block, result);
-
-      if (offsetShouldChange) {
-        await this.increaseTime(newOffset.sub(await this.getTimeIncrement()));
-      }
-
-      await this._resetNextBlockTimestamp();
-
-      return result;
-    } catch (error) {
-      // We set the state root to the previous one. This is equivalent to a
-      // rollback of this block.
-      await this._stateManager.setStateRoot(previousRoot);
-
-      throw new TransactionExecutionError(error);
-    }
-  }
-
-  public async runCall(
-    call: CallParams,
-    runOnNewBlock: boolean
-  ): Promise<{
-    result: Buffer;
-    trace: MessageTrace;
-    error?: Error;
-    consoleLogMessages: string[];
-  }> {
-    const tx = await this._getFakeTransaction({
-      ...call,
-      nonce: await this.getAccountNonce(call.from),
-    });
-
-    const result = await this._runTxAndRevertMutations(tx, runOnNewBlock);
-
-    let vmTrace = this._vmTracer.getLastTopLevelMessageTrace();
-    const vmTracerError = this._vmTracer.getLastError();
-    this._vmTracer.clearLastError();
-
-    if (this._vmTraceDecoder !== undefined) {
-      vmTrace = this._vmTraceDecoder.tryToDecodeMessageTrace(vmTrace);
-    }
-
-    const consoleLogMessages = await this._getConsoleLogMessages(
-      vmTrace,
-      vmTracerError
-    );
-
-    const error = await this._manageErrors(
-      result.execResult,
-      vmTrace,
-      vmTracerError
-    );
-
-    return {
-      result: result.execResult.returnValue,
-      trace: vmTrace,
-      error,
-      consoleLogMessages,
-    };
-  }
-
-  public async getAccountBalance(address: Buffer): Promise<BN> {
-    const account = await this._stateManager.getAccount(address);
-    return new BN(account.balance);
-  }
-
-  public async getAccountNonce(address: Buffer): Promise<BN> {
-    const account = await this._stateManager.getAccount(address);
-    return new BN(account.nonce);
-  }
-
-  public async getAccountNonceInPreviousBlock(address: Buffer): Promise<BN> {
-    const account = await this._stateManager.getAccount(address);
-
-    const latestBlock = await this._getLatestBlock();
-    const latestBlockTxsFromAccount = latestBlock.transactions.filter(
-      (tx: Transaction) => tx.getSenderAddress().equals(address)
-    );
-
-    return new BN(account.nonce).subn(latestBlockTxsFromAccount.length);
   }
 
   public async getLatestBlock(): Promise<Block> {
     return this._getLatestBlock();
   }
 
-  public async getLatestBlockNumber(): Promise<BN> {
-    return new BN((await this._getLatestBlock()).header.number);
+  public async getLatestBlockNumber(): Promise<bigint> {
+    return (await this._getLatestBlock()).header.number;
   }
 
-  public async getLocalAccountAddresses(): Promise<string[]> {
-    return [...this._accountPrivateKeys.keys()];
-  }
-
-  public async getBlockGasLimit(): Promise<BN> {
-    return this._blockGasLimit;
-  }
-
-  public async estimateGas(
-    txParams: TransactionParams
-  ): Promise<{
-    estimation: BN;
-    trace: MessageTrace;
-    error?: Error;
-    consoleLogMessages: string[];
-  }> {
-    const tx = await this._getFakeTransaction({
-      ...txParams,
-      gasLimit: await this.getBlockGasLimit(),
-    });
-
-    const result = await this._runTxAndRevertMutations(tx);
-
-    let vmTrace = this._vmTracer.getLastTopLevelMessageTrace();
-    const vmTracerError = this._vmTracer.getLastError();
-    this._vmTracer.clearLastError();
-
-    if (this._vmTraceDecoder !== undefined) {
-      vmTrace = this._vmTraceDecoder.tryToDecodeMessageTrace(vmTrace);
-    }
-
-    const consoleLogMessages = await this._getConsoleLogMessages(
-      vmTrace,
-      vmTracerError
-    );
-
-    // This is only considered if the call to _runTxAndRevertMutations doesn't
-    // manage errors
-    if (result.execResult.exceptionError !== undefined) {
-      return {
-        estimation: await this.getBlockGasLimit(),
-        trace: vmTrace,
-        error: await this._manageErrors(
-          result.execResult,
-          vmTrace,
-          vmTracerError
-        ),
-        consoleLogMessages,
-      };
-    }
-
-    const initialEstimation = result.gasUsed;
-
-    return {
-      estimation: await this._correctInitialEstimation(
-        txParams,
-        initialEstimation
-      ),
-      trace: vmTrace,
-      consoleLogMessages,
-    };
-  }
-
-  public async getGasPrice(): Promise<BN> {
-    return new BN(BUIDLEREVM_DEFAULT_GAS_PRICE);
-  }
-
-  public async getCoinbaseAddress(): Promise<Buffer> {
-    return COINBASE_ADDRESS;
-  }
-
-  public async getStorageAt(address: Buffer, slot: BN): Promise<Buffer> {
-    const key = slot.toArrayLike(Buffer, "be", 32);
-    const data = await this._stateManager.getContractStorage(address, key);
-
-    // TODO: The state manager returns the data as it was saved, it doesn't
-    //  pad it. Technically, the storage consists of 32-byte slots, so we should
-    //  always return 32 bytes. The problem is that Ganache doesn't handle them
-    //  this way. We compromise a little here to ease the migration into
-    //  BuidlerEVM :(
-
-    // const EXPECTED_DATA_SIZE = 32;
-    // if (data.length < EXPECTED_DATA_SIZE) {
-    //   return Buffer.concat(
-    //     [Buffer.alloc(EXPECTED_DATA_SIZE - data.length, 0), data],
-    //     EXPECTED_DATA_SIZE
-    //   );
-    // }
-
-    return data;
-  }
-
-  public async getBlockByNumber(blockNumber: BN): Promise<Block | undefined> {
-    if (blockNumber.gten(this._blockHashToTotalDifficulty.size)) {
-      return undefined;
-    }
-
+  public async getBlockByNumber(
+    blockNumber: bigint
+  ): Promise<Block | undefined> {
     return this._getBlock(blockNumber);
   }
 
-  public async getBlockByHash(hash: Buffer): Promise<Block | undefined> {
-    if (!(await this._hasBlockWithHash(hash))) {
-      return undefined;
-    }
-
+  public async getBlockByHash(hash: Uint8Array): Promise<Block | undefined> {
     return this._getBlock(hash);
   }
 
   public async getBlockByTransactionHash(
-    hash: Buffer
+    hash: Uint8Array
   ): Promise<Block | undefined> {
-    const blockHash = this._transactionHashToBlockHash.get(bufferToHex(hash));
+    const blockHash = this._transactionHashToBlockHash.get(hashKey(hash));
     if (blockHash === undefined) {
       return undefined;
     }
 
-    return this.getBlockByHash(toBuffer(blockHash));
+    return this.getBlockByHash(blockHash);
   }
 
-  public async getBlockTotalDifficulty(block: Block): Promise<BN> {
-    const blockHash = bufferToHex(block.hash());
-    const td = this._blockHashToTotalDifficulty.get(blockHash);
+  public async getTransactionByHash(
+    hash: Uint8Array
+  ): Promise<any | undefined> {
+    return this._transactionsByHash.get(hashKey(hash))?.transaction;
+  }
 
-    if (td !== undefined) {
-      return td;
+  public async getIndexedTransactionByHash(
+    hash: Uint8Array
+  ): Promise<IndexedQrlTransaction | undefined> {
+    return this._transactionsByHash.get(hashKey(hash));
+  }
+
+  public async getTransactionReceipt(
+    hash: Uint8Array
+  ): Promise<any | undefined> {
+    return this._receiptsByTransactionHash.get(hashKey(hash));
+  }
+
+  public async replayTransaction(
+    hash: Uint8Array,
+    traceListener: any
+  ): Promise<QrlTransactionReplayResult> {
+    const receipt = await this.getTransactionReceipt(hash);
+    if (receipt?.blockHash === undefined) {
+      throw new InvalidInputError("QRL transaction not found or not mined");
     }
 
-    return this._computeTotalDifficulty(block);
-  }
-
-  public async getCode(address: Buffer): Promise<Buffer> {
-    return this._stateManager.getContractCode(address);
-  }
-
-  public async setNextBlockTimestamp(timestamp: BN) {
-    this._nextBlockTimestamp = new BN(timestamp);
-  }
-
-  public async increaseTime(increment: BN) {
-    this._blockTimeOffsetSeconds = this._blockTimeOffsetSeconds.add(increment);
-  }
-
-  public async getTimeIncrement(): Promise<BN> {
-    return this._blockTimeOffsetSeconds;
-  }
-
-  public async getNextBlockTimestamp(): Promise<BN> {
-    return this._nextBlockTimestamp;
-  }
-
-  public async getSuccessfulTransactionByHash(
-    hash: Buffer
-  ): Promise<Transaction | undefined> {
-    const tx = this._transactionByHash.get(bufferToHex(hash));
-    if (tx !== undefined && (await this._transactionWasSuccessful(tx))) {
-      return tx;
+    const block = await this.getBlockByHash(receipt.blockHash);
+    if (block === undefined) {
+      throw new InvalidInputError("QRL block not found for transaction");
+    }
+    const stateBefore = this._stateBeforeByBlock.get(hashKey(block.hash()));
+    if (stateBefore === undefined) {
+      throw new InvalidInputError(
+        "QRL historical state for the block is not retained; cannot replay the transaction"
+      );
     }
 
-    return undefined;
+    const stateManager = stateBefore.shallowCopy();
+    for (const transaction of block.transactions) {
+      const indexed = await this.getIndexedTransactionByHash(
+        transaction.hash()
+      );
+      if (indexed === undefined) {
+        throw new InvalidInputError("QRL block transaction is not indexed");
+      }
+
+      const isTarget = hashKey(transaction.hash()) === hashKey(hash);
+      const vm = this._createVm(
+        stateManager,
+        false,
+        isTarget ? traceListener : undefined
+      );
+      const result = await vm.runTx({
+        tx: transaction,
+        sender: indexed.sender,
+        context: {
+          chainId: transaction.chainId,
+          baseFee: block.header.baseFee,
+          coinbase: block.header.coinbase,
+          blockNumber: block.header.number,
+          timestamp: block.header.timestamp,
+          gasLimit: block.header.gasLimit,
+          noBaseFee: this._context.noBaseFee ?? true,
+        },
+      });
+      if (isTarget) {
+        return {
+          gasUsed: result.gasUsed,
+          gasLimit: transaction.gasLimit,
+          returnValue: result.returnValue,
+          failed: result.status === 0,
+          errorMessage: result.executionError?.message,
+        };
+      }
+    }
+
+    throw new InvalidInputError("QRL transaction not found in its block");
   }
 
-  public async getTxBlockResults(
-    block: Block
-  ): Promise<TxBlockResult[] | undefined> {
-    return this._blockHashToTxBlockResults.get(bufferToHex(block.hash()));
+  public async traceTransactionFrames(
+    hash: Uint8Array
+  ): Promise<QrlTraceFrame> {
+    const indexed = await this.getIndexedTransactionByHash(hash);
+    if (indexed === undefined) {
+      throw new InvalidInputError("QRL transaction not found");
+    }
+    const createFrameCollector = this._runtime.vmQrl.createFrameCollector;
+    if (createFrameCollector === undefined) {
+      throw new InvalidInputError("QRL frame trace collector is unavailable");
+    }
+
+    const transaction = indexed.transaction;
+    const input: Uint8Array = transaction.data ?? new Uint8Array();
+    const value: bigint = transaction.value ?? (global as any).BigInt(0);
+    const root: QrlTraceFrame = {
+      kind: transaction.to === undefined ? "create" : "call",
+      depth: 0,
+      target: transaction.to,
+      from: indexed.sender,
+      input,
+      value,
+      gasLimit: transaction.gasLimit,
+      code: transaction.to === undefined ? new Uint8Array(input) : undefined,
+      steps: [],
+      children: [],
+    };
+    const collector = createFrameCollector(root);
+    const outcome = await this.replayTransaction(hash, collector.listener);
+    root.returnValue = outcome.returnValue;
+    root.gasUsed = outcome.gasUsed;
+    root.errorMessage = outcome.failed
+      ? outcome.errorMessage ?? "execution failed"
+      : undefined;
+    if (collector.lastError !== undefined) {
+      this._failedStackTraces += 1;
+      root.traceError = collector.lastError.message;
+    }
+    return root;
   }
 
-  public async getPendingTransactions(): Promise<Transaction[]> {
-    return [];
-  }
+  public async traceCallFrames(
+    call: CallParams,
+    options: { usePendingState?: boolean } = {}
+  ): Promise<QrlTraceFrame> {
+    const createFrameCollector = this._runtime.vmQrl.createFrameCollector;
+    if (createFrameCollector === undefined) {
+      throw new InvalidInputError("QRL frame trace collector is unavailable");
+    }
 
-  public async signPersonalMessage(
-    address: Buffer,
-    data: Buffer
-  ): Promise<ECDSASignature> {
-    const messageHash = hashPersonalMessage(data);
-    const privateKey = await this._getLocalAccountPrivateKey(address);
-
-    return ecsign(messageHash, privateKey);
-  }
-
-  public async signTypedData(address: Buffer, typedData: any): Promise<string> {
-    const privateKey = await this._getLocalAccountPrivateKey(address);
-
-    return ethSigUtil.signTypedData_v4(privateKey, {
-      data: typedData,
+    const root: QrlTraceFrame = {
+      kind: "call",
+      depth: 0,
+      target: call.to,
+      from: call.from,
+      input: call.data,
+      value: call.value,
+      gasLimit: call.gasLimit,
+      steps: [],
+      children: [],
+    };
+    const collector = createFrameCollector(root);
+    const result = await this.runCall(call, {
+      usePendingState: options.usePendingState,
+      traceListener: collector.listener,
+      emitConsoleLogs: false,
     });
+    root.returnValue = result.returnValue;
+    root.gasUsed = result.gasUsed;
+    root.errorMessage = result.exceptionError?.message;
+    if (collector.lastError !== undefined) {
+      this._failedStackTraces += 1;
+      root.traceError = collector.lastError.message;
+    }
+    return root;
+  }
+
+  public async traceEstimateGasFrames(
+    transaction: any,
+    sender: any,
+    options: EstimateGasOptions = {}
+  ): Promise<QrlTraceFrame> {
+    const createFrameCollector = this._runtime.vmQrl.createFrameCollector;
+    if (createFrameCollector === undefined) {
+      throw new InvalidInputError("QRL frame trace collector is unavailable");
+    }
+
+    const root: QrlTraceFrame = {
+      kind: transaction.to === undefined ? "create" : "call",
+      depth: 0,
+      target: transaction.to,
+      from: sender,
+      input: transaction.data,
+      value: transaction.value,
+      gasLimit: transaction.gasLimit,
+      code:
+        transaction.to === undefined
+          ? new Uint8Array(transaction.data)
+          : undefined,
+      steps: [],
+      children: [],
+    };
+    const collector = createFrameCollector(root);
+    const latestBlock = await this._getLatestBlock();
+    const one: bigint = (global as any).BigInt(1);
+    const stateManager =
+      options.usePendingState === true
+        ? this._pendingStateManager ?? this._stateManager
+        : this._stateManager;
+    const execution = await this._runTxAndRevertMutations(transaction, {
+      sender,
+      stateManager,
+      vm: this._createVm(stateManager, false, collector.listener),
+      context: {
+        chainId: this._context.chainId ?? one,
+        baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+        coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+        blockNumber: (latestBlock.header.number as bigint) + one,
+        timestamp:
+          this._context.timestamp ??
+          this._pendingBlockTimestamp ??
+          this._calculateNextBlockTimestamp(latestBlock),
+        gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+        noBaseFee: this._context.noBaseFee ?? true,
+      },
+    });
+    if (execution.runTxResult !== undefined) {
+      root.returnValue = execution.runTxResult.returnValue;
+      root.gasUsed = execution.runTxResult.gasUsed;
+      root.createdAddress = execution.runTxResult.createdAddress;
+      root.errorMessage = execution.success
+        ? undefined
+        : execution.runTxResult.executionError?.message ?? "execution failed";
+    } else {
+      root.errorMessage = execution.error?.message ?? "execution failed";
+    }
+    if (collector.lastError !== undefined) {
+      this._failedStackTraces += 1;
+      root.traceError = collector.lastError.message;
+    }
+    return root;
+  }
+
+  public async debugTraceCall(
+    call: CallParams,
+    config: QrlTraceConfig = {},
+    options: { usePendingState?: boolean } = {}
+  ): Promise<any> {
+    const createRawStructLogCollector = this._runtime.vmQrl
+      .createRawStructLogCollector;
+    const opcodeName = this._runtime.vmQrl.qrlOpcodeName;
+    if (createRawStructLogCollector === undefined || opcodeName === undefined) {
+      throw new InvalidInputError("QRL struct log collector is unavailable");
+    }
+    const collector = createRawStructLogCollector(config);
+    const result = await this.runCall(call, {
+      usePendingState: options.usePendingState,
+      traceListener: collector.listener,
+      emitConsoleLogs: false,
+    });
+    const outcome = {
+      gasUsed: result.gasUsed,
+      gasLimit: call.gasLimit,
+      returnValue: result.returnValue,
+      failed: result.exceptionError !== undefined,
+      errorMessage: result.exceptionError?.message,
+    };
+    const steps = collector.finish({
+      gasLimit: outcome.gasLimit,
+      gasUsed: outcome.gasUsed,
+    });
+    return getRpcDebugTrace(outcome, steps, opcodeName);
+  }
+
+  public async debugTraceTransaction(
+    hash: Uint8Array,
+    config: QrlTraceConfig = {}
+  ): Promise<any> {
+    const createRawStructLogCollector = this._runtime.vmQrl
+      .createRawStructLogCollector;
+    const opcodeName = this._runtime.vmQrl.qrlOpcodeName;
+    if (createRawStructLogCollector === undefined || opcodeName === undefined) {
+      throw new InvalidInputError("QRL struct log collector is unavailable");
+    }
+    const collector = createRawStructLogCollector(config);
+    const outcome = await this.replayTransaction(hash, collector.listener);
+    const steps = collector.finish({
+      gasLimit: outcome.gasLimit,
+      gasUsed: outcome.gasUsed,
+    });
+    return getRpcDebugTrace(outcome, steps, opcodeName);
+  }
+
+  public recordStackTraceFailure(): void {
+    this._failedStackTraces += 1;
   }
 
   public async getStackTraceFailuresCount(): Promise<number> {
     return this._failedStackTraces;
   }
 
-  public async takeSnapshot(): Promise<number> {
-    const id = this._nextSnapshotId;
+  public async getAccountBalance(address: any): Promise<bigint> {
+    return this._stateManager.getBalance(address);
+  }
 
-    // We copy all the maps here, as they may be modified
-    const snapshot: Snapshot = {
-      id,
-      date: new Date(),
-      latestBlock: await this.getLatestBlock(),
-      stateRoot: await this._stateManager.getStateRoot(),
-      blockTimeOffsetSeconds: new BN(this._blockTimeOffsetSeconds),
-      nextBlockTimestamp: new BN(this._nextBlockTimestamp),
-      transactionByHash: new Map(this._transactionByHash.entries()),
-      transactionHashToBlockHash: new Map(
-        this._transactionHashToBlockHash.entries()
-      ),
-      blockHashToTxBlockResults: new Map(
-        this._blockHashToTxBlockResults.entries()
-      ),
-      blockHashToTotalDifficulty: new Map(
-        this._blockHashToTotalDifficulty.entries()
-      ),
+  public async getAccountNonce(address: any): Promise<bigint> {
+    return this._stateManager.getNonce(address);
+  }
+
+  public async getCode(address: any): Promise<Uint8Array> {
+    return this._stateManager.getCode(address);
+  }
+
+  public async getStorageAt(
+    address: any,
+    key: Uint8Array
+  ): Promise<Uint8Array> {
+    return this._stateManager.getStorage(address, key);
+  }
+
+  public async getPendingCode(address: any): Promise<Uint8Array> {
+    return (this._pendingStateManager ?? this._stateManager).getCode(address);
+  }
+
+  public async getPendingStorageAt(
+    address: any,
+    key: Uint8Array
+  ): Promise<Uint8Array> {
+    return (this._pendingStateManager ?? this._stateManager).getStorage(
+      address,
+      key
+    );
+  }
+
+  public async getBlockGasLimit(): Promise<bigint> {
+    const latestBlock = await this._getLatestBlock();
+    return this._context.gasLimit ?? latestBlock.header.gasLimit;
+  }
+
+  public async getCoinbaseAddress(): Promise<any> {
+    const latestBlock = await this._getLatestBlock();
+    return this._context.coinbase ?? latestBlock.header.coinbase;
+  }
+
+  public async getGasPrice(): Promise<bigint> {
+    return (global as any).BigInt(0);
+  }
+
+  public async newFilter(criteria: QRLLogFilter): Promise<bigint> {
+    if (criteria.blockHash !== undefined) {
+      throw new InvalidArgumentsError(
+        "QRL installed log filters do not support blockHash criteria"
+      );
+    }
+
+    const latest = await this.getLatestBlockNumber();
+    return this._registerFilter({
+      type: "log",
+      criteria,
+      minimumBlock: resolveInstalledFilterMinimum(criteria.fromBlock),
+      nextBlock: resolveInstalledFilterStart(criteria.fromBlock, latest),
+      deadline: this._filterDeadline(),
+    });
+  }
+
+  public async newBlockFilter(): Promise<bigint> {
+    return this._registerFilter({
+      type: "block",
+      lastBlock: await this.getLatestBlockNumber(),
+      deadline: this._filterDeadline(),
+    });
+  }
+
+  public async newPendingTransactionFilter(): Promise<bigint> {
+    return this._registerFilter({
+      type: "pendingTx",
+      reported: new Set(),
+      deadline: this._filterDeadline(),
+    });
+  }
+
+  public uninstallFilter(filterId: bigint): boolean {
+    this._sweepExpiredFilters();
+    const deleted = this._filters.delete(filterKey(filterId));
+    this._scheduleFilterSweep();
+    return deleted;
+  }
+
+  public async getFilterChanges(
+    filterId: bigint
+  ): Promise<string[] | RpcLogOutput[] | undefined> {
+    const filter = this._lookupFilter(filterId);
+    if (filter === undefined) {
+      return undefined;
+    }
+
+    const latest = await this.getLatestBlockNumber();
+    const one: bigint = (global as any).BigInt(1);
+    if (filter.type === "block") {
+      // tslint:disable-next-line:strict-comparisons
+      if (filter.lastBlock > latest) {
+        filter.lastBlock = latest;
+      }
+      const hashes: string[] = [];
+      for (
+        let number = filter.lastBlock + one;
+        // tslint:disable-next-line:strict-comparisons
+        number <= latest;
+        number += one
+      ) {
+        const block = await this.getBlockByNumber(number);
+        if (block !== undefined) {
+          hashes.push(bufferToRpcData(block.hash()));
+        }
+      }
+      filter.lastBlock = latest;
+      return hashes;
+    }
+
+    if (filter.type === "pendingTx") {
+      const current = new Set<string>();
+      const fresh: string[] = [];
+      for (const transaction of await this.getPendingTransactions()) {
+        const hash = bufferToRpcData(transaction.hash());
+        current.add(hash);
+        if (!filter.reported.has(hash)) {
+          fresh.push(hash);
+        }
+      }
+      filter.reported = current;
+      return fresh;
+    }
+
+    const toBlock = resolveLogFilterBlock(
+      filter.criteria.toBlock,
+      latest,
+      latest
+    );
+    const minedTo = minBigInt(toBlock.number, latest);
+    const logs: RpcLogOutput[] = [];
+    for (
+      let number = filter.nextBlock;
+      // tslint:disable-next-line:strict-comparisons
+      number <= minedTo;
+      number += one
+    ) {
+      const block = await this.getBlockByNumber(number);
+      if (block !== undefined) {
+        logs.push(...formatMatchingLogs(block, filter.criteria));
+      }
+    }
+    // tslint:disable-next-line:strict-comparisons
+    if (filter.nextBlock <= minedTo) {
+      filter.nextBlock = minedTo + one;
+    }
+    // tslint:disable-next-line:strict-comparisons
+    if (toBlock.includesPending && filter.nextBlock <= latest + one) {
+      logs.push(
+        ...formatMatchingLogs(await this.getPendingBlock(), filter.criteria)
+      );
+    }
+    return logs;
+  }
+
+  public async getFilterLogs(
+    filterId: bigint
+  ): Promise<RpcLogOutput[] | undefined> {
+    const filter = this._lookupFilter(filterId);
+    if (filter === undefined) {
+      return undefined;
+    }
+    if (filter.type !== "log") {
+      throw new InvalidArgumentsError(
+        "QRL getFilterLogs is only supported for log filters"
+      );
+    }
+    return this.getLogs(filter.criteria);
+  }
+
+  public async getLogs(filter: QRLLogFilter): Promise<RpcLogOutput[]> {
+    if (filter.blockHash !== undefined) {
+      const block = await this.getBlockByHash(filter.blockHash);
+      return block === undefined ? [] : formatMatchingLogs(block, filter);
+    }
+
+    const latest = await this.getLatestBlockNumber();
+    const zero: bigint = (global as any).BigInt(0);
+    const one: bigint = (global as any).BigInt(1);
+    const fromBlock = resolveLogFilterBlock(filter.fromBlock, zero, latest);
+    const toBlock =
+      filter.toBlock === undefined && filter.fromBlock === "pending"
+        ? { number: latest + one, includesPending: true }
+        : resolveLogFilterBlock(filter.toBlock, latest, latest);
+    // tslint:disable-next-line:strict-comparisons
+    if (fromBlock.number > toBlock.number) {
+      return [];
+    }
+
+    const logs: RpcLogOutput[] = [];
+    for (
+      let number = fromBlock.number;
+      // tslint:disable-next-line:strict-comparisons
+      number <= toBlock.number && number <= latest;
+      number += one
+    ) {
+      const block = await this.getBlockByNumber(number);
+      if (block !== undefined) {
+        logs.push(...formatMatchingLogs(block, filter));
+      }
+    }
+    // tslint:disable-next-line:strict-comparisons
+    if (toBlock.includesPending && fromBlock.number <= latest + one) {
+      logs.push(...formatMatchingLogs(await this.getPendingBlock(), filter));
+    }
+    return logs;
+  }
+
+  public newHeadsSubscription(): bigint {
+    return this._registerSubscription({ type: "newHeads" });
+  }
+
+  public newPendingTransactionsSubscription(
+    fullObjects: boolean = false
+  ): bigint {
+    return this._registerSubscription({
+      type: "newPendingTransactions",
+      fullObjects,
+    });
+  }
+
+  public newLogsSubscription(criteria: QRLLogFilter): bigint {
+    if (criteria.blockHash !== undefined) {
+      throw new InvalidArgumentsError(
+        "QRL log subscriptions do not support blockHash criteria"
+      );
+    }
+
+    const from = parseSubscriptionBound(criteria.fromBlock, "fromBlock");
+    const to = parseSubscriptionBound(criteria.toBlock, "toBlock");
+    if (from.kind === "latest" && to.kind === "number") {
+      throw new InvalidArgumentsError(
+        "QRL log subscription has an invalid block range"
+      );
+    }
+    if (from.kind === "number" && to.kind === "number") {
+      // tslint:disable-next-line:strict-comparisons
+      if (from.value > to.value) {
+        throw new InvalidArgumentsError(
+          "QRL log subscription fromBlock cannot be greater than toBlock"
+        );
+      }
+    }
+
+    return this._registerSubscription({
+      type: "logs",
+      criteria,
+      fromBound: from.kind === "number" ? from.value : undefined,
+      toBound: to.kind === "number" ? to.value : undefined,
+    });
+  }
+
+  public unsubscribe(subscriptionId: bigint): boolean {
+    return this._subscriptions.delete(filterKey(subscriptionId));
+  }
+
+  public installedSubscriptionCount(): number {
+    return this._subscriptions.size;
+  }
+
+  public installedFilterCount(): number {
+    return this._filters.size;
+  }
+
+  public async estimateGas(
+    transaction: any,
+    sender: any,
+    options: EstimateGasOptions = {}
+  ): Promise<EstimateGasResult> {
+    const upperBound: bigint = transaction.gasLimit;
+    const zero: bigint = (global as any).BigInt(0);
+    // tslint:disable-next-line:strict-comparisons
+    if (upperBound <= zero) {
+      throw new InvalidInputError(
+        "gas estimation upper bound must be positive"
+      );
+    }
+
+    const latestBlock = await this._getLatestBlock();
+    const one: bigint = (global as any).BigInt(1);
+    const latestBlockNumber: bigint = latestBlock.header.number;
+    const stateManager =
+      options.usePendingState === true
+        ? this._pendingStateManager ?? this._stateManager
+        : this._stateManager;
+    const executionContext: GasEstimationExecutionContext = {
+      sender,
+      stateManager,
+      vm: this._createVm(stateManager, false),
+      context: {
+        chainId: this._context.chainId ?? one,
+        baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+        coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+        blockNumber: latestBlockNumber + one,
+        timestamp:
+          this._context.timestamp ??
+          this._pendingBlockTimestamp ??
+          this._calculateNextBlockTimestamp(latestBlock),
+        gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+        noBaseFee: this._context.noBaseFee ?? true,
+      },
     };
+    const upperTransaction = this._copyTransactionWithGasLimit(
+      transaction,
+      upperBound
+    );
+    const upperExecution = await this._runTxAndRevertMutations(
+      upperTransaction,
+      executionContext
+    );
 
-    this._snapshots.push(snapshot);
-    this._nextSnapshotId += 1;
+    if (!upperExecution.success) {
+      return {
+        estimation: upperBound,
+        runTxResult: upperExecution.runTxResult,
+        error: upperExecution.error,
+      };
+    }
 
+    const initialEstimation: bigint = upperExecution.runTxResult.gasUsed;
+    return {
+      estimation: await this._correctInitialEstimation(
+        transaction,
+        initialEstimation,
+        upperBound,
+        executionContext
+      ),
+      runTxResult: upperExecution.runTxResult,
+    };
+  }
+
+  public async getLocalAccountAddresses(): Promise<string[]> {
+    return [...this._localAccounts.values()].map((address) =>
+      address.toString()
+    );
+  }
+
+  public async runTransaction(
+    transaction: any,
+    sender: any
+  ): Promise<RunTransactionResult> {
+    const localSender = this._getLocalAccount(sender);
+    return this._automine
+      ? this._runTransactionInNewBlock(transaction, localSender)
+      : this._runTransactionInPendingBlock(transaction, localSender);
+  }
+
+  public async runRawTransaction(
+    transaction: any
+  ): Promise<RunTransactionResult> {
+    const sender = await this._getRawTransactionSender(transaction);
+    return this._automine
+      ? this._runTransactionInNewBlock(transaction, sender)
+      : this._runTransactionInPendingBlock(transaction, sender);
+  }
+
+  public async runTransactionInNewBlock(
+    transaction: any,
+    sender: any
+  ): Promise<RunTransactionInNewBlockResult> {
+    return this._runTransactionInNewBlock(
+      transaction,
+      this._getLocalAccount(sender)
+    );
+  }
+
+  public async runRawTransactionInNewBlock(
+    transaction: any
+  ): Promise<RunTransactionInNewBlockResult> {
+    const sender = await this._getRawTransactionSender(transaction);
+    return this._runTransactionInNewBlock(transaction, sender);
+  }
+
+  public async getPendingTransactions(): Promise<any[]> {
+    return this._pendingTransactions.map((entry) => entry.transaction);
+  }
+
+  public async getPendingAccountBalance(address: any): Promise<bigint> {
+    return (this._pendingStateManager ?? this._stateManager).getBalance(
+      address
+    );
+  }
+
+  public async getPendingAccountNonce(address: any): Promise<bigint> {
+    return (this._pendingStateManager ?? this._stateManager).getNonce(address);
+  }
+
+  public async getPendingBlock(): Promise<Block> {
+    const latestBlock = await this._getLatestBlock();
+    const timestamp =
+      this._pendingBlockTimestamp ??
+      this._calculateNextBlockTimestamp(latestBlock);
+    return this._buildBlockFromPending(
+      latestBlock,
+      timestamp,
+      this._pendingStateManager ?? this._stateManager
+    );
+  }
+
+  public async mineBlock(options: MineBlockOptions = {}): Promise<Block> {
+    if (this._pendingTransactions.length === 0) {
+      return this.mineEmptyBlock(options);
+    }
+
+    if (hasBlockOverrides(options)) {
+      throw new InvalidInputError(
+        "cannot override block options while pending transactions exist"
+      );
+    }
+
+    return this._minePendingBlock();
+  }
+
+  public async setNextBlockTimestamp(timestamp: bigint): Promise<void> {
+    const latestBlock = await this._getLatestBlock();
+    const latestBlockTimestamp: bigint = latestBlock.header.timestamp;
+    const lowerBound = this._pendingBlockTimestamp ?? latestBlockTimestamp;
+
+    // tslint:disable-next-line:strict-comparisons
+    if (timestamp <= lowerBound) {
+      throw new InvalidInputError(
+        `timestamp ${timestamp} is not greater than the next block timestamp lower bound ${lowerBound}`
+      );
+    }
+
+    this._nextBlockTimestamp = timestamp;
+  }
+
+  public async increaseTime(increment: bigint): Promise<bigint> {
+    const zero: bigint = (global as any).BigInt(0);
+    // tslint:disable-next-line:strict-comparisons
+    if (increment < zero) {
+      throw new InvalidInputError("time increase must not be negative");
+    }
+
+    this._pendingTimeIncrease += increment;
+    this._totalTimeIncrement += increment;
+    return this._totalTimeIncrement;
+  }
+
+  public async getTimeIncrement(): Promise<bigint> {
+    return this._totalTimeIncrement;
+  }
+
+  public async getNextBlockTimestamp(): Promise<bigint | undefined> {
+    return this._nextBlockTimestamp;
+  }
+
+  public async takeSnapshot(): Promise<bigint> {
+    const id = this._nextSnapshotId;
+    this._nextSnapshotId += (global as any).BigInt(1);
+    this._snapshots.push({
+      id,
+      latestBlock: await this._getLatestBlock(),
+      stateManager: this._stateManager.shallowCopy(),
+      pendingStateManager: this._pendingStateManager?.shallowCopy(),
+      pendingTransactions: this._pendingTransactions.map((entry) => ({
+        ...entry,
+        transactionHash: new Uint8Array(entry.transactionHash),
+      })),
+      pendingBlockTimestamp: this._pendingBlockTimestamp,
+      pendingTimeIncrease: this._pendingTimeIncrease,
+      totalTimeIncrement: this._totalTimeIncrement,
+      nextBlockTimestamp: this._nextBlockTimestamp,
+      transactionsByHash: new Map(this._transactionsByHash),
+      receiptsByTransactionHash: new Map(this._receiptsByTransactionHash),
+      transactionHashToBlockHash: cloneHashMap(
+        this._transactionHashToBlockHash
+      ),
+      stateBeforeByBlock: new Map(this._stateBeforeByBlock),
+    });
     return id;
   }
 
-  public async revertToSnapshot(id: number): Promise<boolean> {
-    const snapshotIndex = this._getSnapshotIndex(id);
-    if (snapshotIndex === undefined) {
+  public async revertToSnapshot(id: bigint): Promise<boolean> {
+    const snapshotIndex = this._snapshots.findIndex(
+      (candidate) => candidate.id === id
+    );
+    if (snapshotIndex === -1) {
       return false;
     }
 
     const snapshot = this._snapshots[snapshotIndex];
-
-    // We compute a new offset such that
-    //  now + new_offset === snapshot_date + old_offset
-    const now = new Date();
-    const offsetToSnapshotInMillis = snapshot.date.valueOf() - now.valueOf();
-    const offsetToSnapshotInSecs = Math.ceil(offsetToSnapshotInMillis / 1000);
-    const newOffset = snapshot.blockTimeOffsetSeconds.addn(
-      offsetToSnapshotInSecs
+    const removedBlocks = await this._getBlocksAfter(
+      snapshot.latestBlock.header.number
     );
-
-    // We delete all following blocks, changes the state root, and all the
-    // relevant Node fields.
-    //
-    // Note: There's no need to copy the maps here, as snapshots can only be
-    // used once
     this._blockchain.deleteAllFollowingBlocks(snapshot.latestBlock);
-    await this._stateManager.setStateRoot(snapshot.stateRoot);
-    this._blockTimeOffsetSeconds = newOffset;
+    this._replaceStateManager(snapshot.stateManager.shallowCopy());
+    this._pendingTransactions.splice(
+      0,
+      this._pendingTransactions.length,
+      ...snapshot.pendingTransactions
+    );
+    this._pendingStateManager = snapshot.pendingStateManager?.shallowCopy();
+    this._pendingVm =
+      this._pendingStateManager === undefined
+        ? undefined
+        : this._createVm(this._pendingStateManager);
+    this._pendingBlockTimestamp = snapshot.pendingBlockTimestamp;
+    this._pendingTimeIncrease = snapshot.pendingTimeIncrease;
+    this._totalTimeIncrement = snapshot.totalTimeIncrement;
     this._nextBlockTimestamp = snapshot.nextBlockTimestamp;
-    this._transactionByHash = snapshot.transactionByHash;
-    this._transactionHashToBlockHash = snapshot.transactionHashToBlockHash;
-    this._blockHashToTxBlockResults = snapshot.blockHashToTxBlockResults;
-    this._blockHashToTotalDifficulty = snapshot.blockHashToTotalDifficulty;
+    replaceMap(this._transactionsByHash, snapshot.transactionsByHash);
+    replaceMap(
+      this._receiptsByTransactionHash,
+      snapshot.receiptsByTransactionHash
+    );
+    replaceMap(
+      this._transactionHashToBlockHash,
+      cloneHashMap(snapshot.transactionHashToBlockHash)
+    );
+    replaceMap(this._stateBeforeByBlock, snapshot.stateBeforeByBlock);
 
-    // We delete this and the following snapshots, as they can only be used
-    // once in Ganache
+    this._resetFilterCursors(snapshot.latestBlock.header.number);
+    for (const block of removedBlocks) {
+      this._notifyRemovedLogSubscriptions(block);
+    }
+
     this._snapshots.splice(snapshotIndex);
-
     return true;
   }
 
-  public async newFilter(
-    filterParams: FilterParams,
-    isSubscription: boolean
-  ): Promise<BN> {
-    filterParams = await this._computeFilterParams(filterParams, true);
-
-    const filterId = this._getNextFilterId();
-    this._filters.set(this._filterIdToFiltersKey(filterId), {
-      id: filterId,
-      type: Type.LOGS_SUBSCRIPTION,
-      criteria: {
-        fromBlock: filterParams.fromBlock,
-        toBlock: filterParams.toBlock,
-        addresses: filterParams.addresses,
-        normalizedTopics: filterParams.normalizedTopics,
-      },
-      deadline: this._newDeadline(),
-      hashes: [],
-      logs: await this.getLogs(filterParams),
-      subscription: isSubscription,
-    });
-
-    return filterId;
-  }
-
-  public async newBlockFilter(isSubscription: boolean): Promise<BN> {
-    const block = await this.getLatestBlock();
-
-    const filterId = this._getNextFilterId();
-    this._filters.set(this._filterIdToFiltersKey(filterId), {
-      id: filterId,
-      type: Type.BLOCK_SUBSCRIPTION,
-      deadline: this._newDeadline(),
-      hashes: [bufferToHex(block.header.hash())],
-      logs: [],
-      subscription: isSubscription,
-    });
-
-    return filterId;
-  }
-
-  public async newPendingTransactionFilter(
-    isSubscription: boolean
-  ): Promise<BN> {
-    const filterId = this._getNextFilterId();
-
-    this._filters.set(this._filterIdToFiltersKey(filterId), {
-      id: filterId,
-      type: Type.PENDING_TRANSACTION_SUBSCRIPTION,
-      deadline: this._newDeadline(),
-      hashes: [],
-      logs: [],
-      subscription: isSubscription,
-    });
-
-    return filterId;
-  }
-
-  public async uninstallFilter(
-    filterId: BN,
-    subscription: boolean
-  ): Promise<boolean> {
-    const key = this._filterIdToFiltersKey(filterId);
-    const filter = this._filters.get(key);
-
-    if (filter === undefined) {
-      return false;
-    }
-
-    if (
-      (filter.subscription && !subscription) ||
-      (!filter.subscription && subscription)
-    ) {
-      return false;
-    }
-
-    this._filters.delete(key);
-    return true;
-  }
-
-  public async getFilterChanges(
-    filterId: BN
-  ): Promise<string[] | RpcLogOutput[] | undefined> {
-    const key = this._filterIdToFiltersKey(filterId);
-    const filter = this._filters.get(key);
-    if (filter === undefined) {
-      return undefined;
-    }
-
-    filter.deadline = this._newDeadline();
-    switch (filter.type) {
-      case Type.BLOCK_SUBSCRIPTION:
-      case Type.PENDING_TRANSACTION_SUBSCRIPTION:
-        const hashes = filter.hashes;
-        filter.hashes = [];
-        return hashes;
-      case Type.LOGS_SUBSCRIPTION:
-        const logs = filter.logs;
-        filter.logs = [];
-        return logs;
-    }
-
-    return undefined;
-  }
-
-  public async getFilterLogs(
-    filterId: BN
-  ): Promise<RpcLogOutput[] | undefined> {
-    const key = this._filterIdToFiltersKey(filterId);
-    const filter = this._filters.get(key);
-    if (filter === undefined) {
-      return undefined;
-    }
-
-    const logs = filter.logs;
-    filter.logs = [];
-    filter.deadline = this._newDeadline();
-    return logs;
-  }
-
-  public async getLogs(filterParams: FilterParams): Promise<RpcLogOutput[]> {
-    filterParams = await this._computeFilterParams(filterParams, false);
-
-    const logs: RpcLogOutput[] = [];
-    for (
-      let i = filterParams.fromBlock;
-      i.lte(filterParams.toBlock);
-      i = i.addn(1)
-    ) {
-      const block = await this._getBlock(new BN(i));
-      const blockResults = this._blockHashToTxBlockResults.get(
-        bufferToHex(block.hash())
-      );
-      if (blockResults === undefined) {
-        continue;
-      }
-
-      if (
-        !bloomFilter(
-          new Bloom(block.header.bloom),
-          filterParams.addresses,
-          filterParams.normalizedTopics
-        )
-      ) {
-        continue;
-      }
-
-      for (const tx of blockResults) {
-        logs.push(
-          ...filterLogs(tx.receipt.logs, {
-            fromBlock: filterParams.fromBlock,
-            toBlock: filterParams.toBlock,
-            addresses: filterParams.addresses,
-            normalizedTopics: filterParams.normalizedTopics,
-          })
-        );
-      }
-    }
-
-    return logs;
-  }
-
-  private _getSnapshotIndex(id: number): number | undefined {
-    for (const [i, snapshot] of this._snapshots.entries()) {
-      if (snapshot.id === id) {
-        return i;
-      }
-
-      // We already removed the snapshot we are looking for
-      if (snapshot.id > id) {
-        return undefined;
-      }
-    }
-
-    return undefined;
-  }
-
-  private _initLocalAccounts(localAccounts: Buffer[]) {
-    for (const pk of localAccounts) {
-      this._accountPrivateKeys.set(bufferToHex(privateToAddress(pk)), pk);
-    }
-  }
-
-  private async _getConsoleLogMessages(
-    vmTrace: MessageTrace,
-    vmTracerError: Error | undefined
-  ): Promise<string[]> {
-    if (vmTracerError !== undefined) {
-      log(
-        "Could not print console log. Please report this to help us improve Buidler.\n",
-        vmTracerError
-      );
-
-      return [];
-    }
-
-    return this._consoleLogger.getLogMessages(vmTrace);
-  }
-
-  private async _manageErrors(
-    vmResult: ExecResult,
-    vmTrace: MessageTrace,
-    vmTracerError?: Error
-  ): Promise<SolidityError | TransactionExecutionError | undefined> {
-    if (vmResult.exceptionError === undefined) {
-      return undefined;
-    }
-
-    let stackTrace: SolidityStackTrace | undefined;
-
-    if (this._solidityTracer !== undefined) {
-      try {
-        if (vmTracerError !== undefined) {
-          throw vmTracerError;
-        }
-
-        stackTrace = this._solidityTracer.getStackTrace(vmTrace);
-      } catch (error) {
-        this._failedStackTraces += 1;
-        log(
-          "Could not generate stack trace. Please report this to help us improve Buidler.\n",
-          error
-        );
-      }
-    }
-
-    const error = vmResult.exceptionError;
-
-    if (error.error === ERROR.OUT_OF_GAS) {
-      return new TransactionExecutionError("Transaction run out of gas");
-    }
-
-    if (error.error === ERROR.REVERT) {
-      if (vmResult.returnValue.length === 0) {
-        if (stackTrace !== undefined) {
-          return encodeSolidityStackTrace(
-            "Transaction reverted without a reason",
-            stackTrace
-          );
-        }
-
-        return new TransactionExecutionError(
-          "Transaction reverted without a reason"
-        );
-      }
-
-      if (stackTrace !== undefined) {
-        return encodeSolidityStackTrace(
-          `VM Exception while processing transaction: revert ${decodeRevertReason(
-            vmResult.returnValue
-          )}`,
-          stackTrace
-        );
-      }
-
-      return new TransactionExecutionError(
-        `VM Exception while processing transaction: revert ${decodeRevertReason(
-          vmResult.returnValue
-        )}`
-      );
-    }
-
-    if (stackTrace !== undefined) {
-      return encodeSolidityStackTrace("Transaction failed: revert", stackTrace);
-    }
-
-    return new TransactionExecutionError("Transaction failed: revert");
-  }
-
-  private _calculateTimestampAndOffset(timestamp?: BN): [BN, boolean, BN] {
-    let blockTimestamp: BN;
-    let offsetShouldChange: boolean;
-    let newOffset: BN = new BN(0);
-
-    // if timestamp is not provided, we check nextBlockTimestamp, if it is
-    // set, we use it as the timestamp instead. If it is not set, we use
-    // time offset + real time as the timestamp.
-    if (timestamp === undefined || timestamp.eq(new BN(0))) {
-      if (this._nextBlockTimestamp.eq(new BN(0))) {
-        blockTimestamp = new BN(getCurrentTimestamp()).add(
-          this._blockTimeOffsetSeconds
-        );
-        offsetShouldChange = false;
-      } else {
-        blockTimestamp = new BN(this._nextBlockTimestamp);
-        offsetShouldChange = true;
-      }
-    } else {
-      offsetShouldChange = true;
-      blockTimestamp = timestamp;
-    }
-
-    if (offsetShouldChange) {
-      newOffset = blockTimestamp.sub(new BN(getCurrentTimestamp()));
-    }
-
-    return [blockTimestamp, offsetShouldChange, newOffset];
-  }
-
-  private async _getNextBlockTemplate(timestamp: BN): Promise<Block> {
-    const block = new Block(
-      {
-        header: {
-          gasLimit: this._blockGasLimit,
-          nonce: "0x42",
-          timestamp,
-        },
-      },
-      { common: this._common }
+  public async mineEmptyBlock(options: MineBlockOptions = {}): Promise<Block> {
+    const latestBlock = await this._getLatestBlock();
+    const one: bigint = (global as any).BigInt(1);
+    const latestBlockNumber: bigint = latestBlock.header.number;
+    const timestamp = this._calculateNextBlockTimestamp(
+      latestBlock,
+      options.timestamp
     );
 
-    block.validate = (blockchain: any, cb: any) => cb(null);
+    const transactions: any[] = [];
+    const receipts: any[] = [];
+    const transactionsRoot = await this._runtime.blockQrl.genQRLTransactionsRoot(
+      transactions
+    );
+    const receiptsRoot = await this._runtime.blockQrl.genQRLReceiptsRoot(
+      receipts
+    );
+    const stateRoot = await this._stateManager.getStateRoot();
+    const block = new this._runtime.blockQrl.QRLBlock({
+      header: {
+        parentHash: latestBlock.hash(),
+        number: latestBlockNumber + one,
+        timestamp,
+        gasLimit:
+          options.gasLimit ??
+          this._context.gasLimit ??
+          latestBlock.header.gasLimit,
+        baseFee:
+          options.baseFee ??
+          this._context.baseFee ??
+          latestBlock.header.baseFee,
+        coinbase:
+          options.coinbase ??
+          this._context.coinbase ??
+          latestBlock.header.coinbase,
+        transactionsRoot,
+        receiptsRoot,
+        stateRoot,
+      },
+      transactions,
+      receipts,
+    });
 
-    const latestBlock = await this.getLatestBlock();
-
-    block.header.number = toBuffer(new BN(latestBlock.header.number).addn(1));
-    block.header.parentHash = latestBlock.hash();
-    block.header.difficulty = block.header.canonicalDifficulty(latestBlock);
-    block.header.coinbase = await this.getCoinbaseAddress();
-
+    await this._putBlock(block);
+    this._consumeTimeControls(options.timestamp);
+    this._notifyBlockSubscriptions(block);
     return block;
   }
 
-  private async _resetNextBlockTimestamp() {
-    this._nextBlockTimestamp = new BN(0);
-  }
+  public async runCall(
+    call: CallParams,
+    options: RunCallOptions = {}
+  ): Promise<any> {
+    const latestBlock = await this._getLatestBlock();
+    const usePendingState = options.usePendingState === true;
+    const one: bigint = (global as any).BigInt(1);
+    const stateManager = usePendingState
+      ? this._pendingStateManager ?? this._stateManager
+      : this._stateManager;
+    const vm =
+      options.traceListener !== undefined
+        ? this._createVm(
+            stateManager,
+            options.emitConsoleLogs ?? false,
+            options.traceListener
+          )
+        : stateManager === this._stateManager
+        ? this._vm
+        : this._pendingVm ?? this._createVm(stateManager);
 
-  private async _saveTransactionAsReceived(tx: Transaction) {
-    this._transactionByHash.set(bufferToHex(tx.hash(true)), tx);
-    this._filters.forEach((filter) => {
-      if (filter.type === Type.PENDING_TRANSACTION_SUBSCRIPTION) {
-        const hash = bufferToHex(tx.hash(true));
-        if (filter.subscription) {
-          this._emitEthEvent(filter.id, hash);
-          return;
-        }
-
-        filter.hashes.push(hash);
+    await stateManager.checkpoint();
+    try {
+      if (call.value !== (global as any).BigInt(0)) {
+        await stateManager.subBalance(call.from, call.value);
+        await stateManager.addBalance(call.to, call.value);
       }
-    });
-  }
 
-  private async _getLocalAccountPrivateKey(sender: Buffer): Promise<Buffer> {
-    const senderAddress = bufferToHex(sender);
-    if (!this._accountPrivateKeys.has(senderAddress)) {
-      throw new InvalidInputError(`unknown account ${senderAddress}`);
-    }
-
-    return this._accountPrivateKeys.get(senderAddress)!;
-  }
-
-  private async _addTransactionToBlock(block: Block, tx: Transaction) {
-    block.transactions.push(tx);
-
-    await promisify(block.genTxTrie.bind(block))();
-
-    block.header.transactionsTrie = block.txTrie.root;
-  }
-
-  private async _saveBlockAsSuccessfullyRun(
-    block: Block,
-    runBlockResult: RunBlockResult
-  ) {
-    await this._putBlock(block);
-
-    const txBlockResults: TxBlockResult[] = [];
-
-    for (let i = 0; i < runBlockResult.results.length; i += 1) {
-      const result = runBlockResult.results[i];
-
-      const receipt = runBlockResult.receipts[i];
-      const logs = receipt.logs.map(
-        (rcpLog, logIndex) =>
-          (runBlockResult.receipts[i].logs[logIndex] = getRpcLog(
-            rcpLog,
-            block.transactions[i],
-            block,
-            i,
-            logIndex
-          ))
-      );
-
-      txBlockResults.push({
-        bloomBitvector: result.bloom.bitvector,
-        createAddresses: result.createdAddress,
-        receipt: {
-          status: receipt.status,
-          gasUsed: receipt.gasUsed,
-          bitvector: receipt.bitvector,
-          logs,
+      return await vm.evm.runCall({
+        to: call.to,
+        caller: call.from,
+        origin: call.from,
+        data: call.data,
+        value: call.value,
+        gasLimit: call.gasLimit,
+        context: {
+          coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+          blockNumber: usePendingState
+            ? (latestBlock.header.number as bigint) + one
+            : latestBlock.header.number,
+          timestamp:
+            this._context.timestamp ??
+            (usePendingState
+              ? this._pendingBlockTimestamp ??
+                this._calculateNextBlockTimestamp(latestBlock)
+              : latestBlock.header.timestamp),
+          gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+          chainId: this._context.chainId ?? (global as any).BigInt(1),
+          baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+          gasPrice: call.gasPrice,
         },
       });
+    } finally {
+      await stateManager.revert();
     }
-
-    const blockHash = bufferToHex(block.hash());
-    this._blockHashToTxBlockResults.set(blockHash, txBlockResults);
-
-    const td = this._computeTotalDifficulty(block);
-    this._blockHashToTotalDifficulty.set(blockHash, td);
-
-    const rpcLogs: RpcLogOutput[] = [];
-    for (const receipt of runBlockResult.receipts) {
-      rpcLogs.push(...receipt.logs);
-    }
-
-    this._filters.forEach((filter, key) => {
-      if (filter.deadline.valueOf() < new Date().valueOf()) {
-        this._filters.delete(key);
-      }
-
-      switch (filter.type) {
-        case Type.BLOCK_SUBSCRIPTION:
-          const hash = block.hash();
-          if (filter.subscription) {
-            this._emitEthEvent(filter.id, getRpcBlock(block, td, false));
-            return;
-          }
-
-          filter.hashes.push(bufferToHex(hash));
-          break;
-        case Type.LOGS_SUBSCRIPTION:
-          if (
-            bloomFilter(
-              new Bloom(block.header.bloom),
-              filter.criteria!.addresses,
-              filter.criteria!.normalizedTopics
-            )
-          ) {
-            const logs = filterLogs(rpcLogs, filter.criteria!);
-            if (logs.length === 0) {
-              return;
-            }
-
-            if (filter.subscription) {
-              logs.forEach((rpcLog) => {
-                this._emitEthEvent(filter.id, rpcLog);
-              });
-              return;
-            }
-
-            filter.logs.push(...logs);
-          }
-          break;
-      }
-    });
-  }
-
-  private async _putBlock(block: Block): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this._vm.blockchain.putBlock(block, (err?: any) => {
-        if (err !== undefined && err !== null) {
-          reject(err);
-          return;
-        }
-
-        resolve();
-      });
-    });
-  }
-
-  private async _hasBlockWithHash(blockHash: Buffer): Promise<boolean> {
-    if (this._blockHashToTotalDifficulty.has(bufferToHex(blockHash))) {
-      return true;
-    }
-
-    const block = await this.getBlockByNumber(new BN(0));
-    return block.hash().equals(blockHash);
-  }
-
-  private async _saveTransactionAsSuccessfullyRun(
-    tx: Transaction,
-    block: Block
-  ) {
-    this._transactionHashToBlockHash.set(
-      bufferToHex(tx.hash(true)),
-      bufferToHex(block.hash())
-    );
-  }
-
-  private async _transactionWasSuccessful(tx: Transaction): Promise<boolean> {
-    return this._transactionHashToBlockHash.has(bufferToHex(tx.hash(true)));
-  }
-
-  private async _timestampClashesWithPreviousBlockOne(
-    block: Block
-  ): Promise<boolean> {
-    const blockTimestamp = new BN(block.header.timestamp);
-
-    const latestBlock = await this.getLatestBlock();
-    const latestBlockTimestamp = new BN(latestBlock.header.timestamp);
-
-    return latestBlockTimestamp.eq(blockTimestamp);
-  }
-
-  private async _increaseBlockTimestamp(block: Block) {
-    block.header.timestamp = new BN(block.header.timestamp).addn(1);
-  }
-
-  private async _setBlockTimestamp(block: Block, timestamp: BN) {
-    block.header.timestamp = new BN(timestamp);
-  }
-
-  private async _validateTransaction(tx: Transaction) {
-    // Geth throws this error if a tx is sent twice
-    if (await this._transactionWasSuccessful(tx)) {
-      throw new InvalidInputError(
-        `known transaction: ${bufferToHex(tx.hash(true)).toString()}`
-      );
-    }
-
-    if (!tx.verifySignature()) {
-      throw new InvalidInputError("Invalid transaction signature");
-    }
-
-    // Geth returns this error if trying to create a contract and no data is provided
-    if (tx.to.length === 0 && tx.data.length === 0) {
-      throw new InvalidInputError(
-        "contract creation without any data provided"
-      );
-    }
-
-    const expectedNonce = await this.getAccountNonce(tx.getSenderAddress());
-    const actualNonce = new BN(tx.nonce);
-    if (!expectedNonce.eq(actualNonce)) {
-      throw new InvalidInputError(
-        `Invalid nonce. Expected ${expectedNonce} but got ${actualNonce}.
-
-If you are running a script or test, you may be sending transactions in parallel.
-Using JavaScript? You probably forgot an await.
-
-If you are using a wallet or dapp, try resetting your wallet's accounts.`
-      );
-    }
-
-    const baseFee = tx.getBaseFee();
-    const gasLimit = new BN(tx.gasLimit);
-
-    if (baseFee.gt(gasLimit)) {
-      throw new InvalidInputError(
-        `Transaction requires at least ${baseFee} gas but got ${gasLimit}`
-      );
-    }
-
-    if (gasLimit.gt(this._blockGasLimit)) {
-      throw new InvalidInputError(
-        `Transaction gas limit is ${gasLimit} and exceeds block gas limit of ${this._blockGasLimit}`
-      );
-    }
-  }
-
-  private _computeTotalDifficulty(block: Block): BN {
-    const difficulty = new BN(block.header.difficulty);
-
-    const parentHash = bufferToHex(block.header.parentHash);
-    if (
-      parentHash ===
-      "0x0000000000000000000000000000000000000000000000000000000000000000"
-    ) {
-      return difficulty;
-    }
-
-    const parentTd = this._blockHashToTotalDifficulty.get(parentHash);
-
-    if (parentTd === undefined) {
-      throw new InternalError(`Unrecognized parent block ${parentHash}`);
-    }
-
-    return parentTd.add(difficulty);
   }
 
   private async _correctInitialEstimation(
-    txParams: TransactionParams,
-    initialEstimation: BN
-  ): Promise<BN> {
-    let tx = await this._getFakeTransaction({
-      ...txParams,
-      gasLimit: initialEstimation,
-    });
+    transaction: any,
+    initialEstimation: bigint,
+    upperBound: bigint,
+    executionContext: GasEstimationExecutionContext
+  ): Promise<bigint> {
+    const initialTransaction = this._copyTransactionWithGasLimit(
+      transaction,
+      initialEstimation
+    );
+    const initialExecution = await this._runTxAndRevertMutations(
+      initialTransaction,
+      executionContext
+    );
 
-    if (tx.getBaseFee().gte(initialEstimation)) {
-      initialEstimation = tx.getBaseFee().addn(1);
-
-      tx = await this._getFakeTransaction({
-        ...txParams,
-        gasLimit: initialEstimation,
-      });
-    }
-
-    const result = await this._runTxAndRevertMutations(tx);
-
-    if (result.execResult.exceptionError === undefined) {
+    if (initialExecution.success) {
       return initialEstimation;
     }
 
     return this._binarySearchEstimation(
-      txParams,
+      transaction,
       initialEstimation,
-      await this.getBlockGasLimit()
+      upperBound,
+      executionContext
     );
   }
 
   private async _binarySearchEstimation(
-    txParams: TransactionParams,
-    highestFailingEstimation: BN,
-    lowestSuccessfulEstimation: BN,
-    roundNumber = 0
-  ): Promise<BN> {
-    if (lowestSuccessfulEstimation.lte(highestFailingEstimation)) {
-      // This shouldn't happen, but we don't wan't to go into an infinite loop
-      // if it ever happens
+    transaction: any,
+    highestFailingEstimation: bigint,
+    lowestSuccessfulEstimation: bigint,
+    executionContext: GasEstimationExecutionContext,
+    roundNumber: number = 0
+  ): Promise<bigint> {
+    // tslint:disable-next-line:strict-comparisons
+    if (lowestSuccessfulEstimation <= highestFailingEstimation) {
       return lowestSuccessfulEstimation;
     }
 
-    const MAX_GAS_ESTIMATION_IMPROVEMENT_ROUNDS = 20;
-
-    const diff = lowestSuccessfulEstimation.sub(highestFailingEstimation);
-
-    const minDiff = highestFailingEstimation.gten(4_000_000)
-      ? 50_000
-      : highestFailingEstimation.gten(1_000_000)
-      ? 10_000
-      : highestFailingEstimation.gten(100_000)
-      ? 1_000
-      : highestFailingEstimation.gten(50_000)
-      ? 500
-      : highestFailingEstimation.gten(30_000)
-      ? 300
-      : 200;
-
-    if (diff.lten(minDiff)) {
+    const maxRounds = 20;
+    const diff = lowestSuccessfulEstimation - highestFailingEstimation;
+    const minDiff = minimumGasEstimationDifference(highestFailingEstimation);
+    // tslint:disable-next-line:strict-comparisons
+    if (diff <= minDiff || roundNumber > maxRounds) {
       return lowestSuccessfulEstimation;
     }
 
-    if (roundNumber > MAX_GAS_ESTIMATION_IMPROVEMENT_ROUNDS) {
-      return lowestSuccessfulEstimation;
-    }
-
-    const binSearchNewEstimation = highestFailingEstimation.add(diff.divn(2));
-
+    const two: bigint = (global as any).BigInt(2);
+    const three: bigint = (global as any).BigInt(3);
+    const midpoint = highestFailingEstimation + diff / two;
     const optimizedEstimation =
-      roundNumber === 0
-        ? highestFailingEstimation.muln(3)
-        : binSearchNewEstimation;
+      roundNumber === 0 ? highestFailingEstimation * three : midpoint;
+    const newEstimation =
+      // tslint:disable-next-line:strict-comparisons
+      optimizedEstimation > midpoint ? midpoint : optimizedEstimation;
 
-    const newEstimation = optimizedEstimation.gt(binSearchNewEstimation)
-      ? binSearchNewEstimation
-      : optimizedEstimation;
-
-    // Let other things execute
     await new Promise((resolve) => setImmediate(resolve));
 
-    const tx = await this._getFakeTransaction({
-      ...txParams,
-      gasLimit: newEstimation,
-    });
-
-    const result = await this._runTxAndRevertMutations(tx);
-
-    if (result.execResult.exceptionError === undefined) {
+    const candidate = this._copyTransactionWithGasLimit(
+      transaction,
+      newEstimation
+    );
+    const execution = await this._runTxAndRevertMutations(
+      candidate,
+      executionContext
+    );
+    if (execution.success) {
       return this._binarySearchEstimation(
-        txParams,
+        transaction,
         highestFailingEstimation,
         newEstimation,
+        executionContext,
         roundNumber + 1
       );
     }
 
     return this._binarySearchEstimation(
-      txParams,
+      transaction,
       newEstimation,
       lowestSuccessfulEstimation,
+      executionContext,
       roundNumber + 1
     );
   }
 
-  /**
-   * This function runs a transaction and reverts all the modifications that it
-   * makes.
-   *
-   * If throwOnError is true, errors are managed locally and thrown on
-   * failure. If it's false, the tx's RunTxResult is returned, and the vmTracer
-   * inspected/resetted.
-   */
   private async _runTxAndRevertMutations(
-    tx: Transaction,
-    runOnNewBlock: boolean = true
-  ): Promise<EVMResult> {
-    const initialStateRoot = await this._stateManager.getStateRoot();
-
+    transaction: any,
+    executionContext: GasEstimationExecutionContext
+  ): Promise<{
+    success: boolean;
+    runTxResult?: any;
+    error?: Error;
+  }> {
+    await executionContext.stateManager.checkpoint();
     try {
-      let blockContext;
-      // if the context is to estimate gas or run calls in pending block
-      if (runOnNewBlock) {
-        const [
-          blockTimestamp,
-          offsetShouldChange,
-          newOffset,
-        ] = this._calculateTimestampAndOffset();
-
-        blockContext = await this._getNextBlockTemplate(blockTimestamp);
-        const needsTimestampIncrease = await this._timestampClashesWithPreviousBlockOne(
-          blockContext
-        );
-
-        if (needsTimestampIncrease) {
-          await this._increaseBlockTimestamp(blockContext);
-        }
-
-        // in the context of running estimateGas call, we have to do binary
-        // search for the gas and run the call multiple times. Since it is
-        // an approximate approach to calculate the gas, it is important to
-        // run the call in a block that is as close to the real one as
-        // possible, hence putting the tx to the block is good to have here.
-        await this._addTransactionToBlock(blockContext, tx);
-      } else {
-        // if the context is to run calls with the latest block
-        blockContext = await this.getLatestBlock();
-      }
-
-      return await this._vm.runTx({
-        block: blockContext,
-        tx,
-        skipNonce: true,
+      const runTxResult = await executionContext.vm.runTx({
+        tx: transaction,
+        sender: executionContext.sender,
+        context: executionContext.context,
         skipBalance: true,
+        skipNonce: true,
       });
+      const error: Error | undefined = runTxResult.executionError;
+      return {
+        success: error === undefined && runTxResult.status !== 0,
+        runTxResult,
+        error,
+      };
+    } catch (error) {
+      return { success: false, error: error as Error };
     } finally {
-      await this._stateManager.setStateRoot(initialStateRoot);
+      await executionContext.stateManager.revert();
     }
   }
 
-  private async _computeFilterParams(
-    filterParams: FilterParams,
-    isFilter: boolean
-  ): Promise<FilterParams> {
-    const latestBlockNumber = await this.getLatestBlockNumber();
-    const newFilterParams = { ...filterParams };
-
-    if (newFilterParams.fromBlock === LATEST_BLOCK) {
-      newFilterParams.fromBlock = latestBlockNumber;
+  private _copyTransactionWithGasLimit(
+    transaction: any,
+    gasLimit: bigint
+  ): any {
+    const Transaction = this._runtime.txQrl?.QRLDynamicFeeTransaction;
+    if (Transaction === undefined) {
+      throw new InvalidInputError(
+        "QRL transaction constructor is unavailable for gas estimation"
+      );
     }
 
-    if (!isFilter && newFilterParams.toBlock === LATEST_BLOCK) {
-      newFilterParams.toBlock = latestBlockNumber;
-    }
-
-    if (newFilterParams.toBlock.gt(latestBlockNumber)) {
-      newFilterParams.toBlock = latestBlockNumber;
-    }
-    if (newFilterParams.fromBlock.gt(latestBlockNumber)) {
-      newFilterParams.fromBlock = latestBlockNumber;
-    }
-
-    return newFilterParams;
-  }
-
-  private _newDeadline(): Date {
-    const dt = new Date();
-    dt.setMinutes(dt.getMinutes() + 5); // This will not overflow
-    return dt;
-  }
-
-  private _getNextFilterId(): BN {
-    this._lastFilterId = this._lastFilterId.addn(1);
-
-    return this._lastFilterId;
-  }
-
-  private _filterIdToFiltersKey(filterId: BN): string {
-    return filterId.toString();
-  }
-
-  private _emitEthEvent(filterId: BN, result: any) {
-    this.emit("ethEvent", {
-      result,
-      filterId,
+    return new Transaction({
+      chainId: transaction.chainId,
+      nonce: transaction.nonce,
+      gasTipCap: transaction.gasTipCap,
+      gasFeeCap: transaction.gasFeeCap,
+      gasLimit,
+      to: transaction.to,
+      value: transaction.value,
+      data: transaction.data,
+      accessList: transaction.accessList,
+      descriptor: transaction.descriptor,
+      extraParams: transaction.extraParams,
+      signature: transaction.signature,
+      publicKey: transaction.publicKey,
     });
   }
+
+  private async _buildBlockFromPending(
+    latestBlock: Block,
+    timestamp: bigint,
+    stateManager: any
+  ): Promise<Block> {
+    const one: bigint = (global as any).BigInt(1);
+    const latestBlockNumber: bigint = latestBlock.header.number;
+    const blockNumber = latestBlockNumber + one;
+    let cumulativeGasUsed: bigint = (global as any).BigInt(0);
+    const transactions = this._pendingTransactions.map(
+      (entry) => entry.transaction
+    );
+    const receipts = this._pendingTransactions.map((entry, index) => {
+      cumulativeGasUsed += entry.runTxResult.gasUsed;
+      return this._runtime.vmQrl.createQRLReceiptFromRunTxResult({
+        result: entry.runTxResult,
+        blockNumber,
+        transactionIndex: index,
+        cumulativeGasUsed,
+      });
+    });
+    const transactionsRoot = await this._runtime.blockQrl.genQRLTransactionsRoot(
+      transactions
+    );
+    const receiptsRoot = await this._runtime.blockQrl.genQRLReceiptsRoot(
+      receipts
+    );
+    const stateRoot = await stateManager.getStateRoot();
+    const draftBlock = new this._runtime.blockQrl.QRLBlock({
+      header: {
+        parentHash: latestBlock.hash(),
+        number: blockNumber,
+        timestamp,
+        gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+        baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+        coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+        transactionsRoot,
+        receiptsRoot,
+        stateRoot,
+      },
+      transactions,
+      receipts,
+    });
+    const blockHash = draftBlock.hash();
+    let logIndexStart = 0;
+    const includedReceipts = receipts.map((receipt, index) => {
+      const includedReceipt = receipt.withInclusion({
+        blockHash,
+        blockNumber,
+        transactionIndex: index,
+        cumulativeGasUsed: receipt.cumulativeGasUsed,
+        logIndexStart,
+      });
+      logIndexStart += receipt.logs.length;
+      return includedReceipt;
+    });
+
+    return new this._runtime.blockQrl.QRLBlock({
+      header: draftBlock.header,
+      transactions,
+      receipts: includedReceipts,
+    });
+  }
+
+  private async _minePendingBlock(): Promise<Block> {
+    const stateManager = this._pendingStateManager;
+    const timestamp = this._pendingBlockTimestamp;
+    if (stateManager === undefined || timestamp === undefined) {
+      throw new InvalidInputError("Pending block state is unavailable");
+    }
+
+    const latestBlock = await this._getLatestBlock();
+    const stateBefore = this._stateManager.shallowCopy();
+    const block = await this._buildBlockFromPending(
+      latestBlock,
+      timestamp,
+      stateManager
+    );
+    let blockWasStored = false;
+
+    try {
+      await this._putBlock(block);
+      blockWasStored = true;
+      this._replaceStateManager(stateManager);
+      this._rememberStateBeforeBlock(block, stateBefore);
+      this._pendingTransactions.forEach((entry, index) => {
+        this._indexMinedTransaction(
+          entry.transactionHash,
+          entry.transaction,
+          entry.sender,
+          block.receipts[index],
+          block
+        );
+      });
+      this._pendingTransactions.splice(0);
+      this._pendingStateManager = undefined;
+      this._pendingVm = undefined;
+      this._pendingBlockTimestamp = undefined;
+      this._notifyBlockSubscriptions(block);
+      return block;
+    } catch (error) {
+      if (blockWasStored) {
+        await this._deleteBlock(block.hash());
+      }
+      throw error;
+    }
+  }
+
+  private async _getRawTransactionSender(transaction: any): Promise<any> {
+    const signer = this._rawTransactionSigner;
+    if (signer === undefined) {
+      throw new InvalidInputError("Raw transaction signer is not configured");
+    }
+
+    const chainId: bigint = this._context.chainId ?? (global as any).BigInt(1);
+    if (transaction.chainId !== chainId) {
+      throw new InvalidInputError(
+        `Invalid transaction chain id ${transaction.chainId}; expected ${chainId}`
+      );
+    }
+
+    let signatureIsValid = false;
+    try {
+      signatureIsValid = await signer.verify(transaction);
+    } catch (_error) {
+      signatureIsValid = false;
+    }
+    if (!signatureIsValid) {
+      throw new InvalidInputError("Invalid transaction signature");
+    }
+
+    try {
+      return await signer.sender(transaction);
+    } catch (_error) {
+      throw new InvalidInputError("Invalid transaction sender");
+    }
+  }
+
+  private async _runTransactionInPendingBlock(
+    transaction: any,
+    sender: any
+  ): Promise<RunTransactionResult> {
+    const latestBlock = await this._getLatestBlock();
+    const isFirstPendingTransaction = this._pendingTransactions.length === 0;
+    const timestamp =
+      this._pendingBlockTimestamp ??
+      this._calculateNextBlockTimestamp(latestBlock);
+    const stateManager =
+      this._pendingStateManager ?? this._stateManager.shallowCopy();
+    const vm = this._pendingVm ?? this._createVm(stateManager);
+    const stateBefore = stateManager.shallowCopy();
+    const transactionHash: Uint8Array = transaction.hash();
+    const one: bigint = (global as any).BigInt(1);
+    const latestBlockNumber: bigint = latestBlock.header.number;
+    let runTxResult: any;
+
+    try {
+      runTxResult = await vm.runTx({
+        tx: transaction,
+        sender,
+        context: {
+          chainId: this._context.chainId ?? (global as any).BigInt(1),
+          baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+          coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+          blockNumber: latestBlockNumber + one,
+          timestamp,
+          gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+          noBaseFee: this._context.noBaseFee ?? true,
+        },
+      });
+    } catch (error) {
+      if (!isFirstPendingTransaction) {
+        this._pendingStateManager = stateBefore;
+        this._pendingVm = this._createVm(stateBefore);
+      }
+      throw error;
+    }
+
+    if (isFirstPendingTransaction) {
+      this._pendingStateManager = stateManager;
+      this._pendingVm = vm;
+      this._pendingBlockTimestamp = timestamp;
+      this._consumeTimeControls();
+    }
+
+    const actualSender = runTxResult.sender ?? sender;
+    this._pendingTransactions.push({
+      transaction,
+      transactionHash: new Uint8Array(transactionHash),
+      sender: actualSender,
+      runTxResult,
+    });
+    this._transactionsByHash.set(hashKey(transactionHash), {
+      transaction,
+      sender: actualSender,
+    });
+    this._notifyPendingTransactionSubscriptions(transaction, actualSender);
+
+    return { transaction, runTxResult };
+  }
+
+  private async _runTransactionInNewBlock(
+    transaction: any,
+    sender: any
+  ): Promise<RunTransactionInNewBlockResult> {
+    const latestBlock = await this._getLatestBlock();
+    const one: bigint = (global as any).BigInt(1);
+    const latestBlockNumber: bigint = latestBlock.header.number;
+    const blockNumber = latestBlockNumber + one;
+    const timestamp = this._calculateNextBlockTimestamp(latestBlock);
+    const transactionHash: Uint8Array = transaction.hash();
+    const stateBefore = this._stateManager.shallowCopy();
+    let storedBlock: Block | undefined;
+
+    await this._stateManager.checkpoint();
+    try {
+      const runTxResult = await this._vm.runTx({
+        tx: transaction,
+        sender,
+        context: {
+          chainId: this._context.chainId ?? one,
+          baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+          coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+          blockNumber,
+          timestamp,
+          gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+          noBaseFee: this._context.noBaseFee ?? true,
+        },
+      });
+      const receipt = this._runtime.vmQrl.createQRLReceiptFromRunTxResult({
+        result: runTxResult,
+        blockNumber,
+        transactionIndex: 0,
+        cumulativeGasUsed: runTxResult.gasUsed,
+      });
+      const transactions = [transaction];
+      const receipts = [receipt];
+      const transactionsRoot = await this._runtime.blockQrl.genQRLTransactionsRoot(
+        transactions
+      );
+      const receiptsRoot = await this._runtime.blockQrl.genQRLReceiptsRoot(
+        receipts
+      );
+      const stateRoot = await this._stateManager.getStateRoot();
+      const draftBlock = new this._runtime.blockQrl.QRLBlock({
+        header: {
+          parentHash: latestBlock.hash(),
+          number: blockNumber,
+          timestamp,
+          gasLimit: this._context.gasLimit ?? latestBlock.header.gasLimit,
+          baseFee: this._context.baseFee ?? latestBlock.header.baseFee,
+          coinbase: this._context.coinbase ?? latestBlock.header.coinbase,
+          transactionsRoot,
+          receiptsRoot,
+          stateRoot,
+        },
+        transactions,
+        receipts,
+      });
+      const includedReceipt = receipt.withInclusion({
+        blockHash: draftBlock.hash(),
+        blockNumber,
+        transactionIndex: 0,
+        cumulativeGasUsed: receipt.cumulativeGasUsed,
+        logIndexStart: 0,
+      });
+      const block = new this._runtime.blockQrl.QRLBlock({
+        header: draftBlock.header,
+        transactions,
+        receipts: [includedReceipt],
+      });
+
+      await this._putBlock(block);
+      storedBlock = block;
+      await this._stateManager.commit();
+      this._rememberStateBeforeBlock(block, stateBefore);
+      this._indexMinedTransaction(
+        transactionHash,
+        transaction,
+        sender,
+        includedReceipt,
+        block
+      );
+      this._consumeTimeControls();
+      this._notifyPendingTransactionSubscriptions(transaction, sender);
+      this._notifyBlockSubscriptions(block);
+
+      return {
+        transaction,
+        runTxResult,
+        receipt: includedReceipt,
+        block,
+      };
+    } catch (error) {
+      if (storedBlock !== undefined) {
+        await this._deleteBlock(storedBlock.hash());
+      }
+      await this._stateManager.revert();
+      throw error;
+    }
+  }
+
+  private _createVm(
+    stateManager: any,
+    emitConsoleLogs: boolean = true,
+    traceListener?: any
+  ): any {
+    const consoleTraceListener = emitConsoleLogs
+      ? createQrlConsoleLogTraceListener(this._consoleLogListener)
+      : undefined;
+    const evm = new this._runtime.evmQrl.QRLEVM({
+      stateManager,
+      allowUnlimitedContractSize: this._allowUnlimitedContractSize,
+      traceListener: combineQrlTraceListeners(
+        consoleTraceListener,
+        traceListener
+      ),
+    });
+    return new this._runtime.vmQrl.QRLVM({
+      stateManager,
+      evm,
+      context: this._context,
+    });
+  }
+
+  private _replaceStateManager(stateManager: any): void {
+    this._vm = this._createVm(stateManager);
+    this._stateManager = stateManager;
+  }
+
+  private _rememberStateBeforeBlock(block: Block, stateManager: any): void {
+    this._stateBeforeByBlock.set(hashKey(block.hash()), stateManager);
+  }
+
+  private _indexMinedTransaction(
+    transactionHash: Uint8Array,
+    transaction: any,
+    sender: any,
+    receipt: any,
+    block: Block
+  ): void {
+    const key = hashKey(transactionHash);
+    this._transactionsByHash.set(key, { transaction, sender });
+    this._receiptsByTransactionHash.set(key, receipt);
+    this._transactionHashToBlockHash.set(key, new Uint8Array(block.hash()));
+  }
+
+  private _calculateNextBlockTimestamp(
+    latestBlock: Block,
+    explicitTimestamp?: bigint
+  ): bigint {
+    const one: bigint = (global as any).BigInt(1);
+    const latestBlockTimestamp: bigint = latestBlock.header.timestamp;
+    const timestamp =
+      explicitTimestamp ??
+      this._nextBlockTimestamp ??
+      latestBlockTimestamp + one + this._pendingTimeIncrease;
+
+    // tslint:disable-next-line:strict-comparisons
+    if (timestamp <= latestBlockTimestamp) {
+      throw new InvalidInputError(
+        `timestamp ${timestamp} is not greater than the latest block timestamp ${latestBlockTimestamp}`
+      );
+    }
+
+    return timestamp;
+  }
+
+  private _consumeTimeControls(explicitTimestamp?: bigint): void {
+    if (explicitTimestamp !== undefined) {
+      return;
+    }
+
+    if (this._nextBlockTimestamp !== undefined) {
+      this._nextBlockTimestamp = undefined;
+      return;
+    }
+
+    this._pendingTimeIncrease = (global as any).BigInt(0);
+  }
+
+  private _resetFilterCursors(latest: bigint): void {
+    const one: bigint = (global as any).BigInt(1);
+    for (const filter of this._filters.values()) {
+      if (filter.type === "block") {
+        // tslint:disable-next-line:strict-comparisons
+        if (filter.lastBlock > latest) {
+          filter.lastBlock = latest;
+        }
+        continue;
+      }
+      if (filter.type === "log") {
+        // tslint:disable-next-line:strict-comparisons
+        if (filter.nextBlock > latest + one) {
+          filter.nextBlock = maxBigInt(filter.minimumBlock, latest + one);
+        }
+        continue;
+      }
+      filter.reported.clear();
+    }
+  }
+
+  private _registerSubscription(subscription: QRLSubscription): bigint {
+    const id = this._nextSubscriptionId;
+    this._nextSubscriptionId += (global as any).BigInt(1);
+    this._subscriptions.set(filterKey(id), subscription);
+    return id;
+  }
+
+  private _notifyPendingTransactionSubscriptions(
+    transaction: any,
+    sender: any
+  ): void {
+    for (const [id, subscription] of this._subscriptions) {
+      if (subscription.type !== "newPendingTransactions") {
+        continue;
+      }
+
+      const result = subscription.fullObjects
+        ? getPendingRpcTransaction(transaction, sender)
+        : bufferToRpcData(transaction.hash());
+      this._emitSubscription(id, result);
+    }
+  }
+
+  private _notifyBlockSubscriptions(block: Block): void {
+    for (const [id, subscription] of this._subscriptions) {
+      if (subscription.type === "newHeads") {
+        this._emitSubscription(id, getRpcBlockHeader(block));
+        continue;
+      }
+      if (
+        subscription.type !== "logs" ||
+        !subscriptionMatchesBlock(subscription, block.header.number)
+      ) {
+        continue;
+      }
+
+      for (const log of formatMatchingLogs(block, subscription.criteria)) {
+        this._emitSubscription(id, log);
+      }
+    }
+  }
+
+  private _notifyRemovedLogSubscriptions(block: Block): void {
+    for (const [id, subscription] of this._subscriptions) {
+      if (
+        subscription.type !== "logs" ||
+        !subscriptionMatchesBlock(subscription, block.header.number)
+      ) {
+        continue;
+      }
+
+      for (const log of formatMatchingLogs(block, subscription.criteria)) {
+        this._emitSubscription(id, { ...log, removed: true });
+      }
+    }
+  }
+
+  private _emitSubscription(id: string, result: unknown): void {
+    try {
+      this.emit("ethEvent", {
+        filterId: (global as any).BigInt(id),
+        result,
+      });
+    } catch (_error) {
+      // Subscription listeners must not interrupt transaction processing.
+    }
+  }
+
+  private async _getBlocksAfter(blockNumber: bigint): Promise<Block[]> {
+    if (!this._hasLogSubscriptions()) {
+      return [];
+    }
+
+    const latest = await this.getLatestBlockNumber();
+    const one: bigint = (global as any).BigInt(1);
+    const blocks: Block[] = [];
+    for (
+      let number = blockNumber + one;
+      // tslint:disable-next-line:strict-comparisons
+      number <= latest;
+      number += one
+    ) {
+      const block = await this.getBlockByNumber(number);
+      if (block !== undefined) {
+        blocks.push(block);
+      }
+    }
+    return blocks;
+  }
+
+  private _hasLogSubscriptions(): boolean {
+    for (const subscription of this._subscriptions.values()) {
+      if (subscription.type === "logs") {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private _registerFilter(filter: QRLInstalledFilter): bigint {
+    this._sweepExpiredFilters();
+    const id = this._nextFilterId;
+    this._nextFilterId += (global as any).BigInt(1);
+    this._filters.set(filterKey(id), filter);
+    this._scheduleFilterSweep();
+    return id;
+  }
+
+  private _lookupFilter(filterId: bigint): QRLInstalledFilter | undefined {
+    this._sweepExpiredFilters();
+    const filter = this._filters.get(filterKey(filterId));
+    if (filter === undefined) {
+      return undefined;
+    }
+    filter.deadline = this._filterDeadline();
+    this._scheduleFilterSweep();
+    return filter;
+  }
+
+  private _filterDeadline(): number {
+    return this._filterNow() + QRL_FILTER_DEADLINE_MS;
+  }
+
+  private _sweepExpiredFilters(): void {
+    const now = this._filterNow();
+    for (const [id, filter] of this._filters) {
+      if (filter.deadline <= now) {
+        this._filters.delete(id);
+      }
+    }
+  }
+
+  private _scheduleFilterSweep(): void {
+    if (this._filterExpiryTimer !== undefined) {
+      clearTimeout(this._filterExpiryTimer);
+      this._filterExpiryTimer = undefined;
+    }
+
+    let earliest: number | undefined;
+    for (const filter of this._filters.values()) {
+      if (earliest === undefined || filter.deadline < earliest) {
+        earliest = filter.deadline;
+      }
+    }
+    if (earliest === undefined) {
+      return;
+    }
+
+    const delay = Math.max(0, earliest - this._filterNow());
+    this._filterExpiryTimer = setTimeout(() => {
+      this._filterExpiryTimer = undefined;
+      this._sweepExpiredFilters();
+      this._scheduleFilterSweep();
+    }, delay);
+    this._filterExpiryTimer.unref?.();
+  }
+
+  private async _putBlock(block: Block): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this._blockchain.putBlock(block, (error) => {
+        if (error !== null) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  private _initLocalAccounts(localAccounts: LocalAccount[]): void {
+    for (const account of localAccounts) {
+      this._localAccounts.set(accountKey(account.address), account.address);
+    }
+  }
+
+  private _getLocalAccount(sender: any): any {
+    const key = accountKey(sender);
+    const account = this._localAccounts.get(key);
+    if (account === undefined) {
+      throw new InvalidInputError(`unknown account ${key}`);
+    }
+    return account;
+  }
+
+  private async _deleteBlock(blockHash: Uint8Array): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this._blockchain.delBlock(blockHash, (error) => {
+        if (error !== null) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+}
+
+function combineQrlTraceListeners(
+  first: any | undefined,
+  second: any | undefined
+): any | undefined {
+  if (first === undefined) {
+    return second;
+  }
+  if (second === undefined) {
+    return first;
+  }
+
+  return {
+    enterFrame: (frame: any) => {
+      callTraceListener(first.enterFrame, frame);
+      callTraceListener(second.enterFrame, frame);
+    },
+    exitFrame: (frame: any) => {
+      callTraceListener(first.exitFrame, frame);
+      callTraceListener(second.exitFrame, frame);
+    },
+    step: (step: any) => {
+      callTraceListener(first.step, step);
+      callTraceListener(second.step, step);
+    },
+    precompile: (frame: any) => {
+      callTraceListener(first.precompile, frame);
+      callTraceListener(second.precompile, frame);
+    },
+  };
+}
+
+function callTraceListener(
+  callback: ((value: any) => void) | undefined,
+  value: any
+): void {
+  try {
+    callback?.(value);
+  } catch {
+    // Observers are diagnostic and must never affect VM execution.
+  }
+}
+
+function filterKey(id: bigint): string {
+  return id.toString();
+}
+
+function minBigInt(left: bigint, right: bigint): bigint {
+  // tslint:disable-next-line:strict-comparisons
+  return left < right ? left : right;
+}
+
+function formatMatchingLogs(
+  block: Block,
+  filter: QRLLogFilter
+): RpcLogOutput[] {
+  return collectMatchingLogs(block as any, filter).map((log) =>
+    getRpcLog(log as any)
+  );
+}
+
+function getPendingRpcTransaction(transaction: any, sender: any): any {
+  return {
+    ...getRpcTransaction(transaction, undefined, undefined, false, sender),
+    blockHash: null,
+    blockNumber: null,
+    transactionIndex: null,
+  };
+}
+
+function getRpcBlockHeader(block: Block): any {
+  if (typeof block.header.toJSON === "function") {
+    return block.header.toJSON();
+  }
+
+  return {
+    hash: bufferToRpcData(block.hash()),
+    parentHash: bufferToRpcData(block.header.parentHash),
+    number: numberToRpcQuantity(block.header.number),
+    timestamp: numberToRpcQuantity(block.header.timestamp),
+  };
+}
+
+function subscriptionMatchesBlock(
+  subscription: Extract<QRLSubscription, { type: "logs" }>,
+  blockNumber: bigint
+): boolean {
+  if (subscription.fromBound !== undefined) {
+    // tslint:disable-next-line:strict-comparisons
+    if (blockNumber < subscription.fromBound) {
+      return false;
+    }
+  }
+  if (subscription.toBound !== undefined) {
+    // tslint:disable-next-line:strict-comparisons
+    if (blockNumber > subscription.toBound) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function minimumGasEstimationDifference(estimation: bigint): bigint {
+  const bigint = (value: number): bigint => (global as any).BigInt(value);
+  // tslint:disable-next-line:strict-comparisons
+  if (estimation >= bigint(4_000_000)) {
+    return bigint(50_000);
+  }
+  // tslint:disable-next-line:strict-comparisons
+  if (estimation >= bigint(1_000_000)) {
+    return bigint(10_000);
+  }
+  // tslint:disable-next-line:strict-comparisons
+  if (estimation >= bigint(100_000)) {
+    return bigint(1_000);
+  }
+  // tslint:disable-next-line:strict-comparisons
+  if (estimation >= bigint(50_000)) {
+    return bigint(500);
+  }
+  // tslint:disable-next-line:strict-comparisons
+  if (estimation >= bigint(30_000)) {
+    return bigint(300);
+  }
+  return bigint(200);
+}
+
+function hasBlockOverrides(options: MineBlockOptions): boolean {
+  return (
+    options.timestamp !== undefined ||
+    options.gasLimit !== undefined ||
+    options.baseFee !== undefined ||
+    options.coinbase !== undefined
+  );
+}
+
+function cloneHashMap(
+  source: Map<string, Uint8Array>
+): Map<string, Uint8Array> {
+  return new Map(
+    [...source].map(([key, hash]) => [key, new Uint8Array(hash)] as const)
+  );
+}
+
+function replaceMap<KeyT, ValueT>(
+  target: Map<KeyT, ValueT>,
+  source: Map<KeyT, ValueT>
+): void {
+  target.clear();
+  for (const [key, value] of source) {
+    target.set(key, value);
+  }
+}
+
+function hashKey(hash: Uint8Array): string {
+  return Buffer.from(hash).toString("hex").toLowerCase();
+}
+
+function accountKey(address: any): string {
+  return address.toString().toLowerCase();
 }

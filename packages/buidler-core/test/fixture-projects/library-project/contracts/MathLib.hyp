@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
+
+library MathLib {
+    function double(uint256 x) external pure returns (uint256) {
+        return x * 2;
+    }
+}

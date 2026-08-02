@@ -8,7 +8,7 @@ install it and create a file named `.mocharc.json` in your project's root direct
 
 ```json
 {
-  "require": ["@nomiclabs/buidler/register"],
+  "require": ["@theqrl/hardhat/register"],
   "timeout": 20000,
   "recursive": "test"
 }

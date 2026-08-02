@@ -3,31 +3,26 @@ import { IncomingMessage, ServerResponse } from "http";
 import getRawBody from "raw-body";
 import WebSocket from "ws";
 
-import { EthereumProvider } from "../../../types";
+import { IQrlProvider } from "../../../types";
 import {
-  isSuccessfulJsonResponse,
   isValidJsonRequest,
   isValidJsonResponse,
   JsonRpcRequest,
   JsonRpcResponse,
 } from "../../util/jsonrpc";
 import {
-  BuidlerEVMProviderError,
   InternalError,
   InvalidJsonInputError,
   InvalidRequestError,
+  MethodNotFoundError,
 } from "../provider/errors";
 
-// tslint:disable only-buidler-error
+// tslint:disable only-hardhat-error
 
-const log = debug("buidler:core:buidler-evm:jsonrpc");
+const log = debug("buidler:core:qrl:jsonrpc");
 
 export default class JsonRpcHandler {
-  private _provider: EthereumProvider;
-
-  constructor(provider: EthereumProvider) {
-    this._provider = provider;
-  }
+  constructor(private readonly _provider: IQrlProvider) {}
 
   public handleHttp = async (req: IncomingMessage, res: ServerResponse) => {
     this._setCorsHeaders(res);
@@ -45,9 +40,11 @@ export default class JsonRpcHandler {
     }
 
     if (Array.isArray(jsonHttpRequest)) {
+      // Batch semantics: every entry is handled independently; a failing
+      // entry never aborts the batch, and ids map 1:1.
       const responses = await Promise.all(
         jsonHttpRequest.map((singleReq: any) =>
-          this._handleSingleRequest(singleReq)
+          this._handleSingleHttpRequest(singleReq)
         )
       );
 
@@ -55,19 +52,19 @@ export default class JsonRpcHandler {
       return;
     }
 
-    const rpcResp = await this._handleSingleRequest(jsonHttpRequest);
+    const rpcResp = await this._handleSingleHttpRequest(jsonHttpRequest);
 
     this._sendResponse(res, rpcResp);
   };
 
   public handleWs = async (ws: WebSocket) => {
-    const subscriptions: string[] = [];
+    const subscriptions = new Set<string>();
     let isClosed = false;
 
     const listener = (payload: { subscription: string; result: any }) => {
-      // Don't attempt to send a message to the websocket if we already know it is closed,
-      // or the current websocket connection isn't interested in the particular subscription.
-      if (isClosed || subscriptions.includes(payload.subscription)) {
+      // Only forward notifications for subscriptions created through this
+      // websocket connection, and never after it closed.
+      if (isClosed || !subscriptions.has(payload.subscription)) {
         return;
       }
 
@@ -75,7 +72,7 @@ export default class JsonRpcHandler {
         ws.send(
           JSON.stringify({
             jsonrpc: "2.0",
-            method: "eth_subscribe",
+            method: "qrl_subscription",
             params: payload,
           })
         );
@@ -84,7 +81,7 @@ export default class JsonRpcHandler {
       }
     };
 
-    // Handle eth_subscribe notifications.
+    // Forward notifications owned by this WebSocket connection.
     this._provider.addListener("notification", listener);
 
     ws.on("message", async (msg) => {
@@ -98,23 +95,64 @@ export default class JsonRpcHandler {
           throw new InvalidRequestError("Invalid request");
         }
 
-        rpcResp = await this._handleRequest(rpcReq);
-
-        // If eth_subscribe was successful, keep track of the subscription id,
-        // so we can cleanup on websocket close.
+        // Subscriptions belong to the connection that created them: an
+        // unsubscribe for a foreign (or unknown) id answers false WITHOUT
+        // reaching the provider, so one client can never remove another
+        // client's subscription — ids are sequential and guessable. The
+        // shortcut applies ONLY to well-formed requests (exactly one string
+        // parameter); malformed ones fall through to standard validation.
         if (
-          rpcReq.method === "eth_subscribe" &&
-          isSuccessfulJsonResponse(rpcResp)
+          rpcReq.method === "qrl_unsubscribe" &&
+          Array.isArray(rpcReq.params) &&
+          rpcReq.params.length === 1 &&
+          typeof rpcReq.params[0] === "string" &&
+          !subscriptions.has(rpcReq.params[0])
         ) {
-          subscriptions.push(rpcResp.result.id);
+          rpcResp = {
+            jsonrpc: "2.0",
+            id: rpcReq.id,
+            result: false,
+          };
+        } else {
+          rpcResp = await this._handleRequest(rpcReq);
+        }
+
+        // Track successful qrl_subscribe calls so notifications can be
+        // routed and cleaned up per connection. When the provider finishes
+        // AFTER the socket closed, the close handler has already run — the
+        // subscription must be released immediately instead of leaking.
+        if (
+          rpcReq.method === "qrl_subscribe" &&
+          isValidJsonResponse(rpcResp) &&
+          "result" in rpcResp
+        ) {
+          if (isClosed) {
+            try {
+              await this._provider.send("qrl_unsubscribe", [
+                (rpcResp as any).result,
+              ]);
+            } catch {
+              // Nothing to clean up if the provider dropped it already.
+            }
+          } else {
+            subscriptions.add((rpcResp as any).result);
+          }
+        }
+
+        // A successful own unsubscribe releases the id.
+        if (
+          rpcReq.method === "qrl_unsubscribe" &&
+          Array.isArray(rpcReq.params) &&
+          isValidJsonResponse(rpcResp) &&
+          (rpcResp as any).result === true
+        ) {
+          subscriptions.delete(rpcReq.params[0]);
         }
       } catch (error) {
         rpcResp = _handleError(error);
       }
 
-      // Validate the RPC response.
       if (!isValidJsonResponse(rpcResp)) {
-        // Malformed response coming from the provider, report to user as an internal error.
         rpcResp = _handleError(new InternalError("Internal error"));
       }
 
@@ -126,15 +164,38 @@ export default class JsonRpcHandler {
     });
 
     ws.on("close", () => {
-      // Remove eth_subscribe listener.
       this._provider.removeListener("notification", listener);
 
-      // Clear any active subscriptions for the closed websocket connection.
       isClosed = true;
       subscriptions.forEach(async (subscriptionId) => {
-        await this._provider.send("eth_unsubscribe", [subscriptionId]);
+        try {
+          await this._provider.send("qrl_unsubscribe", [subscriptionId]);
+        } catch {
+          // The provider may not support subscriptions yet.
+        }
       });
     });
+  };
+
+  // Subscriptions need a push channel; over plain HTTP they are rejected
+  // with a stable error (same behavior as go-qrl). Only WELL-FORMED
+  // requests take this shortcut — malformed ones go through the standard
+  // validation path and report invalid-request errors.
+  private _handleSingleHttpRequest = async (rpcReq: any) => {
+    if (
+      isValidJsonRequest(rpcReq) &&
+      (rpcReq.method === "qrl_subscribe" || rpcReq.method === "qrl_unsubscribe")
+    ) {
+      const rpcResp = _handleError(
+        new MethodNotFoundError(
+          `${rpcReq.method} is only supported over WebSocket connections`
+        )
+      );
+      rpcResp.id = rpcReq.id;
+      return rpcResp;
+    }
+
+    return this._handleSingleRequest(rpcReq);
   };
 
   private _sendEmptyResponse(res: ServerResponse) {
@@ -145,7 +206,7 @@ export default class JsonRpcHandler {
   private _setCorsHeaders(res: ServerResponse) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Request-Method", "*");
-    res.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET");
+    res.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET, POST");
     res.setHeader("Access-Control-Allow-Headers", "*");
   }
 
@@ -172,14 +233,13 @@ export default class JsonRpcHandler {
       rpcResp = _handleError(error);
     }
 
-    // Validate the RPC response.
     if (!isValidJsonResponse(rpcResp)) {
-      // Malformed response coming from the provider, report to user as an internal error.
+      // Malformed response coming from the provider; report as internal.
       rpcResp = _handleError(new InternalError("Internal error"));
     }
 
     if (rpcReq !== undefined) {
-      rpcResp.id = rpcReq.id !== undefined ? rpcReq.id : null;
+      rpcResp.id = rpcReq.id !== undefined ? rpcReq.id : (null as any);
     }
 
     return rpcResp;
@@ -225,17 +285,32 @@ const _readWsRequest = (msg: string): JsonRpcRequest => {
 };
 
 const _handleError = (error: any): JsonRpcResponse => {
-  // In case of non-buidler error, treat it as internal and associate the appropriate error code.
-  if (!BuidlerEVMProviderError.isBuidlerEVMProviderError(error)) {
-    error = new InternalError(error.message);
+  log(`${error.message ?? error}`);
+
+  // Provider errors carry their own numeric codes; anything else is
+  // internal. Unlike the upstream handler, `data` (revert payloads) and
+  // `transactionHash` (failed mined transactions) are forwarded so clients
+  // behind the HTTP layer keep the full error information.
+  if (typeof error?.code !== "number") {
+    error = new InternalError(
+      typeof error?.message === "string" ? error.message : "Internal error"
+    );
+  }
+
+  const jsonError: any = {
+    code: error.code,
+    message: error.message,
+  };
+  if (error.data !== undefined) {
+    jsonError.data = error.data;
+  }
+  if (typeof error.transactionHash === "string") {
+    jsonError.transactionHash = error.transactionHash;
   }
 
   return {
     jsonrpc: "2.0",
     id: null,
-    error: {
-      code: error.code,
-      message: error.message,
-    },
+    error: jsonError,
   };
 };

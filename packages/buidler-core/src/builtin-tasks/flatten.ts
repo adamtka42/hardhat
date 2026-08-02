@@ -1,8 +1,9 @@
 import { internalTask, task } from "../internal/core/config/config-env";
-import { BuidlerError } from "../internal/core/errors";
+import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
-import { DependencyGraph } from "../internal/solidity/dependencyGraph";
-import { ResolvedFile, ResolvedFilesMap } from "../internal/solidity/resolver";
+import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
+import { getImportDirectives } from "../internal/hyperion/imports";
+import { ResolvedFile, ResolvedFilesMap } from "../internal/hyperion/resolver";
 import { getPackageJson } from "../internal/util/packageInfo";
 
 import {
@@ -38,18 +39,30 @@ function getSortedFiles(dependenciesGraph: DependencyGraph) {
     return sortedNames.map((n) => filesMap[n]);
   } catch (error) {
     if (error.toString().includes("Error: There is a cycle in the graph.")) {
-      throw new BuidlerError(ERRORS.BUILTIN_TASKS.FLATTEN_CYCLE, error);
+      throw new HardhatError(ERRORS.BUILTIN_TASKS.FLATTEN_CYCLE, error);
     }
 
-    // tslint:disable-next-line only-buidler-error
+    // tslint:disable-next-line only-hardhat-error
     throw error;
   }
 }
 
 function getFileWithoutImports(resolvedFile: ResolvedFile) {
-  const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+).*$/gm;
+  // Remove EXACTLY the import directive ranges reported by the shared
+  // lexer: multi-line imports disappear completely, and code sharing a
+  // line with an import (e.g. `import "./A.hyp"; contract B {}`) survives.
+  const content = resolvedFile.content;
+  const directives = getImportDirectives(content);
 
-  return resolvedFile.content.replace(IMPORT_SOLIDITY_REGEX, "").trim();
+  let withoutImports = "";
+  let previousEnd = 0;
+  for (const directive of directives) {
+    withoutImports += content.slice(previousEnd, directive.start);
+    previousEnd = directive.end;
+  }
+  withoutImports += content.slice(previousEnd);
+
+  return withoutImports.trim();
 }
 
 export default function () {
@@ -67,7 +80,7 @@ export default function () {
       }
 
       const packageJson = await getPackageJson();
-      flattened += `// Sources flattened with buidler v${packageJson.version} https://buidler.dev`;
+      flattened += `// Sources flattened with Hardhat v${packageJson.version}`;
 
       const sortedFiles = getSortedFiles(graph);
 

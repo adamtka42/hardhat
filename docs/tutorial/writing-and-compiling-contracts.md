@@ -1,84 +1,58 @@
 # 4. Writing and compiling smart contracts
 
-We're going to create a simple smart contract that implements a token that can be transferred. Token contracts are most frequently used to exchange or store value. We won't go in depth into the Solidity code of the contract on this tutorial, but there's some logic we implemented that you should know:
+We are going to create a simple smart contract that implements a token that can
+be transferred. Token contracts are commonly used to exchange or store value.
+We will not go in depth into the Hyperion code of the contract in this
+tutorial, but there is some logic you should know:
 
-- There is a fixed total supply of tokens that can't be changed.
+- There is a fixed total supply of tokens that cannot be changed.
 - The entire supply is assigned to the address that deploys the contract.
 - Anyone can receive tokens.
-- Anyone with at least one token can transfer tokens.
-- The token is non-divisible. You can transfer 1, 2, 3 or 37 tokens but not 2.5.
+- Anyone with enough tokens can transfer tokens.
+- The token is non-divisible. You can transfer 1, 2, 3, or 37 tokens but not
+  2.5.
 
 ::: tip
-You might have heard about ERC20, which is a token standard in Ethereum. Tokens such as DAI, USDC, MKR and ZRX follow the ERC20 standard which allows them all to be compatible with any software that can deal with ERC20 tokens. **For simplicity's sake the token we're going to build is *not* an ERC20.**
+You may have heard about ERC-20 on Ethereum or SQRCTF1 on QRL. For simplicity's
+sake the token we are going to build is not a full standard token.
 :::
 
 ## Writing smart contracts
 
-Start by creating a new directory called `contracts` and create a file inside the directory called `Token.sol`. 
+Start by creating a new directory called `contracts` and create a file inside
+the directory called `Token.hyp`.
 
-Paste the code below into the file and take a minute to read the code. It's simple and it's full of comments explaining the basics of Solidity.
-
-::: tip
-To get syntax highlighting you should add Solidity support to your text editor. Just look for Solidity or Ethereum plugins. We recommend using Visual Studio Code or Sublime Text 3.
-::: 
+Paste the code below into the file and take a minute to read it:
 
 ```solidity
-// Solidity files have to start with this pragma.
-// It will be used by the Solidity compiler to validate its version.
-pragma solidity ^0.5.15;
+// SPDX-License-Identifier: MIT
+pragma hyperion >=0.0;
 
-
-// This is the main building block for smart contracts.
 contract Token {
-    // Some string type variables to identify the token.
-    string public name = "My Buidler Token";
-    string public symbol = "MBT";
+    string public name = "My QRL Token";
+    string public symbol = "MQT";
 
-    // The fixed amount of tokens stored in an unsigned integer type variable.
     uint256 public totalSupply = 1000000;
-
-    // An address type variable is used to store ethereum accounts.
     address public owner;
 
-    // A mapping is a key/value map. Here we store each account balance.
-    mapping(address => uint256) balances;
+    mapping(address => uint256) private balances;
 
-    /**
-     * Contract initialization.
-     *
-     * The `constructor` is executed only once when the contract is created.
-     * The `public` modifier makes a function callable from outside the contract.
-     */
-    constructor() public {
-        // The totalSupply is assigned to transaction sender, which is the account
-        // that is deploying the contract.
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+
+    constructor() {
         balances[msg.sender] = totalSupply;
         owner = msg.sender;
     }
 
-    /**
-     * A function to transfer tokens.
-     *
-     * The `external` modifier makes a function *only* callable from outside
-     * the contract.
-     */
     function transfer(address to, uint256 amount) external {
-        // Check if the transaction sender has enough tokens.
-        // If `require`'s first argument evaluates to `false` then the
-        // transaction will revert.
         require(balances[msg.sender] >= amount, "Not enough tokens");
 
-        // Transfer the amount.
         balances[msg.sender] -= amount;
         balances[to] += amount;
+
+        emit Transfer(msg.sender, to, amount);
     }
 
-    /**
-     * Read only function to retrieve the token balance of a given account.
-     *
-     * The `view` modifier indicates that it doesn't modify the contract's
-     * state, which allows us to call it without executing a transaction.
-     */
     function balanceOf(address account) external view returns (uint256) {
         return balances[account];
     }
@@ -86,21 +60,30 @@ contract Token {
 ```
 
 ::: tip
-`*.sol` is used for Solidity files. We recommend matching the file name to the contract it contains, which is a common practice.
+QRL Hardhat compiles Hyperion source files with the `.hyp` extension. We
+recommend matching the file name to the contract it contains.
 :::
 
-
 ## Compiling contracts
-To compile the contract run `npx buidler compile` in your terminal. The `compile` task is one of the built-in tasks.
 
+To compile the contract run:
+
+```sh
+npx hardhat compile
 ```
-$ npx buidler compile
+
+The `compile` task is one of the built-in tasks.
+
+```text
+$ npx hardhat compile
 Compiling...
 Compiled 1 contract successfully
 ```
 
-The contract has been successfully compiled and it's ready to be used. 
+The contract has been successfully compiled and is ready to be used. Compiled
+artifacts are written to `artifacts/` and compiler cache files are written to
+`cache/`.
 
-::: warning
-While Solidity 0.6.x has been recently released, our recommendation is to stick with 0.5.15 for this tutorial as defined in the `pragma` directive in the contract code. Some tools and libraries haven't been fully migrated yet.
-:::
+For more details about compiler configuration, see
+[Compiling contracts](../guides/compile-contracts.md).
+

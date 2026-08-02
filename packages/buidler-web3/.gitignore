@@ -83,7 +83,6 @@ typings/
 
 # vuepress build output
 .vuepress/dist
-
 # Serverless directories
 .serverless/
 
@@ -92,4 +91,3 @@ typings/
 
 # DynamoDB Local files
 .dynamodb/
-

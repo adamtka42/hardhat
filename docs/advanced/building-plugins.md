@@ -1,60 +1,245 @@
 # Building plugins
 
-This section is an overview of how to create a plugin. For a complete example of a
-plugin go to the [TypeScript plugin boilerplate project](https://github.com/nomiclabs/buidler-ts-plugin-boilerplate/).
+Plugins are reusable QRL Hardhat configuration. Anything you can do in a plugin
+can usually be prototyped in `hardhat.config.js` first and moved into a package
+when it becomes reusable.
 
-## Plugin functionality
+The main things a plugin can do are:
 
-Plugins are bits of reusable configuration. Anything that you can do in a plugin, can also be done in your config file. You can test your ideas in a config file, and move them into a plugin when ready.
+- define tasks,
+- override existing tasks,
+- extend the resolved config,
+- extend the Hardhat Runtime Environment,
+- read or write artifacts,
+- throw plugin-specific errors.
 
-The main things that plugins can do are extending the Buidler Runtime Environment, extending the Buidler config, defining new tasks, and overriding existing ones.
+This guide covers the plugin API that remains useful in the QRL fork. It does
+not describe the removed Ethereum plugin stack.
 
-### Extending the BRE
+## Plugin entrypoint
 
-To learn how to successfully extend the [BRE](./buidler-runtime-environment.md) in TypeScript, and to give your users type information about your extension, take a look at [`src/index.ts`](https://github.com/nomiclabs/buidler-ts-plugin-boilerplate/blob/master/src/index.ts) in the boilerplate repo and read the [Extending the BRE](./buidler-runtime-environment.md#extending-the-bre) documentation.
+A plugin package is loaded with `usePlugin("package-name")`. The package should
+export a function from its main entrypoint:
 
-Make sure to keep the type extension in your main file, as that convention is used across different plugins.
+~~~js
+module.exports = function qrlExamplePlugin() {
+  // Register tasks and extenders here.
+};
+~~~
 
-### Extending the Buidler config
+When loaded, QRL Hardhat calls the exported function while processing
+`hardhat.config.js`.
 
-An example on how to add fields to the Buidler config can be found in [`src/index.ts`](https://github.com/nomiclabs/buidler-ts-plugin-boilerplate/blob/master/src/index.ts).
+During development, you can put the same code directly in `hardhat.config.js`.
+Move it to a package once the behavior is stable.
 
-Note that all config extension's have to be optional.
+## Defining tasks
 
-### Throwing errors from your plugins
+Use `task()` from `@theqrl/hardhat/config`:
 
-To show better stack traces to your users, please only throw [`BuidlerPluginError`](/api/classes/buidlerpluginerror.html#constructors) errors, which can be found in `@nomiclabs/buidler/plugins`.
+~~~js
+const { task } = require("@theqrl/hardhat/config");
 
-### Optimizing your plugin for better startup time
+task("qrl-chain-id", "Prints the selected QRL chain id").setAction(
+  async (_, { network }) => {
+    const chainId = await network.provider.send("qrl_chainId");
+    console.log(chainId);
+  }
+);
+~~~
 
-Keeping startup time short is vital to give a good user experience. To do so, Buidler and its plugins delay any slow import or initialization until the very last moment. To do so, you can use `lazyObject`, and `lazyFunction` from `@nomiclabs/buidler/plugins`.
+Task actions receive `(taskArgs, hre, runSuper)`. The `hre` object includes:
 
-An example on how to use them is present in [`src/index.ts`](https://github.com/nomiclabs/buidler-ts-plugin-boilerplate/blob/master/src/index.ts).
+- `config`
+- `hardhatArguments`
+- `network`
+- `run`
+- `tasks`
+- `qrl`
 
-## Notes on dependencies
+Use `hre.network.provider.send()` for direct `qrl_*` RPC calls and `hre.qrl`
+for artifact, deployment, contract, call, and transaction helpers.
 
-Knowing when to use a `dependency` or a `peerDependency` can be tricky. We recommend [these](https://yarnpkg.com/blog/2018/04/18/dependencies-done-right/) [articles](https://lexi-lambda.github.io/blog/2016/08/24/understanding-the-npm-dependency-model/) to learn about their distinctions.
+## Parameters
 
-If you are still in doubt, these can be helpful:
+Use `types` for parsed task parameters:
 
-- **Rule of thumb #1:** Buidler MUST be a peer dependency.
+~~~js
+const { task, types } = require("@theqrl/hardhat/config");
 
-- **Rule of thumb #2:** If your plugin P depends on another plugin P2, P2 should be a peer dependency of P, and P2's peer dependencies should be peer dependencies of P.
+task("qrl-balance", "Prints a QRL account balance")
+  .addParam("account", "QRL address")
+  .addOptionalParam("block", "Block tag", "latest", types.string)
+  .setAction(async ({ account, block }, { network }) => {
+    const [balance] = await network.provider.send("qrl_getBalance", [
+      account,
+      block,
+    ]);
 
-- **Rule of thumb #3:** If you have a non-Buidler dependency that your users may `require()`, it should be a peer dependency.
+    console.log(balance);
+  });
+~~~
 
-- **Rule of thumb #4:** Every `peerDependency` should also be a `devDependency`.
+For go-qrl compatibility, pass a block tag such as `latest` to
+`qrl_getBalance`.
 
-Also, if you depend on a Buidler plugin written in TypeScript, you should add it's type extensions' `.d.ts` file to the `files` array of `tsconfig.json`.
+## Overriding tasks
 
-## Hooking into the user's workflow
+Calling `task()` with an existing task name overrides that task. Use `runSuper`
+to preserve the original behavior:
 
-To integrate into your users' existing workflow, we recommend plugin authors to override built-in tasks whenever it makes sense.
+~~~js
+const { task } = require("@theqrl/hardhat/config");
 
-Examples of suggested overrides are:
+task("test").setAction(async (args, hre, runSuper) => {
+  const chainId = await hre.network.provider.send("qrl_chainId");
+  console.log("Running tests on QRL chain:", chainId);
 
-- Preprocessing smart contracts should override one of the `compile` internal tasks.
-- Linter integrations should override the `check` task.
-- Plugins generating intermediate files should override the `clean` task.
+  return runSuper(args);
+});
+~~~
 
-For a list of all the built-in tasks and internal tasks please take a look at [`task-names.ts`](https://github.com/nomiclabs/buidler/blob/master/packages/buidler-core/src/builtin-tasks/task-names.ts)
+Override built-in tasks conservatively. Prefer adding a new task unless the
+plugin genuinely needs to hook into a standard workflow such as `compile`,
+`test`, `run`, `clean`, or `console`.
+
+Internal tasks are available through `internalTask()`, but they are less stable
+than public tasks and may change as the QRL fork evolves.
+
+## Extending the config
+
+Use `extendConfig()` to add derived fields to the resolved config:
+
+~~~js
+const { extendConfig } = require("@theqrl/hardhat/config");
+
+extendConfig((config, userConfig) => {
+  const userPluginConfig = userConfig.qrlExample || {};
+
+  config.qrlExample = {
+    timeoutMs: userPluginConfig.timeoutMs || 300000,
+  };
+});
+~~~
+
+The `userConfig` object is read-only. Do not mutate it. Add fields to the
+resolved `config` object instead.
+
+Any user-facing plugin config should be optional so projects can load the plugin
+without extra boilerplate.
+
+## Extending the runtime environment
+
+Use `extendEnvironment()` to expose helpers on `hre`:
+
+~~~js
+const { extendEnvironment } = require("@theqrl/hardhat/config");
+
+extendEnvironment((hre) => {
+  hre.qrlExample = {
+    async accounts() {
+      return hre.network.provider.send("qrl_accounts");
+    },
+    async deploy(contractName, tx = {}) {
+      const [from] = await hre.network.provider.send("qrl_accounts");
+      return hre.qrl.deployContract(contractName, { from, ...tx });
+    },
+  };
+});
+~~~
+
+The extender runs after the Hardhat Runtime Environment is initialized.
+
+If you write the plugin in TypeScript, add module augmentation for
+`HardhatRuntimeEnvironment` and any config fields your plugin adds. Keep the
+runtime behavior and type declarations in sync.
+
+## Reading artifacts
+
+Plugins can use artifact helpers from `@theqrl/hardhat/plugins`:
+
+~~~js
+const { readArtifact } = require("@theqrl/hardhat/plugins");
+
+task("artifact-abi", "Prints a contract ABI")
+  .addParam("contract", "Contract name")
+  .setAction(async ({ contract }, { config }) => {
+    const artifact = await readArtifact(config.paths.artifacts, contract);
+    console.log(JSON.stringify(artifact.abi, null, 2));
+  });
+~~~
+
+Artifacts are generated from Hyperion `.hyp` contracts and consumed by
+`hre.qrl`.
+
+## Lazy initialization
+
+Use `lazyObject()` or `lazyFunction()` from `@theqrl/hardhat/plugins` when a
+helper is expensive to initialize:
+
+~~~js
+const { lazyObject } = require("@theqrl/hardhat/plugins");
+const { extendEnvironment } = require("@theqrl/hardhat/config");
+
+extendEnvironment((hre) => {
+  hre.qrlExample = lazyObject(() => ({
+    async chainId() {
+      return hre.network.provider.send("qrl_chainId");
+    },
+  }));
+});
+~~~
+
+This keeps startup time low when users run unrelated tasks.
+
+## Throwing plugin errors
+
+Use `HardhatPluginError` for user-facing plugin failures:
+
+~~~js
+const { HardhatPluginError } = require("@theqrl/hardhat/plugins");
+
+throw new HardhatPluginError(
+  "qrl-hardhat-example-plugin",
+  "QRL_RPC_URL must be set for this task"
+);
+~~~
+
+This gives users cleaner error messages than throwing arbitrary errors.
+
+## Dependencies
+
+Plugin packages should treat QRL Hardhat as a peer dependency:
+
+~~~json
+{
+  "peerDependencies": {
+    "@theqrl/hardhat": "^1.3.3"
+  },
+  "devDependencies": {
+    "@theqrl/hardhat": "^1.3.3"
+  }
+}
+~~~
+
+If your plugin depends on another plugin, that plugin should normally be a peer
+dependency too. If your plugin exposes a third-party library in its public API,
+consider making that library a peer dependency so users control the version.
+
+## QRL-only assumptions
+
+QRL Hardhat plugins should not assume Ethereum-only APIs. Prefer:
+
+- `qrl_*` JSON-RPC methods,
+- `hre.qrl` contract helpers,
+- QRL addresses,
+- Hyperion artifacts,
+- hardhatqrlvm or HTTP go-qrl networks.
+
+Avoid depending on `eth_*` RPC methods, Ethereum private keys, Ethers.js
+signers, upstream Ethereum `web3` providers, Ganache, Truffle, Waffle,
+Solidity-only compiler options, or Buidler EVM internals unless your plugin
+explicitly provides a compatibility layer and documents its limits.
+`@theqrl/web3` is the QRL-native Web3 implementation and can be exposed through
+`@theqrl/hardhat-web3`.
+

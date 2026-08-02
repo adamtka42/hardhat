@@ -13,39 +13,71 @@ interface CommonNetworkConfig {
   gas?: "auto" | number;
   gasPrice?: "auto" | number;
   gasMultiplier?: number;
-}
-
-interface BuidlerNetworkAccount {
-  privateKey: string;
-  balance: string;
-}
-
-export interface BuidlerNetworkConfig extends CommonNetworkConfig {
-  accounts?: BuidlerNetworkAccount[];
-  blockGasLimit?: number;
-  hardfork?: string;
-  throwOnTransactionFailures?: boolean;
-  throwOnCallFailures?: boolean;
-  loggingEnabled?: boolean;
-  allowUnlimitedContractSize?: boolean;
-  initialDate?: string;
-}
-
-export interface HDAccountsConfig {
-  mnemonic: string;
-  initialIndex?: number;
-  count?: number;
-  path?: string;
+  /**
+   * Contract console logging (development only). Meaningful on the
+   * `hardhatqrlvm` network, where it defaults to enabled; accepted but inert
+   * on HTTP networks so shared config files validate everywhere.
+   */
+  consoleLog?: boolean;
 }
 
 export interface OtherAccountsConfig {
   type: string;
 }
 
+export interface HardhatQrlvmAccountConfig {
+  /**
+   * Optional extended seed enabling `qrl_sign` for this account. Local
+   * transactions never need it — the local network accepts unsigned
+   * transactions — and it is NEVER printed by `hardhat node`.
+   */
+  seed?: string;
+  address: string;
+  balance?: string | number;
+  nonce?: number;
+}
+
+export interface HardhatQrlvmNetworkConfig extends CommonNetworkConfig {
+  accounts?: HardhatQrlvmAccountConfig[];
+  automine?: boolean;
+  loggingEnabled?: boolean;
+  blockGasLimit?: number;
+  /**
+   * Genesis block timestamp as an ISO 8601 date string. Later blocks default
+   * to `parent + 1` second, shifted by `qrl_increaseTime` /
+   * `qrl_setNextBlockTimestamp`.
+   */
+  initialDate?: string;
+  /**
+   * Throw from `qrl_sendTransaction` when an automined transaction reverts
+   * (default `true`). The transaction is still mined; the error carries the
+   * revert data and the transaction hash.
+   */
+  throwOnTransactionFailures?: boolean;
+  /**
+   * Throw from `qrl_call` when execution reverts (default `true`). When
+   * disabled the raw revert return data is returned instead.
+   */
+  throwOnCallFailures?: boolean;
+  /**
+   * Skip the deployed-code size limit, e.g. for coverage-instrumented
+   * contracts. Local testing only.
+   */
+  allowUnlimitedContractSize?: boolean;
+  /**
+   * Append Hyperion stack traces (contract, function, file:line) to failed
+   * transaction/call errors. Enabled by default when the compile cache and a
+   * tracing-capable qrljs build are available.
+   */
+  stackTraces?: boolean;
+  qrlJsMonorepoPath?: string;
+}
+
+export type QrlExtendedSeed = string;
+
 export type NetworkConfigAccounts =
   | "remote"
-  | string[]
-  | HDAccountsConfig
+  | QrlExtendedSeed[]
   | OtherAccountsConfig;
 
 export interface HttpNetworkConfig extends CommonNetworkConfig {
@@ -55,7 +87,7 @@ export interface HttpNetworkConfig extends CommonNetworkConfig {
   accounts?: NetworkConfigAccounts;
 }
 
-export type NetworkConfig = BuidlerNetworkConfig | HttpNetworkConfig;
+export type NetworkConfig = HttpNetworkConfig | HardhatQrlvmNetworkConfig;
 
 export interface Networks {
   [networkName: string]: NetworkConfig;
@@ -64,7 +96,7 @@ export interface Networks {
 /**
  * The project paths:
  * * root: the project's root.
- * * configFile: the buidler's config filepath.
+ * * configFile: Hardhat config filepath.
  * * cache: project's cache directory.
  * * artifacts: artifact's directory.
  * * sources: project's sources directory.
@@ -79,62 +111,54 @@ export interface ProjectPaths {
   tests: string;
 }
 
-type EVMVersion = string;
-
-export interface SolcConfig {
+export interface HyperionConfig {
   version: string;
-  optimizer: SolcOptimizerConfig;
-  evmVersion?: EVMVersion;
+  compilerPath?: string;
+  compilerRepositoryUrl?: string;
+  optimizer: HyperionOptimizerConfig;
 }
 
-export interface SolcOptimizerConfig {
+export interface HyperionOptimizerConfig {
   enabled: boolean;
   runs: number;
 }
 
-export interface AnalyticsConfig {
-  enabled: boolean;
-}
-
-export interface BuidlerConfig {
+export interface HardhatConfig {
   defaultNetwork?: string;
   networks?: Networks;
   paths?: Omit<Partial<ProjectPaths>, "configFile">;
-  solc?: DeepPartial<SolcConfig>;
+  hyperion?: DeepPartial<HyperionConfig>;
   mocha?: Mocha.MochaOptions;
-  analytics?: Partial<AnalyticsConfig>;
 }
 
-export interface ResolvedBuidlerConfig extends BuidlerConfig {
+export interface ResolvedHardhatConfig extends HardhatConfig {
   defaultNetwork: string;
   paths: ProjectPaths;
   networks: Networks;
-  solc: SolcConfig;
-  analytics: AnalyticsConfig;
+  hyperion: HyperionConfig;
 }
 
 // End config types
 
-export interface SolcInput {
+export interface CompilerInput {
   settings: {
     metadata: { useLiteralContent: boolean };
-    optimizer: SolcOptimizerConfig;
+    optimizer: HyperionOptimizerConfig;
     outputSelection: { "*": { "": string[]; "*": string[] } };
-    evmVersion?: string;
   };
   sources: { [p: string]: { content: string } };
   language: string;
 }
 
 /**
- * A function that receives a BuidlerRuntimeEnvironment and
+ * A function that receives a HardhatRuntimeEnvironment and
  * modify its properties or add new ones.
  */
-export type EnvironmentExtender = (env: BuidlerRuntimeEnvironment) => void;
+export type EnvironmentExtender = (env: HardhatRuntimeEnvironment) => void;
 
 export type ConfigExtender = (
-  config: ResolvedBuidlerConfig,
-  userConfig: DeepReadonly<BuidlerConfig>
+  config: ResolvedHardhatConfig,
+  userConfig: DeepReadonly<HardhatConfig>
 ) => void;
 
 export interface TasksMap {
@@ -214,15 +238,15 @@ export interface ParamDefinitionsMap {
 }
 
 /**
- * Buidler arguments:
+ * Hardhat arguments:
  * * network: the network to be used.
  * * showStackTraces: flag to show stack traces.
- * * version: flag to show buidler's version.
- * * help: flag to show buidler's help message.
+ * * version: flag to show Hardhat version.
+ * * help: flag to show Hardhat help message.
  * * emoji:
- * * config: used to specify buidler's config file.
+ * * config: used to specify Hardhat config file.
  */
-export interface BuidlerArguments {
+export interface HardhatArguments {
   network?: string;
   showStackTraces: boolean;
   version: boolean;
@@ -233,9 +257,9 @@ export interface BuidlerArguments {
   maxMemory?: number;
 }
 
-export type BuidlerParamDefinitions = {
-  [param in keyof Required<BuidlerArguments>]: OptionalParamDefinition<
-    BuidlerArguments[param]
+export type HardhatParamDefinitions = {
+  [param in keyof Required<HardhatArguments>]: OptionalParamDefinition<
+    HardhatArguments[param]
   >;
 };
 
@@ -280,33 +304,33 @@ export interface RunSuperFunction<ArgT extends TaskArguments> {
 
 export type ActionType<ArgsT extends TaskArguments> = (
   taskArgs: ArgsT,
-  env: BuidlerRuntimeEnvironment,
+  env: HardhatRuntimeEnvironment,
   runSuper: RunSuperFunction<ArgsT>
 ) => Promise<any>;
 
-export interface EthereumProvider extends EventEmitter {
+export interface QrlProvider extends EventEmitter {
   send(method: string, params?: any[]): Promise<any>;
 }
 
-// This alias is here for backwards compatibility
-export type IEthereumProvider = EthereumProvider;
+export type IQrlProvider = QrlProvider;
 
 export interface Network {
   name: string;
   config: NetworkConfig;
-  provider: EthereumProvider;
+  provider: QrlProvider;
 }
 
-export interface BuidlerRuntimeEnvironment {
-  readonly config: ResolvedBuidlerConfig;
-  readonly buidlerArguments: BuidlerArguments;
+export interface HardhatRuntimeEnvironment {
+  readonly config: ResolvedHardhatConfig;
+  readonly hardhatArguments: HardhatArguments;
   readonly tasks: TasksMap;
   readonly run: RunTaskFunction;
   readonly network: Network;
-  readonly ethereum: EthereumProvider; // DEPRECATED: Use network.provider
+  qrl: QrlRuntimeHelpers;
 }
 
 export interface Artifact {
+  sourceName?: string;
   contractName: string;
   abi: any;
   bytecode: string; // "0x"-prefixed hex string
@@ -319,4 +343,183 @@ export interface LinkReferences {
   [libraryFileName: string]: {
     [libraryName: string]: Array<{ length: number; start: number }>;
   };
+}
+
+export interface QrlTransactionRequest {
+  from?: string;
+  to?: string;
+  gas?: string | number;
+  gasLimit?: string | number;
+  gasPrice?: string | number;
+  maxFeePerGas?: string | number;
+  maxPriorityFeePerGas?: string | number;
+  value?: string | number;
+  data?: string;
+  nonce?: string | number;
+  chainId?: string | number;
+}
+
+export interface QrlDeploymentResult {
+  hash: string;
+  receipt: any;
+  address?: string;
+}
+
+export interface QrlWaitOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
+export interface QrlLibraryAddresses {
+  /**
+   * Deployed addresses of external libraries, keyed by bare library name
+   * (`MathLib`) or fully qualified name (`contracts/MathLib.hyp:MathLib`).
+   */
+  [libraryName: string]: string;
+}
+
+export interface QrlDeployOptions extends QrlWaitOptions {
+  libraries?: QrlLibraryAddresses;
+}
+
+export interface QrlFactoryOptions {
+  libraries?: QrlLibraryAddresses;
+}
+
+export interface QrlTransactionReceipt {
+  transactionHash: string;
+  blockHash?: string;
+  blockNumber?: string | number;
+  contractAddress?: string | null;
+  status?: string | number | boolean;
+  logs?: any[];
+  [key: string]: any;
+}
+
+export interface QrlTransactionResponse {
+  hash: string;
+  wait(
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ): Promise<QrlTransactionReceipt>;
+}
+
+export interface QrlRuntimeHelpers {
+  readArtifact(contractName: string): Promise<Artifact>;
+  getContractFactory(
+    contractName: string,
+    options?: QrlFactoryOptions
+  ): Promise<QrlContractFactory>;
+  getContractAt(contractName: string, address: string): Promise<QrlContract>;
+  sendTransaction(tx: QrlTransactionRequest): Promise<string>;
+  call(tx: QrlTransactionRequest, blockTag?: string): Promise<string>;
+  waitForTransaction(
+    txHash: string,
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ): Promise<QrlTransactionReceipt>;
+  deployContract(
+    contractName: string,
+    tx?: QrlTransactionRequest,
+    constructorDataOrArgs?: string | any[],
+    deployOptions?: QrlDeployOptions
+  ): Promise<QrlDeploymentResult>;
+}
+
+export interface QrlContractFactory {
+  readonly contractName: string;
+  readonly artifact: Artifact;
+  /**
+   * The deploy bytecode with the factory's `libraries` applied. Contains
+   * `__$...$__` placeholders while libraries remain unresolved.
+   */
+  readonly bytecode: string;
+  /**
+   * Deploys the contract and returns a ready-to-use contract wrapper with
+   * deployment metadata attached (`deployTransactionHash`, `deployReceipt`,
+   * plus transitional `hash`/`receipt` aliases). Use `qrl.deployContract()`
+   * for the raw `QrlDeploymentResult` metadata.
+   *
+   * Note the QRL argument order, which differs from ethers: transaction
+   * overrides come first and constructor arguments second, e.g.
+   * `deploy({ from }, ["Hello"])`. This avoids the ambiguity of
+   * `deploy(...args, overrides)` with object/tuple constructor arguments.
+   */
+  deploy(
+    tx?: QrlTransactionRequest,
+    constructorDataOrArgs?: string | any[],
+    waitOptions?: QrlWaitOptions
+  ): Promise<QrlContract>;
+  attach(address: string): QrlContract;
+}
+
+export interface QrlBaseContract {
+  readonly address: string;
+  readonly contractName: string;
+  readonly artifact: Artifact;
+
+  /**
+   * Deployment metadata, present only on contracts returned by
+   * `factory.deploy()`.
+   */
+  readonly deployTransactionHash?: string;
+  readonly deployReceipt?: QrlTransactionReceipt;
+
+  /**
+   * @deprecated Transitional alias for `deployTransactionHash`, kept so
+   * existing code destructuring `factory.deploy()` results keeps working.
+   * Removal target: next major version.
+   */
+  readonly hash?: string;
+
+  /**
+   * @deprecated Transitional alias for `deployReceipt`, kept so existing
+   * code destructuring `factory.deploy()` results keeps working. Removal
+   * target: next major version.
+   */
+  readonly receipt?: QrlTransactionReceipt;
+
+  readonly functions: QrlContractFunctionMap;
+  readonly callStatic: QrlContractFunctionMap;
+  readonly send: QrlContractFunctionMap;
+
+  deployed?(): Promise<QrlContract>;
+  waitForDeployment?(): Promise<QrlContract>;
+  encodeFunctionData(functionName: string, args?: any[]): string;
+  decodeFunctionResult(functionName: string, data: string): any[];
+  decodeEventLog(eventName: string, log: any): any;
+  decodeReceiptLogs(receipt: any): any[];
+  callFunction(
+    functionName: string,
+    args?: any[],
+    tx?: Omit<QrlTransactionRequest, "to" | "data">,
+    blockTag?: string
+  ): Promise<any[]>;
+  sendFunction(
+    functionName: string,
+    args?: any[],
+    tx?: Omit<QrlTransactionRequest, "to" | "data">
+  ): Promise<string>;
+  call(
+    data: string,
+    tx?: Omit<QrlTransactionRequest, "to" | "data">,
+    blockTag?: string
+  ): Promise<string>;
+  sendTransaction(
+    data: string,
+    tx?: Omit<QrlTransactionRequest, "to" | "data">
+  ): Promise<string>;
+}
+
+/**
+ * Contract wrapper with dynamically attached direct method aliases for
+ * unambiguous ABI functions. Use `QrlBaseContract` to type a variable when
+ * strict field typing is preferred over the dynamic method surface.
+ */
+export type QrlContract = QrlBaseContract & {
+  [functionNameAlias: string]: any;
+};
+
+export interface QrlContractFunctionMap {
+  [functionName: string]: (...args: any[]) => Promise<any>;
 }

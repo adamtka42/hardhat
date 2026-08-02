@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C"
     },
     {
@@ -11,7 +11,7 @@
           "type": "UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "line": 3
           }
         }

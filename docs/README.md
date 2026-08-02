@@ -1,115 +1,62 @@
----
-home: true 
-pageClass: custom
-heroImage: ./mascots.svg
-actionText: Get Started
-search: false
-footer: Copyright © 2018-2019 Nomic Labs LLC
----
-<div>
+# QRL Hardhat documentation
 
-  <div class="example-1">
-  <h3>1. Write your contract</h3>
+This directory contains the QRL Hardhat documentation. QRL Hardhat targets
+Hyperion `.hyp` contracts, QRL addresses, `qrl_*` JSON-RPC methods, local
+in-process tests through `hardhatqrlvm`, and live go-qrl HTTP networks.
 
-  ```solidity
+## Start here
 
-  import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+- [Tutorial](tutorial/README.md): a step-by-step walkthrough for a new QRL
+  Hardhat project.
+- [Getting started](getting-started.md): a compact setup guide with one sample
+  contract, test, and deployment script.
+- [Project setup](guides/project-setup.md): project layout, sample project
+  files, generated folders, and network choices.
+- [Configuration](config/README.md): network, compiler, path, and account
+  configuration.
 
-  pragma solidity ^0.5.1;
-      
-  contract DeathStar is ERC721 {
+## Core workflows
 
-    address private owner;
+- [Compiling contracts](guides/compile-contracts.md): Hyperion `.hyp`
+  compilation, artifacts, cache files, and compiler options.
+- [Writing scripts](guides/scripts.md): deployment and maintenance scripts that
+  use `hre.qrl`.
+- [Deploying contracts](guides/deploying.md): hardhatqrlvm and HTTP go-qrl
+  deployment flows.
+- [Using the Hardhat console](guides/buidler-console.md): interactive REPL
+  usage with QRL helpers and direct `qrl_*` RPC calls.
+- [Running a standalone local node](guides/node.md): `hardhat node` — an
+  HTTP/WebSocket JSON-RPC endpoint over the local QRL network.
+- [Hyperion stack traces](guides/stack-traces.md): source-mapped stack
+  traces for reverts and the `debug_trace*` RPC on `hardhatqrlvm`.
+- [Contract console logging](guides/console-log.md): `console.log` from
+  Hyperion contracts on `hardhatqrlvm`.
+- [Creating tasks](guides/create-task.md): custom CLI tasks for QRL projects.
+- [Creating plugins](guides/create-plugin.md): a small QRL-compatible plugin walkthrough.
+- [QRL Hardhat plugins](plugins/README.md): plugin status, loading, and QRL compatibility expectations.
 
-    constructor (address owner) public {
-      owner = owner;
-    }
+## Networks and tooling
 
-    function shoot(string memory planet) public {
-      require(msg.sender == owner);
-      // TODO: BAM
-    }
-  }
+- [hardhatqrlvm](hardhat-qrlvm/README.md): in-process QRL VM network for local tests.
+- [TypeScript projects](guides/typescript.md): TypeScript setup and runtime
+  imports.
+- [VS Code tests and scripts](guides/vscode-tests.md): debugging test and script
+  runs from VS Code.
+- [Hardhat Runtime Environment](advanced/hardhat-runtime-environment.md):
+  runtime globals, `network.provider`, and `hre.qrl`.
+- [Building plugins](advanced/building-plugins.md): extending tasks, config, and runtime helpers.
 
-  ```
+## Troubleshooting
 
-  </div>
+- [Common problems](troubleshooting/common-problems.md): common QRL Hardhat
+  setup, network, account, ABI, and gas issues.
+- [Error codes](troubleshooting/error-codes.md): QRL-focused `BDLRxxx` reference and fixes.
+- [Verbose logging](troubleshooting/verbose-logging.md): collecting detailed
+  logs from tasks, providers, and RPC calls.
 
+## Removed upstream documentation
 
-  <div class="example-2">
-  <h3>2. Choose your plugins & setup</h3>
+This fork intentionally does not include the old Ethereum-specific Buidler
+documentation for Buidler EVM, Ganache, Truffle, Waffle, Web3.js, Ethers.js,
+Infura, or Solidity-only workflows. Use the QRL-specific guides above instead.
 
-  ```js
-  // For unit tests
-  usePlugin("@nomiclabs/buidler-truffle5");
-  usePlugin("@nomiclabs/buidler-ganache");
-  usePlugin("buidler-gas-reporter");
-
-  // Linting
-  usePlugin("@nomiclabs/buidler-solhint");
-
-  // For scripts
-  usePlugin("@nomiclabs/buidler-ethers");
-  
-  // Faster compilation
-  usePlugin("@nomiclabs/buidler-docker-solc");
-
-  module.exports = {
-    buidlerevm: {
-      throwOnTransactionFailures: true
-    }
-  };
-  ```
-
-  </div>
-
-  <div class="clear"></div>
-
-  <div class="example-3">
-  <h3>3. Write your tests</h3>
-
-```js
-contract('ERC721', function () {
-  describe('safeTransferFrom to a contract that does not implement the required function', function () {
-    it('reverts', async function () {
-
-      const invalidReceiver = this.token;
-
-      await this.token.safeTransferFrom(
-        owner,
-        invalidReceiver.address,
-        tokenId,
-        { from: owner }
-      )        
-    });
-  });
-});
-```
-
-  </div>
-
-
-  <div class="example-4">
-  <h3>4. Debug your code with Buidler EVM</h3>
-
-  ```
-$ npx buidler test
-
-Contract: DeathStar
-    safeTransferFrom to a contract that does not implement the required function:
-
-Error: Transaction reverted: function selector was not recognized and there's no fallback function
-    at DeathStar.<unrecognized-selector> (contracts/DeathStar.sol:9)
-    at DeathStar._checkOnERC721Received (contracts/token/ERC721/ERC721.sol:334)
-    at DeathStar._safeTransferFrom (contracts/token/ERC721/ERC721.sol:196)
-    at DeathStar.safeTransferFrom (contracts/token/ERC721/ERC721.sol:179)
-    at DeathStar.safeTransferFrom (contracts/token/ERC721/ERC721.sol:162)
-    at TruffleContract.safeTransferFrom (node_modules/@nomiclabs/truffle-contract/lib/execute.js:157:24)
-    at Context.<anonymous> (test/DeathStar-test.js:321:26)
-
-
-  ```
-
-  </div>
-  <div class="clear"></div>
-</div>

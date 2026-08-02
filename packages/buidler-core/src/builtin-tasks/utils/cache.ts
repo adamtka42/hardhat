@@ -3,26 +3,40 @@ import isEqual from "lodash/isEqual";
 import path from "path";
 
 import {
-  SOLC_INPUT_FILENAME,
-  SOLC_OUTPUT_FILENAME,
+  COMPILER_INPUT_FILENAME,
+  COMPILER_OUTPUT_FILENAME,
 } from "../../internal/constants";
+import { CompilerIdentity } from "../../internal/hyperion/compiler-types";
 import { glob } from "../../internal/util/glob";
 import { getPackageJson } from "../../internal/util/packageInfo";
-import { ProjectPaths, SolcConfig } from "../../types";
+import { HyperionConfig, ProjectPaths } from "../../types";
 
 // Checks the earliest date of modification for compiled files against the latest date for source files (including libraries).
-// Furthermore, cache is invalidated if Buidler's version changes, or a different solc version is set in the buidler config.
+// Furthermore, cache is invalidated if Hardhat's version changes, a different
+// compiler config is set in the config, or the resolved hypc binary changes
+// (path, mtime, size or detected version — the config's `version` string
+// alone cannot tell two local builds apart).
 export async function areArtifactsCached(
   sourceTimestamps: number[],
-  newSolcConfig: SolcConfig,
-  paths: ProjectPaths
+  newHyperionConfig: HyperionConfig,
+  paths: ProjectPaths,
+  compilerIdentity?: CompilerIdentity
 ): Promise<boolean> {
+  // No resolvable hypc binary means nothing can be verified — never report
+  // a cache hit (a legacy cache without a stored fingerprint would otherwise
+  // compare equal to an undefined one). The compile itself then surfaces
+  // the real "binary not found" error.
+  if (compilerIdentity === undefined) {
+    return false;
+  }
+
   const oldConfig = await getLastUsedConfig(paths.cache);
 
   if (
     oldConfig === undefined ||
-    !compareSolcConfigs(oldConfig.solc, newSolcConfig) ||
-    !(await compareBuidlerVersion(oldConfig.buidlerVersion))
+    !compareHyperionConfigs(oldConfig.hyperion, newHyperionConfig) ||
+    !isEqual(oldConfig.compiler, compilerIdentity) ||
+    !(await compareHardhatVersion(oldConfig.hardhatVersion))
   ) {
     return false;
   }
@@ -31,13 +45,15 @@ export async function areArtifactsCached(
   const minArtifactDate = await getMinArtifactDate(paths.artifacts);
 
   if (
-    !(await fsExtra.pathExists(path.join(paths.cache, SOLC_INPUT_FILENAME)))
+    !(await fsExtra.pathExists(path.join(paths.cache, COMPILER_INPUT_FILENAME)))
   ) {
     return false;
   }
 
   if (
-    !(await fsExtra.pathExists(path.join(paths.cache, SOLC_OUTPUT_FILENAME)))
+    !(await fsExtra.pathExists(
+      path.join(paths.cache, COMPILER_OUTPUT_FILENAME)
+    ))
   ) {
     return false;
   }
@@ -76,7 +92,7 @@ async function getMinArtifactDate(artifactsPath: string): Promise<number> {
   return Math.min(...timestamps);
 }
 
-const LAST_CONFIG_USED_FILENAME = "last-solc-config.json";
+const LAST_CONFIG_USED_FILENAME = "last-compiler-config.json";
 
 function getPathToCachedLastConfigPath(cachePath: string) {
   const pathToLastConfigUsed = path.join(cachePath, LAST_CONFIG_USED_FILENAME);
@@ -86,14 +102,21 @@ function getPathToCachedLastConfigPath(cachePath: string) {
 
 async function getLastUsedConfig(
   cachePath: string
-): Promise<{ solc: SolcConfig; buidlerVersion: string } | undefined> {
+): Promise<
+  | {
+      hyperion: HyperionConfig;
+      hardhatVersion: string;
+      compiler?: CompilerIdentity;
+    }
+  | undefined
+> {
   const pathToConfig = getPathToCachedLastConfigPath(cachePath);
 
   if (!(await fsExtra.pathExists(pathToConfig))) {
     return undefined;
   }
 
-  return module.require(pathToConfig);
+  return fsExtra.readJson(pathToConfig);
 }
 
 async function getLastUsedConfigTimestamp(
@@ -108,14 +131,16 @@ async function getLastUsedConfigTimestamp(
   return (await fsExtra.stat(pathToConfig)).ctimeMs;
 }
 
-export async function cacheBuidlerConfig(
+export async function cacheHardhatConfig(
   paths: ProjectPaths,
-  config: SolcConfig
+  config: HyperionConfig,
+  compilerIdentity?: CompilerIdentity
 ) {
   const pathToLastConfigUsed = getPathToCachedLastConfigPath(paths.cache);
   const newJson = {
-    solc: config,
-    buidlerVersion: await getCurrentBuidlerVersion(),
+    hyperion: config,
+    hardhatVersion: await getCurrentHardhatVersion(),
+    compiler: compilerIdentity,
   };
 
   await fsExtra.ensureDir(path.dirname(pathToLastConfigUsed));
@@ -127,23 +152,23 @@ export async function cacheBuidlerConfig(
   );
 }
 
-function compareSolcConfigs(
-  oldConfig: SolcConfig,
-  newConfig: SolcConfig
+function compareHyperionConfigs(
+  oldConfig: HyperionConfig,
+  newConfig: HyperionConfig
 ): boolean {
   return isEqual(oldConfig, newConfig);
 }
 
-async function getCurrentBuidlerVersion(): Promise<string> {
+async function getCurrentHardhatVersion(): Promise<string> {
   const packageJson = await getPackageJson();
 
   return packageJson.version;
 }
 
-async function compareBuidlerVersion(
-  lastBuidlerVersion: string
+async function compareHardhatVersion(
+  lastHardhatVersion: string
 ): Promise<boolean> {
-  const currentVersion = await getCurrentBuidlerVersion();
+  const currentVersion = await getCurrentHardhatVersion();
 
-  return lastBuidlerVersion === currentVersion;
+  return lastHardhatVersion === currentVersion;
 }

@@ -1,25 +1,24 @@
-[![npm](https://img.shields.io/npm/v/@nomiclabs/buidler-web3.svg)](https://www.npmjs.com/package/@nomiclabs/buidler-web3)
-[![buidler](https://buidler.dev/buidler-plugin-badge.svg?1)](https://buidler.dev)
+# QRL Hardhat Web3
 
-# buidler-web3
-
-This plugin integrates [Web3.js](https://github.com/ethereum/web3.js) `1.x` into [Buidler](http://getbuidler.com).
+This plugin integrates [`@theqrl/web3`](https://www.npmjs.com/package/@theqrl/web3) with QRL Hardhat.
 
 ## What
 
-This plugin brings to Buidler the Web3 module and an initialized instance of Web3.
+This plugin adds the `@theqrl/web3` constructor and an initialized Web3
+instance to the Hardhat Runtime Environment. The instance uses the provider of
+the selected QRL Hardhat network.
 
-# Installation
+## Installation
 
-```bash
-npm install --save-dev @nomiclabs/buidler-web3 web3
-```
+~~~bash
+npm install --save-dev @theqrl/hardhat-web3 @theqrl/web3
+~~~
 
-And add the following statement to your `buidler.config.js`:
+Add the plugin to `hardhat.config.js`:
 
-```js
-usePlugin("@nomiclabs/buidler-web3");
-```
+~~~js
+usePlugin("@theqrl/hardhat-web3");
+~~~
 
 ## Tasks
 
@@ -27,29 +26,49 @@ This plugin creates no additional tasks.
 
 ## Environment extensions
 
-This plugin adds the following elements to the `BuidlerRuntimeEnvironment`:
+The plugin adds these fields to the `HardhatRuntimeEnvironment`:
 
-- `Web3`: The Web3.js module.
-- `web3`: An instantiated Web3.js object connected to the selected network.
+- `Web3`: the constructor exported as `Web3` by `@theqrl/web3`.
+- `web3`: a singleton `Web3` instance connected to the selected Hardhat
+  network.
+
+QRL network APIs are available under `web3.qrl`. The plugin does not add an
+Ethereum `web3.eth` alias.
+
+Subscriptions are available when the selected provider supports them.
+`hardhatqrlvm` forwards subscription notifications, including `newHeads`. HTTP
+networks do not advertise subscription support; use a subscription-capable
+transport when push events are required.
 
 ## Usage
-Install it and access Web3.js through the Buidler Runtime Environment anywhere you need it (tasks, scripts, tests, etc). For example, in your `buidler.config.js`:
-```
-usePlugin("@nomiclabs/buidler-web3");
 
-// task action function receives the Buidler Runtime Environment as second argument
-task("accounts", "Prints accounts", async (_, { web3 }) => {
-  
-  console.log(await web3.eth.getAccounts());
-  
+Access Web3 through the Hardhat Runtime Environment in tasks, scripts, tests,
+or the console. For example, in `hardhat.config.js`:
+
+~~~js
+usePlugin("@theqrl/hardhat-web3");
+
+task("accounts", "Prints QRL accounts", async (_, { web3 }) => {
+  console.log(await web3.qrl.getAccounts());
 });
 
 module.exports = {};
-```
-And then run `npx buidler accounts` to try it.
+~~~
 
-Read the documentation on the [Buidler Runtime Environment](https://buidler.dev/documentation/#buidler-runtime-environment-bre) to learn how to access the BRE in different ways to use Web3.js from anywhere the BRE is accessible.
+Run the task with:
+
+~~~bash
+npx hardhat accounts
+~~~
 
 ## TypeScript support
 
-You need to add this to your `tsconfig.json`'s `files` array: `"node_modules/@nomiclabs/buidler-web3/src/type-extensions.d.ts"`
+Add the plugin's module augmentation to the `files` array in `tsconfig.json`:
+
+~~~json
+{
+  "files": [
+    "node_modules/@theqrl/hardhat-web3/src/type-extensions.d.ts"
+  ]
+}
+~~~

@@ -2,9 +2,9 @@
   "description": "Should output console.log on contract creation event if it doesn't revert",
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
-      "imports": ["/../../../../../../../../console.sol"],
+      "imports": ["@theqrl/hardhat/console.hyp"],
       "consoleLogs": [["C"]]
     }
   ]

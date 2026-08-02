@@ -100,6 +100,17 @@ export class TransactionExecutionError extends BuidlerEVMProviderError {
   }
 }
 
+export class QrlExecutionError extends InvalidInputError {
+  constructor(
+    message: string,
+    public readonly data?: string,
+    public readonly transactionHash?: string,
+    public readonly traceFrame?: any
+  ) {
+    super(message);
+  }
+}
+
 export class MethodNotSupportedError extends BuidlerEVMProviderError {
   public static readonly CODE = -32004;
 

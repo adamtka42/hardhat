@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import debug from "debug";
 import fsExtra from "fs-extra";
 import path from "path";
 
@@ -7,19 +8,23 @@ import {
   saveArtifact,
 } from "../internal/artifacts";
 import {
-  SOLC_INPUT_FILENAME,
-  SOLC_OUTPUT_FILENAME,
+  COMPILER_INPUT_FILENAME,
+  COMPILER_OUTPUT_FILENAME,
 } from "../internal/constants";
 import { internalTask, task, types } from "../internal/core/config/config-env";
-import { BuidlerError } from "../internal/core/errors";
+import { HardhatError } from "../internal/core/errors";
 import { ERRORS } from "../internal/core/errors-list";
-import { Compiler } from "../internal/solidity/compiler";
-import { getInputFromDependencyGraph } from "../internal/solidity/compiler/compiler-input";
-import { DependencyGraph } from "../internal/solidity/dependencyGraph";
-import { Resolver } from "../internal/solidity/resolver";
+import { Compiler } from "../internal/hyperion/compiler";
+import {
+  getInputFromDependencyGraph,
+  HyperionInput,
+} from "../internal/hyperion/compiler-input";
+import { getVersionMismatchWarning } from "../internal/hyperion/compiler-version";
+import { DependencyGraph } from "../internal/hyperion/dependencyGraph";
+import { Resolver } from "../internal/hyperion/resolver";
 import { glob } from "../internal/util/glob";
 import { pluralize } from "../internal/util/strings";
-import { ResolvedBuidlerConfig, SolcInput } from "../types";
+import { ResolvedHardhatConfig } from "../types";
 
 import {
   TASK_BUILD_ARTIFACTS,
@@ -32,10 +37,16 @@ import {
   TASK_COMPILE_GET_SOURCE_PATHS,
   TASK_COMPILE_RUN_COMPILER,
 } from "./task-names";
-import { areArtifactsCached, cacheBuidlerConfig } from "./utils/cache";
+import { areArtifactsCached, cacheHardhatConfig } from "./utils/cache";
 
-async function cacheSolcJsonFiles(
-  config: ResolvedBuidlerConfig,
+const log = debug("buidler:core:tasks:compile");
+
+function createCompiler(config: ResolvedHardhatConfig): Compiler {
+  return new Compiler(config.hyperion, config.paths.root, config.paths.cache);
+}
+
+async function cacheCompilerJsonFiles(
+  config: ResolvedHardhatConfig,
   input: any,
   output: any
 ) {
@@ -43,7 +54,7 @@ async function cacheSolcJsonFiles(
 
   // TODO: This could be much better. It feels somewhat hardcoded
   await fsExtra.writeFile(
-    path.join(config.paths.cache, SOLC_INPUT_FILENAME),
+    path.join(config.paths.cache, COMPILER_INPUT_FILENAME),
     JSON.stringify(input, undefined, 2),
     {
       encoding: "utf8",
@@ -51,7 +62,7 @@ async function cacheSolcJsonFiles(
   );
 
   await fsExtra.writeFile(
-    path.join(config.paths.cache, SOLC_OUTPUT_FILENAME),
+    path.join(config.paths.cache, COMPILER_OUTPUT_FILENAME),
     JSON.stringify(output, undefined, 2),
     {
       encoding: "utf8",
@@ -70,7 +81,7 @@ function isConsoleLogError(error: any): boolean {
 
 export default function () {
   internalTask(TASK_COMPILE_GET_SOURCE_PATHS, async (_, { config }) => {
-    return glob(path.join(config.paths.sources, "**/*.sol"));
+    return glob(path.join(config.paths.sources, "**/*.hyp"));
   });
 
   internalTask(
@@ -101,8 +112,7 @@ export default function () {
 
     return getInputFromDependencyGraph(
       dependencyGraph,
-      config.solc.optimizer,
-      config.solc.evmVersion
+      config.hyperion.optimizer
     );
   });
 
@@ -113,86 +123,132 @@ export default function () {
       undefined,
       types.json
     )
-    .setAction(async ({ input }: { input: SolcInput }, { config }) => {
-      const compiler = new Compiler(
-        config.solc.version,
-        path.join(config.paths.cache, "compilers")
-      );
-
-      return compiler.compile(input);
-    });
-
-  internalTask(TASK_COMPILE_COMPILE, async (_, { config, run }) => {
-    const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
-
-    console.log("Compiling...");
-    const output = await run(TASK_COMPILE_RUN_COMPILER, { input });
-
-    let hasErrors = false;
-    let hasConsoleLogErrors = false;
-    if (output.errors) {
-      for (const error of output.errors) {
-        hasErrors = hasErrors || error.severity === "error";
-        if (error.severity === "error") {
-          hasErrors = true;
-
-          if (isConsoleLogError(error)) {
-            hasConsoleLogErrors = true;
-          }
-
-          console.error(chalk.red(error.formattedMessage));
-        } else {
-          console.log("\n");
-          console.warn(chalk.yellow(error.formattedMessage));
-        }
+    .setAction(
+      async (
+        { input, compiler }: { input: HyperionInput; compiler?: Compiler },
+        { config }
+      ) => {
+        return (compiler ?? createCompiler(config)).compile(input);
       }
-    }
-
-    if (hasConsoleLogErrors) {
-      console.error(
-        chalk.red(
-          `The console.log call you made isn’t supported. See https://buidler.dev/console-log for the list of supported methods.`
-        )
-      );
-      console.log();
-    }
-
-    if (hasErrors || !output.contracts) {
-      throw new BuidlerError(ERRORS.BUILTIN_TASKS.COMPILE_FAILURE);
-    }
-
-    await cacheSolcJsonFiles(config, input, output);
-
-    await cacheBuidlerConfig(config.paths, config.solc);
-
-    return output;
-  });
-
-  internalTask(TASK_COMPILE_CHECK_CACHE, async ({ force }, { config, run }) => {
-    if (force) {
-      return false;
-    }
-
-    const dependencyGraph: DependencyGraph = await run(
-      TASK_COMPILE_GET_DEPENDENCY_GRAPH
     );
 
-    const sourceTimestamps = dependencyGraph
-      .getResolvedFiles()
-      .map((file) => file.lastModificationDate.getTime());
+  internalTask(
+    TASK_COMPILE_COMPILE,
+    async ({ compiler }: { compiler?: Compiler }, { config, run }) => {
+      const selectedCompiler = compiler ?? createCompiler(config);
+      const input = await run(TASK_COMPILE_GET_COMPILER_INPUT);
 
-    return areArtifactsCached(sourceTimestamps, config.solc, config.paths);
-  });
+      console.log("Compiling...");
+      const output = await run(TASK_COMPILE_RUN_COMPILER, {
+        input,
+        compiler: selectedCompiler,
+      });
+
+      let hasErrors = false;
+      let hasConsoleLogErrors = false;
+      if (output.errors) {
+        for (const error of output.errors) {
+          hasErrors = hasErrors || error.severity === "error";
+          if (error.severity === "error") {
+            hasErrors = true;
+
+            if (isConsoleLogError(error)) {
+              hasConsoleLogErrors = true;
+            }
+
+            console.error(chalk.red(error.formattedMessage));
+          } else {
+            console.log("\n");
+            console.warn(chalk.yellow(error.formattedMessage));
+          }
+        }
+      }
+
+      if (hasConsoleLogErrors) {
+        console.error(
+          chalk.red(
+            `The console.log call you made isn’t supported. See the QRL Hardhat documentation for the list of supported methods.`
+          )
+        );
+        console.log();
+      }
+
+      if (hasErrors || !output.contracts) {
+        throw new HardhatError(ERRORS.BUILTIN_TASKS.COMPILE_FAILURE);
+      }
+
+      await cacheCompilerJsonFiles(config, input, output);
+
+      await cacheHardhatConfig(
+        config.paths,
+        config.hyperion,
+        (await selectedCompiler.getCompiler()).identity
+      );
+
+      return output;
+    }
+  );
+
+  internalTask(
+    TASK_COMPILE_CHECK_CACHE,
+    async (
+      { force, compiler }: { force: boolean; compiler?: Compiler },
+      { config, run }
+    ) => {
+      if (force) {
+        return false;
+      }
+
+      const selectedCompiler = compiler ?? createCompiler(config);
+
+      // The dependency graph includes every transitively imported file, so
+      // changes to imported libraries (e.g. under node_modules) also
+      // invalidate the cache, not just changes to project-local sources.
+      const dependencyGraph: DependencyGraph = await run(
+        TASK_COMPILE_GET_DEPENDENCY_GRAPH
+      );
+
+      const sourceTimestamps = dependencyGraph
+        .getResolvedFiles()
+        .map((file) => file.lastModificationDate.getTime());
+
+      return areArtifactsCached(
+        sourceTimestamps,
+        config.hyperion,
+        config.paths,
+        (await selectedCompiler.getCompiler()).identity
+      );
+    }
+  );
 
   internalTask(TASK_BUILD_ARTIFACTS, async ({ force }, { config, run }) => {
     const sources = await run(TASK_COMPILE_GET_SOURCE_PATHS);
 
     if (sources.length === 0) {
-      console.log("No Solidity source file available.");
+      console.log("No Hyperion source file available.");
       return;
     }
 
-    const isCached: boolean = await run(TASK_COMPILE_CHECK_CACHE, { force });
+    const compiler = createCompiler(config);
+    const resolvedCompiler = await compiler.getCompiler();
+    log(
+      "Resolved %s hypc %s at %s",
+      resolvedCompiler.source,
+      resolvedCompiler.longVersion ?? "(version not detected)",
+      resolvedCompiler.path
+    );
+    const versionWarning = getVersionMismatchWarning(
+      config.hyperion.version,
+      resolvedCompiler
+    );
+    if (versionWarning !== undefined) {
+      console.warn(chalk.yellow(versionWarning));
+    }
+
+    const isCached: boolean = await run(TASK_COMPILE_CHECK_CACHE, {
+      force,
+      compiler,
+    });
 
     if (isCached) {
       console.log(
@@ -201,7 +257,7 @@ export default function () {
       return;
     }
 
-    const compilationOutput = await run(TASK_COMPILE_COMPILE);
+    const compilationOutput = await run(TASK_COMPILE_COMPILE, { compiler });
 
     if (compilationOutput === undefined) {
       return;

@@ -2,12 +2,12 @@ import { assert } from "chai";
 import path from "path";
 
 import { TASK_CLEAN } from "../../../../src/builtin-tasks/task-names";
-import { BuidlerContext } from "../../../../src/internal/context";
+import { HardhatContext } from "../../../../src/internal/context";
 import { loadConfigAndTasks } from "../../../../src/internal/core/config/config-loading";
 import { ERRORS } from "../../../../src/internal/core/errors-list";
-import { resetBuidlerContext } from "../../../../src/internal/reset";
+import { resetHardhatContext } from "../../../../src/internal/reset";
 import { useEnvironment } from "../../../helpers/environment";
-import { expectBuidlerError } from "../../../helpers/errors";
+import { expectHardhatError } from "../../../helpers/errors";
 import {
   getFixtureProjectPath,
   useFixtureProject,
@@ -19,10 +19,12 @@ describe("config loading", function () {
     useEnvironment();
 
     it("should load the default config if none is given", function () {
-      assert.isDefined(this.env.config.networks.localhost);
-      assert.deepEqual(this.env.config.networks.localhost.accounts, [
-        "0xa95f9e3e7ae4e4865c5968828fe7c03fffa8a9f3bb52d36d26243f4c868ee166",
-      ]);
+      assert.isDefined(this.env.config.networks.qrl);
+      assert.equal(this.env.config.defaultNetwork, "custom");
+      assert.equal(
+        (this.env.config.networks.qrl as any).url,
+        "http://127.0.0.1:33462"
+      );
     });
   });
 
@@ -31,15 +33,15 @@ describe("config loading", function () {
       useFixtureProject("invalid-config");
 
       beforeEach(function () {
-        BuidlerContext.createBuidlerContext();
+        HardhatContext.createHardhatContext();
       });
 
       afterEach(function () {
-        resetBuidlerContext();
+        resetHardhatContext();
       });
 
       it("Should throw the right error", function () {
-        expectBuidlerError(
+        expectHardhatError(
           () => loadConfigAndTasks(),
           ERRORS.GENERAL.INVALID_CONFIG
         );
@@ -51,11 +53,11 @@ describe("config loading", function () {
     useFixtureProject("custom-config-file");
 
     beforeEach(function () {
-      BuidlerContext.createBuidlerContext();
+      HardhatContext.createHardhatContext();
     });
 
     afterEach(function () {
-      resetBuidlerContext();
+      resetHardhatContext();
     });
 
     it("should accept a relative path from the CWD", function () {
@@ -104,13 +106,13 @@ describe("config loading", function () {
     useFixtureProject("config-project");
 
     afterEach(function () {
-      resetBuidlerContext();
+      resetHardhatContext();
     });
 
     it("should remove everything from global state after loading", function () {
       const globalAsAny: any = global;
 
-      BuidlerContext.createBuidlerContext();
+      HardhatContext.createHardhatContext();
       loadConfigAndTasks();
 
       assert.isUndefined(globalAsAny.internalTask);
@@ -119,9 +121,9 @@ describe("config loading", function () {
       assert.isUndefined(globalAsAny.extendEnvironment);
       assert.isUndefined(globalAsAny.usePlugin);
 
-      resetBuidlerContext();
+      resetHardhatContext();
 
-      BuidlerContext.createBuidlerContext();
+      HardhatContext.createHardhatContext();
       loadConfigAndTasks();
 
       assert.isUndefined(globalAsAny.internalTask);
@@ -129,7 +131,7 @@ describe("config loading", function () {
       assert.isUndefined(globalAsAny.types);
       assert.isUndefined(globalAsAny.extendEnvironment);
       assert.isUndefined(globalAsAny.usePlugin);
-      resetBuidlerContext();
+      resetHardhatContext();
     });
   });
 
@@ -137,15 +139,15 @@ describe("config loading", function () {
     useFixtureProject("config-imports-lib-project");
 
     beforeEach(function () {
-      BuidlerContext.createBuidlerContext();
+      HardhatContext.createHardhatContext();
     });
 
     afterEach(function () {
-      resetBuidlerContext();
+      resetHardhatContext();
     });
 
     it("should accept a relative path from the CWD", function () {
-      expectBuidlerError(
+      expectHardhatError(
         () => loadConfigAndTasks(),
         ERRORS.GENERAL.LIB_IMPORTED_FROM_THE_CONFIG
       );

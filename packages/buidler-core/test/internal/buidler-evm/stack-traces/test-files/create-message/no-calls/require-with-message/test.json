@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "params": [],
       "stackTrace": [
@@ -10,7 +10,7 @@
           "message": "req",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "constructor",
             "line": 12
           }

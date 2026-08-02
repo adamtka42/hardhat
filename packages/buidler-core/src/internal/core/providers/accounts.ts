@@ -1,207 +1,151 @@
-import { Transaction as TransactionT } from "ethereumjs-tx";
+import path from "path";
 
-import { IEthereumProvider } from "../../../types";
-import { deriveKeyFromMnemonicAndPath } from "../../util/keys-derivation";
-import { BuidlerError } from "../errors";
+import { IQrlProvider } from "../../../types";
+import { loadQrlJsTxRuntime } from "../../buidler-evm/provider/runtime";
+import {
+  isValidQrlAddress,
+  normalizeQrlAddress,
+  qrlAddressFromSeed,
+  qrlAddressToBytes,
+} from "../../qrl/address";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 import { createChainIdGetter } from "./provider-utils";
 import { wrapSend } from "./wrapper";
 
-// This library's types are wrong, they don't type check
-// tslint:disable-next-line no-var-requires
-const ethSigUtil = require("eth-sig-util");
-
 export interface JsonRpcTransactionData {
   from?: string;
   to?: string;
   gas?: string | number;
+  gasLimit?: string | number;
   gasPrice?: string | number;
+  maxFeePerGas?: string | number;
+  maxPriorityFeePerGas?: string | number;
   value?: string | number;
   data?: string;
   nonce?: string | number;
+  chainId?: string | number;
 }
 
-const HD_PATH_REGEX = /^m(:?\/\d+'?)+\/?$/;
+const ML_DSA_87_DESCRIPTOR = new Uint8Array([0x01, 0x00, 0x00]);
+const EMPTY_EXTRA_PARAMS = new Uint8Array();
+const HEX_DATA_REGEX = /^(0x)?[0-9a-fA-F]*$/;
 
 export function createLocalAccountsProvider(
-  provider: IEthereumProvider,
-  hexPrivateKeys: string[]
+  provider: IQrlProvider,
+  extendedSeeds: string[]
 ) {
-  const {
-    bufferToHex,
-    toBuffer,
-    privateToAddress,
-  } = require("ethereumjs-util");
-
-  const privateKeys = hexPrivateKeys.map((h) => toBuffer(h));
-  const addresses = privateKeys.map((pk) => bufferToHex(privateToAddress(pk)));
+  const seeds = [...extendedSeeds];
+  const addresses = seeds.map(qrlAddressFromSeed);
 
   const getChainId = createChainIdGetter(provider);
 
-  function getPrivateKey(address: string): Buffer | undefined {
-    for (let i = 0; i < address.length; i++) {
-      if (addresses[i] === address.toLowerCase()) {
-        return privateKeys[i];
+  function getSeed(address: string): string | undefined {
+    for (let i = 0; i < addresses.length; i++) {
+      if (addresses[i].toLowerCase() === address.toLowerCase()) {
+        return seeds[i];
       }
     }
   }
 
   return wrapSend(provider, async (method: string, params: any[]) => {
-    const { ecsign, hashPersonalMessage, toRpcSig } = await import(
-      "ethereumjs-util"
-    );
-
-    if (method === "eth_accounts" || method === "eth_requestAccounts") {
+    if (method === "qrl_accounts" || method === "qrl_requestAccounts") {
       return [...addresses];
     }
 
-    if (method === "eth_sign") {
+    if (method === "qrl_sign") {
       const [address, data] = params;
 
       if (address !== undefined) {
+        validateTransactionAddress(address);
+
         if (data === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.ETHSIGN_MISSING_DATA_PARAM);
+          throw new HardhatError(ERRORS.NETWORK.QRLSIGN_MISSING_DATA_PARAM);
         }
 
-        const privateKey = getPrivateKey(address);
+        validateHexData(data);
 
-        if (privateKey === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+        const seed = getSeed(address);
+
+        if (seed === undefined) {
+          throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
             account: address,
           });
         }
 
-        const messageHash = hashPersonalMessage(toBuffer(data));
-
-        const signature = ecsign(messageHash, privateKey);
-        return toRpcSig(signature.v, signature.r, signature.s);
+        return signQrlMessage(data, seed);
       }
     }
 
-    if (method === "eth_signTypedData") {
-      const [address, data] = params;
-
-      if (address !== undefined) {
-        if (data === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.ETHSIGN_MISSING_DATA_PARAM);
-        }
-
-        const privateKey = getPrivateKey(address);
-
-        if (privateKey === undefined) {
-          throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
-            account: address,
-          });
-        }
-
-        return ethSigUtil.signTypedData_v4(privateKey, {
-          data,
-        });
-      }
-    }
-
-    if (method === "eth_sendTransaction" && params.length > 0) {
+    if (method === "qrl_sendTransaction" && params.length > 0) {
       const tx: JsonRpcTransactionData = params[0];
 
-      if (tx.gas === undefined) {
-        throw new BuidlerError(
+      if (tx.gas === undefined && tx.gasLimit === undefined) {
+        throw new HardhatError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
           { param: "gas" }
         );
       }
 
-      if (tx.gasPrice === undefined) {
-        throw new BuidlerError(
+      if (tx.maxFeePerGas === undefined && tx.gasPrice === undefined) {
+        throw new HardhatError(
           ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
-          { param: "gasPrice" }
+          { param: "maxFeePerGas" }
+        );
+      }
+
+      if (tx.maxPriorityFeePerGas === undefined && tx.gasPrice === undefined) {
+        throw new HardhatError(
+          ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
+          { param: "maxPriorityFeePerGas" }
+        );
+      }
+
+      validateTransactionAddress(tx.from);
+      validateTransactionAddress(tx.to);
+
+      if (tx.from === undefined) {
+        throw new HardhatError(
+          ERRORS.NETWORK.MISSING_TX_PARAM_TO_SIGN_LOCALLY,
+          { param: "from" }
         );
       }
 
       if (tx.nonce === undefined) {
-        tx.nonce = await provider.send("eth_getTransactionCount", [
+        tx.nonce = await provider.send("qrl_getTransactionCount", [
           tx.from,
           "pending",
         ]);
       }
 
-      const privateKey = getPrivateKey(tx.from!);
+      const seed = getSeed(tx.from);
 
-      if (privateKey === undefined) {
-        throw new BuidlerError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
+      if (seed === undefined) {
+        throw new HardhatError(ERRORS.NETWORK.NOT_LOCAL_ACCOUNT, {
           account: tx.from,
         });
       }
 
       const chainId = await getChainId();
 
-      const rawTransaction = await getSignedTransaction(
-        tx,
-        chainId,
-        privateKey
-      );
+      const rawTransaction = await getSignedTransaction(tx, chainId, seed);
 
-      return provider.send("eth_sendRawTransaction", [
-        bufferToHex(rawTransaction),
-      ]);
+      return provider.send("qrl_sendRawTransaction", [rawTransaction]);
     }
 
     return provider.send(method, params);
   });
 }
 
-export function createHDWalletProvider(
-  provider: IEthereumProvider,
-  mnemonic: string,
-  hdpath: string = "m/44'/60'/0'/0/",
-  initialIndex: number = 0,
-  count: number = 10
-) {
-  if (hdpath.match(HD_PATH_REGEX) === null) {
-    throw new BuidlerError(ERRORS.NETWORK.INVALID_HD_PATH, { path: hdpath });
-  }
-
-  if (!hdpath.endsWith("/")) {
-    hdpath += "/";
-  }
-
-  const privateKeys: Buffer[] = [];
-
-  for (let i = initialIndex; i < initialIndex + count; i++) {
-    const privateKey = deriveKeyFromMnemonicAndPath(
-      mnemonic,
-      hdpath + i.toString()
-    );
-
-    if (privateKey === undefined) {
-      throw new BuidlerError(ERRORS.NETWORK.CANT_DERIVE_KEY, {
-        mnemonic,
-        path: hdpath,
-      });
-    }
-
-    privateKeys.push(privateKey);
-  }
-
-  const { bufferToHex } = require("ethereumjs-util");
-
-  return createLocalAccountsProvider(
-    provider,
-    privateKeys.map((pk) => bufferToHex(pk))
-  );
-}
-
-export function createSenderProvider(
-  provider: IEthereumProvider,
-  from?: string
-) {
-  let addresses = from === undefined ? undefined : [from];
+export function createSenderProvider(provider: IQrlProvider, from?: string) {
+  let addresses = from === undefined ? undefined : [normalizeQrlAddress(from)];
 
   return wrapSend(provider, async (method: string, params: any[]) => {
     if (
-      method === "eth_sendTransaction" ||
-      method === "eth_call" ||
-      method === "eth_estimateGas"
+      method === "qrl_sendTransaction" ||
+      method === "qrl_call" ||
+      method === "qrl_estimateGas"
     ) {
       const tx: JsonRpcTransactionData = params[0];
 
@@ -210,9 +154,14 @@ export function createSenderProvider(
 
         if (senderAccount !== undefined) {
           tx.from = senderAccount;
-        } else if (method === "eth_sendTransaction") {
-          throw new BuidlerError(ERRORS.NETWORK.NO_REMOTE_ACCOUNT_AVAILABLE);
+        } else if (method === "qrl_sendTransaction") {
+          throw new HardhatError(ERRORS.NETWORK.NO_REMOTE_ACCOUNT_AVAILABLE);
         }
+      }
+
+      if (tx !== undefined) {
+        validateTransactionAddress(tx.from);
+        validateTransactionAddress(tx.to);
       }
     }
 
@@ -224,39 +173,174 @@ export function createSenderProvider(
       return addresses;
     }
 
-    addresses = (await provider.send("eth_accounts")) as string[];
+    addresses = ((await provider.send("qrl_accounts")) as string[]).map(
+      normalizeQrlAddress
+    );
     return addresses;
+  }
+}
+
+function validateTransactionAddress(address: string | undefined) {
+  if (address !== undefined && !isValidQrlAddress(address)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_QRL_ADDRESS, { address });
+  }
+}
+
+function validateHexData(value: string) {
+  if (typeof value !== "string" || !HEX_DATA_REGEX.test(value)) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_HEX_DATA, { value });
+  }
+
+  const normalized =
+    value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+  if (normalized.length % 2 !== 0) {
+    throw new HardhatError(ERRORS.NETWORK.INVALID_HEX_DATA, { value });
   }
 }
 
 async function getSignedTransaction(
   tx: JsonRpcTransactionData,
   chainId: number,
-  privateKey: Buffer
-): Promise<Buffer> {
-  const chains = require("ethereumjs-common/dist/chains");
+  seed: string
+): Promise<string> {
+  const transaction = createQrlDynamicFeeTransaction(tx, chainId);
 
-  const { Transaction } = await import("ethereumjs-tx");
-  let transaction: TransactionT;
-
-  if (chains.chains.names[chainId] !== undefined) {
-    transaction = new Transaction(tx, { chain: chainId });
-  } else {
-    const { default: Common } = await import("ethereumjs-common");
-
-    const common = Common.forCustomChain(
-      "mainnet",
-      {
-        chainId,
-        networkId: chainId,
-      },
-      "istanbul"
-    );
-
-    transaction = new Transaction(tx, { common });
+  if (isQrlJsTransaction(transaction)) {
+    return signQrlJsTransaction(transaction, seed);
   }
 
-  transaction.sign(privateKey);
+  const { signTransaction } = require("@theqrl/web3-qrl-accounts");
+  const signed = await signTransaction(transaction, seed);
+  return signed.rawTransaction;
+}
 
-  return transaction.serialize();
+function createQrlDynamicFeeTransaction(
+  tx: JsonRpcTransactionData,
+  chainId: number
+): any {
+  const data = tx.data ?? "0x";
+
+  validateHexData(data);
+
+  const qrlJsTransaction = createQrlJsDynamicFeeTransaction(tx, chainId, data);
+  if (qrlJsTransaction !== undefined) {
+    return qrlJsTransaction;
+  }
+
+  const { FeeMarketEIP1559Transaction } = require("@theqrl/web3-qrl-accounts");
+  const to = tx.to === undefined ? undefined : qrlAddressToBytes(tx.to);
+
+  return FeeMarketEIP1559Transaction.fromTxData({
+    type: "0x2",
+    chainId: tx.chainId ?? chainId,
+    nonce: tx.nonce,
+    gasLimit: tx.gasLimit ?? tx.gas,
+    maxFeePerGas: tx.maxFeePerGas ?? tx.gasPrice,
+    maxPriorityFeePerGas: tx.maxPriorityFeePerGas ?? tx.gasPrice,
+    to,
+    value: tx.value,
+    data,
+    accessList: [],
+  });
+}
+
+function createQrlJsDynamicFeeTransaction(
+  tx: JsonRpcTransactionData,
+  chainId: number,
+  data: string
+): any | undefined {
+  const txQrl = loadQrlJsTxRuntime();
+
+  if (txQrl === undefined) {
+    return undefined;
+  }
+
+  return new txQrl.QRLDynamicFeeTransaction({
+    chainId: toBigInt(tx.chainId ?? chainId),
+    nonce: toBigInt(tx.nonce),
+    gasLimit: toBigInt(tx.gasLimit ?? tx.gas),
+    gasFeeCap: toBigInt(tx.maxFeePerGas ?? tx.gasPrice),
+    gasTipCap: toBigInt(tx.maxPriorityFeePerGas ?? tx.gasPrice),
+    to: tx.to,
+    value: toBigInt(tx.value ?? 0),
+    data: hexDataToBytes(data),
+    descriptor: ML_DSA_87_DESCRIPTOR,
+    extraParams: EMPTY_EXTRA_PARAMS,
+  });
+}
+
+function isQrlJsTransaction(transaction: any): boolean {
+  return (
+    transaction !== undefined &&
+    typeof transaction.serialize === "function" &&
+    typeof transaction.getMessageToSign === "function" &&
+    typeof transaction._processAuthValues !== "function"
+  );
+}
+
+function signQrlJsTransaction(transaction: any, seed: string): string {
+  const wallet = newQrlWalletFromSeed(seed);
+  const signature = wallet.sign(transaction.getMessageToSign());
+  return serializeQrlJsSignedTransaction(
+    transaction,
+    signature,
+    wallet.getPK()
+  );
+}
+
+function serializeQrlJsSignedTransaction(
+  transaction: any,
+  signature: Uint8Array,
+  publicKey: Uint8Array
+): string {
+  const signed = new transaction.constructor({
+    chainId: transaction.chainId,
+    nonce: transaction.nonce,
+    gasLimit: transaction.gasLimit,
+    gasFeeCap: transaction.gasFeeCap,
+    gasTipCap: transaction.gasTipCap,
+    to: transaction.to,
+    value: transaction.value,
+    data: transaction.data,
+    accessList: transaction.accessList,
+    descriptor: ML_DSA_87_DESCRIPTOR,
+    extraParams: EMPTY_EXTRA_PARAMS,
+    signature,
+    publicKey,
+  });
+
+  return `0x${Buffer.from(signed.serialize()).toString("hex")}`;
+}
+
+function newQrlWalletFromSeed(seed: string): any {
+  const accountsEntry = require.resolve("@theqrl/web3-qrl-accounts");
+  const { newMLDSA87WalletFromExtendedSeed } = require(path.join(
+    path.dirname(accountsEntry),
+    "qrl_wallet.js"
+  ));
+
+  return newMLDSA87WalletFromExtendedSeed(hexDataToBytes(seed));
+}
+
+function toBigInt(value: string | number | undefined): any {
+  if (value === undefined) {
+    return (global as any).BigInt(0);
+  }
+
+  return (global as any).BigInt(value);
+}
+
+function hexDataToBytes(value: string): Uint8Array {
+  const normalized =
+    value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+  return Uint8Array.from(Buffer.from(normalized, "hex"));
+}
+
+function seedToQrlAccount(seed: string): any {
+  const { seedToAccount } = require("@theqrl/web3-qrl-accounts");
+  return seedToAccount(seed);
+}
+
+function signQrlMessage(data: string, seed: string): string {
+  return seedToQrlAccount(seed).sign(data).signature;
 }

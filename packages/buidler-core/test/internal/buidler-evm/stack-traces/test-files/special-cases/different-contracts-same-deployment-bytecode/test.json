@@ -2,7 +2,7 @@
   "description": "Should clash create bytecodes and resolve to D",
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "stackTrace": [
         {
@@ -10,7 +10,7 @@
           "message": "C and D have the same deployment bytecode because they always fail and get recognized as D",
           "sourceReference": {
             "contract": "D",
-            "file": "d.sol",
+            "file": "d.hyp",
             "function": "constructor",
             "line": 5
           }

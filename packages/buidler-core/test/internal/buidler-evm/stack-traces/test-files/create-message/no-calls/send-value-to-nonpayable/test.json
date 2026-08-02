@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "value": 1,
       "stackTrace": [
@@ -9,7 +9,7 @@
           "type": "FUNCTION_NOT_PAYABLE_ERROR",
           "value": 1,
           "sourceReference": {
-            "file": "c.sol",
+            "file": "c.hyp",
             "contract": "C",
             "function": "constructor",
             "line": 5

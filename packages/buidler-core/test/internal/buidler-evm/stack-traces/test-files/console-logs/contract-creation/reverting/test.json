@@ -2,15 +2,15 @@
   "description": "Should output console.log on contract creation event if it reverts",
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
-      "imports": ["/../../../../../../../../console.sol"],
+      "imports": ["@theqrl/hardhat/console.hyp"],
       "consoleLogs": [["C"]],
       "stackTrace": [
         {
           "type": "REVERT_ERROR",
           "sourceReference": {
-            "file": "c.sol",
+            "file": "c.hyp",
             "contract": "C",
             "function": "constructor",
             "line": 9

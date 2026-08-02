@@ -1,70 +1,180 @@
-# Using the Buidler console
+# Using the Hardhat console
 
-Budiler comes built-in with an interactive JavaScript console. You can use it by running `npx buidler console`:
-```
-$ npx buidler console
-All contracts have already been compiled, skipping compilation.
->
-```
+QRL Hardhat includes an interactive JavaScript console. It starts a Node.js REPL
+with the Hardhat Runtime Environment loaded, so you can inspect configuration,
+query QRL JSON-RPC methods, and interact with deployed Hyperion contracts.
 
-The `compile` task will be called before opening the console prompt, but you can skip this with the `--no-compile` parameter.
+Run it with:
 
-The execution environment for the console is the same as for tasks. This means the configuration has been processed, and the [Buidler Runtime Environment] initialized and injected into the global scope. For example, that you'll have access in the global scope to the `config` object:
-```
-> config
-{ defaultNetwork: 'buidlerevm',
-  solc:
-   { version: '0.5.8', optimizer: { enabled: false, runs: 200 } },
-  
-  ...
- 
-}
->
-```
+~~~sh
+npx hardhat console --network hardhatqrlvm
+~~~
 
-And the initialized `ethers` object if you're using the `buidler-ethers` plugin:
-```
-> ethers
-{ provider:
-   EthersProviderWrapper {
-       
-  ...
+or against an HTTP go-qrl network:
 
-  },
-  getContract: [AsyncFunction: getContract],
-  signers: [AsyncFunction: signers] }
->
-```
+~~~sh
+QRL_RPC_URL=http://127.0.0.1:33462 \
+QRL_ACCOUNT_SEED=<qrl-extended-seed> \
+npx hardhat console --network qrl
+~~~
 
-And the `artifacts` object if you're using the `buidler-truffle5` plugin, and so on. 
+The console runs the `compile` task before opening the prompt. Skip compilation
+with `--no-compile`:
 
-Anything that has been injected into the [Buidler Runtime Environment] will be magically available in the global scope, or if you're the more explicit kind of developer, you can also require the BRE explicitly and get autocomplete:
+~~~sh
+npx hardhat console --network hardhatqrlvm --no-compile
+~~~
 
-```
-> const buidler = require("@nomiclabs/buidler")
+## Runtime globals
+
+The console has the same runtime globals as tasks, tests, and scripts:
+
+- `config`
+- `hardhatArguments`
+- `network`
+- `run`
+- `tasks`
+- `qrl`
+
+For example:
+
+~~~js
+> network.name
+'hardhatqrlvm'
+> config.defaultNetwork
+'hardhatqrlvm'
+~~~
+
+If you prefer explicit imports, require the runtime:
+
+~~~js
+> const hre = require("@theqrl/hardhat")
 undefined
-> buidler.
-buidler.__defineGetter__      buidler.__defineSetter__      buidler.__lookupGetter__      buidler.__lookupSetter__      buidler.__proto__
-buidler.hasOwnProperty        buidler.isPrototypeOf         buidler.propertyIsEnumerable  buidler.toLocaleString        buidler.toString
-buidler.valueOf
+> hre.network.name
+'hardhatqrlvm'
+~~~
 
-buidler._runTaskDefinition    buidler.constructor           buidler.injectToGlobal
+## Querying QRL JSON-RPC
 
-buidler._extenders            buidler.buidlerArguments      buidler.config                buidler.ethereum              buidler.ethers
-buidler.network               buidler.run                   buidler.tasks
+Use `network.provider.send` for direct `qrl_*` JSON-RPC calls:
 
->
-```
+~~~js
+> await network.provider.send("qrl_chainId")
+'0x1'
+> await network.provider.send("qrl_accounts")
+[
+  'Q01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101'
+]
+~~~
 
-You will also notice that the console has the handy history feature you expect out of most interactive terminals, including across different sessions. Try it by pressing the up arrow key.
+Some go-qrl methods require the same parameters they require over HTTP. For
+example, include a block tag when querying balances:
 
-### Asynchronous operations and top-level await
+~~~js
+> const [from] = await network.provider.send("qrl_accounts")
+undefined
+> await network.provider.send("qrl_getBalance", [from, "latest"])
+['0x3635c9adc5dea00000']
+~~~
 
-Interacting with the Ethereum network and your smart contracts are asynchronous operations, hence most APIs and libraries
-use JavaScript's `Promise` for returning values.   
+## Interacting with contracts
 
-To make things easier, Buidler's console supports `await` top-level await (i.e. `console.log(await web3.eth.getBalance()`). To use this feature, you need to be using Node 10 or higher.
+Attach to a deployed contract with `qrl.getContractAt`:
 
-For any help or feedback you may have, you can find us in the [Buidler Support Telegram group](http://t.me/BuidlerSupport).
+~~~js
+> const token = await qrl.getContractAt("Token", process.env.TOKEN_ADDRESS)
+undefined
+> await token.name()
+'My QRL Token'
+~~~
 
-[Buidler Runtime Environment]: ../advanced/buidler-runtime-environment.md
+Read-only method aliases perform a call and unwrap a single output to a
+scalar:
+
+~~~js
+> const balance = await token.balanceOf(from)
+undefined
+> balance.toString(10)
+'1000000'
+~~~
+
+State-changing aliases send a transaction and return a transaction response
+with a receipt-polling `wait()`:
+
+~~~js
+> const tx = await token.transfer(process.env.RECIPIENT, 1)
+undefined
+> await tx.wait(300000)
+{
+  transactionHash: '0x...',
+  status: '0x1',
+  ...
+}
+~~~
+
+The explicit low-level maps are still available: `token.callStatic.name()`
+always returns a decoded array, and `token.functions.transfer(...)` returns a
+transaction hash string.
+
+For overloaded ABI functions, use the full signature:
+
+~~~js
+> await resolver.callStatic["addr(bytes32)"](node)
+> await resolver.functions["setAddr(bytes32,address)"](node, recipient, { from })
+~~~
+
+## Deploying from the console
+
+You can deploy contracts directly from the console while experimenting:
+
+~~~js
+> const Token = await qrl.getContractFactory("Token")
+undefined
+> const token = await Token.deploy()
+undefined
+> token.address
+'Q...'
+> token.deployTransactionHash
+'0x...'
+~~~
+
+`deploy()` waits for the deployment receipt and returns a ready-to-use
+contract wrapper. The sender defaults to the network's `from` config or the
+first `qrl_accounts` account.
+
+For repeatable deployments, prefer a script in `scripts/` and run it with
+`npx hardhat run`. See [Writing scripts](scripts.md).
+
+## Console history
+
+The console stores command history in:
+
+~~~text
+cache/console-history.txt
+~~~
+
+The file is local development state and should not be committed.
+
+## Troubleshooting
+
+If `hardhatqrlvm` cannot start, first check whether a development override
+(`QRLJS_MONOREPO_PATH` / `qrlJsMonorepoPath`) is set but invalid — unset it or
+build the checkout it points to. If no override is set, the bundled runtime in
+the installed package may be corrupted; reinstall the package:
+
+~~~sh
+npm install @theqrl/hardhat --force
+npx hardhat console --network hardhatqrlvm
+~~~
+
+If an HTTP network cannot connect, verify `QRL_RPC_URL` with `qrl_chainId`:
+
+~~~sh
+curl -s -X POST "$QRL_RPC_URL" \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","method":"qrl_chainId","params":[],"id":1}'
+~~~
+
+For more common failures, see
+[Common problems](../troubleshooting/common-problems.md).
+

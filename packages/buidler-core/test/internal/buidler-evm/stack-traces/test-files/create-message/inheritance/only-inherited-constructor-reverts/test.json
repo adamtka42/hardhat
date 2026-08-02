@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "stackTrace": [
         {
@@ -9,7 +9,7 @@
           "message": "D failed",
           "sourceReference": {
             "contract": "C",
-            "file": "d.sol",
+            "file": "d.hyp",
             "function": "constructor",
             "line": 5
           }

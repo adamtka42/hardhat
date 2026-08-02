@@ -1,61 +1,126 @@
 # Verbose logging
 
-You can enable Buidler's verbose mode by running it with its `--verbose` flag, or by setting the `BUIDLER_VERBOSE` environment variable to `true`.
+Use verbose logging when a QRL Hardhat command fails before the real error is
+visible, or when you need to collect enough context to debug a network,
+configuration, plugin, or task issue.
 
-This mode will print a lot of output that can be super useful for debugging. An example of Buidler run in verbose mode is:
+## CLI flags
 
-```
-pato@pmbp:asd% npx buidler --verbose
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/internal/core/tasks/builtin-tasks +0ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/clean +3ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/compile +2ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/console +53ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/flatten +3ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/help +1ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/run +2ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-core/builtin-tasks/test +1ms
-  buidler:core:plugins Loading plugin @nomiclabs/buidler-truffle5 +2ms
-  buidler:core:plugins Buidler is linked, searching for plugin starting from CWD /private/tmp/asd +0ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-truffle5/dist/index.js +5ms
-  buidler:core:plugins Loading plugin @nomiclabs/buidler-web3 +60ms
-  buidler:core:plugins Buidler is linked, searching for plugin starting from CWD /private/tmp/asd +0ms
-  buidler:core:plugins Loading plugin file /Users/pato/projects/buidler/buidler/packages/buidler-web3/dist/index.js +0ms
-  buidler:core:analytics Computing Project Id for /private/tmp/asd +0ms
-  buidler:core:analytics Project Id set to acce19ef71fcff30788e87c9d69ca4d0a5aee84c8f8cf696183a21b788730078 +1ms
-  buidler:core:analytics Looking up Client Id at /Users/pato/.buidler/config.json +1ms
-  buidler:core:analytics Client Id found: 61cf5dde-8c57-447b-bfe0-d57bdd80ab68 +1ms
-  buidler:core:bre Creating BuidlerRuntimeEnvironment +0ms
-  buidler:core:bre Running task help +1ms
-Buidler version 1.0.0
+Run any Hardhat command with `--verbose`:
 
-Usage: buidler [GLOBAL OPTIONS] <TASK> [TASK OPTIONS]
+~~~sh
+npx hardhat --verbose compile
+npx hardhat --verbose test --network hardhatqrlvm
+QRL_RPC_URL=http://127.0.0.1:33462 npx hardhat --verbose test --network qrl
+~~~
 
-GLOBAL OPTIONS:
+`--verbose` enables the internal `debug` logger for namespaces matching
+`hardhat*`. The current core namespaces include:
 
-  --config              A Buidler config file.
-  --emoji               Use emoji in messages.
-  --help                Shows this message, or a task's help if its name is provided
-  --max-memory          The maximum amount of memory that Buidler can use.
-  --network             The network to connect to.
-  --show-stack-traces   Show stack traces.
-  --verbose             Enables Buidler verbose logging
-  --version             Shows buidler's version.
+- `hardhat:core:cli`
+- `hardhat:core:bre`
+- `hardhat:core:plugins`
+- `hardhat:core:execution-mode`
+- `hardhat:core:scripts-runner`
 
+The exact namespaces that appear depend on the command path.
 
-AVAILABLE TASKS:
+Use `--show-stack-traces` when the compact Hardhat error message is not enough:
 
-  clean         Clears the cache and deletes all artifacts
-  compile       Compiles the entire project, building all artifacts
-  console       Opens a buidler console
-  flatten       Flattens and prints all contracts and their dependencies
-  help          Prints this message
-  run           Runs a user-defined script after compiling the project
-  sample-task   A sample Buidler task
-  test          Runs mocha tests
+~~~sh
+npx hardhat --show-stack-traces test --network hardhatqrlvm
+npx hardhat --verbose --show-stack-traces run scripts/deploy.js --network qrl
+~~~
 
-To get help for a specific task run: npx buidler help [task]
+## DEBUG environment variable
 
-  buidler:core:cli Killing Buidler after successfully running task help +0ms
-```
+QRL Hardhat uses the `debug` package internally, so you can enable the same logs
+with `DEBUG`:
 
-Buidler uses the [debug](https://github.com/visionmedia/debug) package to manage logging. The `DEBUG` environment variable that can be used to turn on the verbose logging and filter it using a simple wildcard pattern.
+~~~sh
+DEBUG=hardhat* npx hardhat test --network hardhatqrlvm
+DEBUG=hardhat:core:* npx hardhat compile
+DEBUG=hardhat:core:bre npx hardhat run scripts/deploy.js --network qrl
+~~~
+
+Use `--verbose` for the broad default. Use `DEBUG` when you want a narrower
+namespace while debugging a specific area.
+
+## HARDHAT environment variables
+
+CLI parameters can also be set with `HARDHAT_` environment variables:
+
+~~~sh
+HARDHAT_VERBOSE=true npx hardhat test --network hardhatqrlvm
+HARDHAT_SHOW_STACK_TRACES=true npx hardhat test --network hardhatqrlvm
+HARDHAT_NETWORK=hardhatqrlvm npx hardhat test
+HARDHAT_MAX_MEMORY=4096 npx hardhat compile
+~~~
+
+Boolean values should be written as `true` or `false`.
+
+Do not rely on old `BUIDLER_*` environment variables. This fork uses
+`HARDHAT_*` for Hardhat CLI parameters.
+
+## RPC debugging
+
+`--verbose` shows Hardhat internals, but the HTTP provider does not dump raw
+JSON-RPC request and response bodies. For endpoint problems, verify the node
+directly:
+
+~~~sh
+curl -s -X POST "$QRL_RPC_URL" \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","method":"qrl_chainId","params":[],"id":1}'
+~~~
+
+Check accounts before testing deployment or transactions:
+
+~~~sh
+curl -s -X POST "$QRL_RPC_URL" \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","method":"qrl_accounts","params":[],"id":1}'
+~~~
+
+If the endpoint is a private go-qrl network, also check the node logs. Hardhat
+can report connection and RPC errors, but the node logs are the source of truth
+for server-side rejection details.
+
+## hardhatqrlvm debugging
+
+`hardhatqrlvm` uses the QRL runtime bundled with the installed package, or a
+built `qrljs-monorepo` checkout when the development override is set. If it
+fails before tests start, run with verbose logging to see which runtime
+source was selected:
+
+~~~sh
+npx hardhat --verbose --show-stack-traces test --network hardhatqrlvm
+~~~
+
+For `BDLR123`, verbose output can confirm that Hardhat is creating a `hardhatqrlvm`
+provider. The fix depends on the runtime source: if a development override
+(`QRLJS_MONOREPO_PATH` / `networks.<network>.qrlJsMonorepoPath`) is set,
+unset it or build the checkout it points to; without an override, the bundled
+runtime in the installed package may be corrupted — reinstall the package.
+
+## Capturing output
+
+Redirect both stdout and stderr when sharing logs:
+
+~~~sh
+npx hardhat --verbose --show-stack-traces test --network hardhatqrlvm \
+  > hardhat-qrlvm.log 2>&1
+
+QRL_RPC_URL=http://127.0.0.1:33462 \
+npx hardhat --verbose --show-stack-traces test --network qrl \
+  > hardhat-qrl-http.log 2>&1
+~~~
+
+Review logs before sharing or committing them. They can contain local paths,
+RPC URLs, account addresses, and other environment-specific details.
+
+## Warnings are not verbose logs
+
+Node.js deprecation warnings and npm update notices are not controlled by
+`--verbose`. If tests pass and only those notices are printed, treat them as
+toolchain warnings rather than Hardhat debug output.

@@ -1,29 +1,39 @@
 ---
 prev: false
 ---
-![Teacher Buidler](/buidler_tutorial.svg)
-# Buidler's tutorial for beginners
 
-Welcome to our beginners guide to Ethereum contracts and dApp development. This tutorial is aimed at hackathon participants who are getting setup to quickly build something from scratch.
+# QRL Hardhat tutorial for beginners
 
-To orchestrate this process we're going to use **Buidler**, which is a task runner that facilitates building on Ethereum. It helps developers manage and automate the recurring tasks that are inherent to the process of building smart contracts and dApps, as well as easily introducing more functionality around this workflow. This means compiling and testing at the very core.
+Welcome to this beginner guide to QRL smart contract development. This
+tutorial is aimed at developers who want to get a small Hyperion contract
+compiled, tested, and deployed with QRL Hardhat.
 
-**Buidler** also comes built-in with **Buidler EVM**, a local Ethereum network designed for development. It allows you to deploy your contracts, run your tests and debug your code.
+To orchestrate this process we are going to use **QRL Hardhat**, a QRL-only
+smart contract development toolchain based on the upstream Hardhat/Buidler
+codebase. It helps developers manage recurring tasks like compiling contracts,
+running tests, writing deployment scripts, and connecting to local or remote QRL
+networks.
 
-In this tutorial we'll guide you through:
-- Setting up your Node.js environment for Ethereum development
-- Creating and configuring a **Buidler** project
-- The basics of a Solidity smart contract that implements a token
-- Writing automated tests for your contract using [Ethers.js](https://docs.ethers.io/ethers.js/html/) and [Waffle](https://getwaffle.io/)
-- Debugging Solidity with `console.log()` using **Buidler EVM**
-- Deploying your contract to **Buidler EVM** and Ethereum testnets
+QRL Hardhat also includes **hardhatqrlvm**, an in-process QRL VM network designed
+for development. It lets you deploy contracts, run tests, and call contracts
+without starting a go-qrl node.
 
- To follow this tutorial you should be able to:
+In this tutorial we will guide you through:
 
-  - Write code in [JavaScript](https://developer.mozilla.org/en-US/docs/Learn/Getting_started_with_the_web/JavaScript_basics)
-  - Operate a [terminal](https://en.wikipedia.org/wiki/Terminal_emulator)
-  - Use [git](https://git-scm.com/doc)
-  - Understand the basics of how [smart contracts](https://ethereum.org/learn/#smart-contracts) work
-  - Set up a [Metamask](https://metamask.io/) wallet 
+- Setting up your Node.js environment for QRL development
+- Creating and configuring a QRL Hardhat project
+- The basics of a Hyperion smart contract that implements a simple token
+- Writing automated tests for your contract using `hre.qrl` and Mocha
+- Debugging tests and scripts with hardhatqrlvm and verbose logging
+- Deploying your contract to hardhatqrlvm and an HTTP go-qrl network
 
-If you can't do any of the above, follow the links and take some time to get learn the basics.
+To follow this tutorial you should be able to:
+
+- Write code in JavaScript
+- Operate a terminal
+- Use git
+- Understand the basics of how smart contracts work
+- Run or connect to a QRL development network when deploying outside hardhatqrlvm
+
+If you cannot do any of the above, take some time to learn the basics first.
+

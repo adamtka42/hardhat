@@ -1,128 +1,169 @@
-import { BN } from "ethereumjs-util";
-import * as t from "io-ts";
+import { InvalidArgumentsError, MethodNotFoundError } from "../errors";
+import { rpcAddress, validateParams } from "../input";
+import { HardhatNode, MineBlockOptions } from "../node";
+import { bufferToRpcData, numberToRpcQuantity } from "../output";
 
-import {
-  InvalidInputError,
-  MethodNotFoundError,
-  MethodNotSupportedError,
-} from "../errors";
-import { rpcQuantity, validateParams } from "../input";
-import { BuidlerNode } from "../node";
-import { numberToRpcQuantity } from "../output";
+export interface EvmModuleConfig {
+  addressFromBytes: (value: Uint8Array) => any;
+}
 
-// tslint:disable only-buidler-error
+// tslint:disable only-hardhat-error
 
 export class EvmModule {
-  constructor(private readonly _node: BuidlerNode) {}
+  constructor(
+    private readonly _node: HardhatNode,
+    private readonly _config: EvmModuleConfig
+  ) {}
 
   public async processRequest(
     method: string,
     params: any[] = []
   ): Promise<any> {
     switch (method) {
-      case "evm_increaseTime":
+      case "qrl_increaseTime":
         return this._increaseTimeAction(...this._increaseTimeParams(params));
 
-      case "evm_setNextBlockTimestamp":
+      case "qrl_setNextBlockTimestamp":
         return this._setNextBlockTimestampAction(
           ...this._setNextBlockTimestampParams(params)
         );
 
-      case "evm_mine":
+      case "qrl_mine":
         return this._mineAction(...this._mineParams(params));
 
-      case "evm_revert":
+      case "qrl_revert":
         return this._revertAction(...this._revertParams(params));
 
-      case "evm_snapshot":
+      case "qrl_snapshot":
         return this._snapshotAction(...this._snapshotParams(params));
     }
 
     throw new MethodNotFoundError(`Method ${method} not found`);
   }
 
-  // evm_setNextBlockTimestamp
+  // qrl_setNextBlockTimestamp
 
-  private _setNextBlockTimestampParams(params: any[]): [number] {
-    return validateParams(params, t.number);
+  private _setNextBlockTimestampParams(params: any[]): [bigint] {
+    return [parseSingleQuantity(params, "timestamp")];
   }
 
   private async _setNextBlockTimestampAction(
-    timestamp: number
+    timestamp: bigint
   ): Promise<string> {
-    const latestBlock = await this._node.getLatestBlock();
-    const increment = new BN(timestamp).sub(
-      new BN(latestBlock.header.timestamp)
-    );
-    if (increment.lte(new BN(0))) {
-      throw new InvalidInputError(
-        `Timestamp ${timestamp} is lower than previous block's timestamp` +
-          `${new BN(latestBlock.header.timestamp).toNumber()}`
-      );
+    try {
+      await this._node.setNextBlockTimestamp(timestamp);
+    } catch (error) {
+      throw new InvalidArgumentsError((error as Error).message);
     }
-    await this._node.setNextBlockTimestamp(new BN(timestamp));
     return timestamp.toString();
   }
 
-  // evm_increaseTime
+  // qrl_increaseTime
 
-  private _increaseTimeParams(params: any[]): [number] {
-    return validateParams(params, t.number);
+  private _increaseTimeParams(params: any[]): [bigint] {
+    return [parseSingleQuantity(params, "seconds")];
   }
 
-  private async _increaseTimeAction(increment: number): Promise<string> {
-    await this._node.increaseTime(new BN(increment));
-    const totalIncrement = await this._node.getTimeIncrement();
-    // This RPC call is an exception: it returns a number in decimal
-    return totalIncrement.toString();
-  }
-
-  // evm_mine
-
-  private _mineParams(params: any[]): [number] {
-    if (params.length === 0) {
-      params.push(0);
+  private async _increaseTimeAction(increment: bigint): Promise<string> {
+    try {
+      return (await this._node.increaseTime(increment)).toString();
+    } catch (error) {
+      throw new InvalidArgumentsError((error as Error).message);
     }
-    return validateParams(params, t.number);
   }
 
-  private async _mineAction(timestamp: number): Promise<string> {
-    // if timestamp is specified, make sure it is bigger than previous
-    // block's timestamp
-    if (timestamp !== 0) {
-      const latestBlock = await this._node.getLatestBlock();
-      const increment = new BN(timestamp).sub(
-        new BN(latestBlock.header.timestamp)
+  // qrl_mine
+
+  private _mineParams(params: any[]): [MineBlockOptions] {
+    if (params.length > 1) {
+      throw new InvalidArgumentsError(
+        "qrl_mine expects at most one options object"
       );
-      if (increment.lte(new BN(0))) {
-        throw new InvalidInputError(
-          `Timestamp ${timestamp} is lower than previous block's timestamp` +
-            `${new BN(latestBlock.header.timestamp).toNumber()}`
-        );
-      }
     }
-    await this._node.mineEmptyBlock(new BN(timestamp));
-    return numberToRpcQuantity(0);
+    if (params.length === 0 || params[0] === undefined) {
+      return [{}];
+    }
+    const options = params[0];
+    if (
+      typeof options !== "object" ||
+      options === null ||
+      Array.isArray(options)
+    ) {
+      throw new InvalidArgumentsError("qrl_mine options must be an object");
+    }
+
+    return [
+      {
+        timestamp: parseOptionalQuantity(options.timestamp, "timestamp"),
+        gasLimit: parseOptionalQuantity(options.gasLimit, "gasLimit"),
+        baseFee: parseOptionalQuantity(options.baseFee, "baseFee"),
+        coinbase:
+          options.coinbase === undefined
+            ? undefined
+            : this._config.addressFromBytes(
+                validateParams([options.coinbase], rpcAddress)[0]
+              ),
+      },
+    ];
   }
 
-  // evm_revert
-
-  private _revertParams(params: any[]): [BN] {
-    return validateParams(params, rpcQuantity);
+  private async _mineAction(options: MineBlockOptions): Promise<string> {
+    const block = await this._node.mineBlock(options);
+    return bufferToRpcData(block.hash());
   }
 
-  private async _revertAction(snapshotId: BN): Promise<boolean> {
-    return this._node.revertToSnapshot(snapshotId.toNumber());
+  // qrl_revert
+
+  private _revertParams(params: any[]): [bigint] {
+    return [parseSingleQuantity(params, "snapshot id")];
   }
 
-  // evm_snapshot
+  private async _revertAction(snapshotId: bigint): Promise<boolean> {
+    return this._node.revertToSnapshot(snapshotId);
+  }
+
+  // qrl_snapshot
 
   private _snapshotParams(params: any[]): [] {
-    return [];
+    return validateParams(params);
   }
 
   private async _snapshotAction(): Promise<string> {
-    const snapshotId = await this._node.takeSnapshot();
-    return numberToRpcQuantity(snapshotId);
+    return numberToRpcQuantity(await this._node.takeSnapshot());
   }
+}
+
+function parseSingleQuantity(params: any[], name: string): bigint {
+  if (params.length !== 1) {
+    throw new InvalidArgumentsError(`Expected one ${name} argument`);
+  }
+  return parseQrlControlQuantity(params[0], name);
+}
+
+function parseOptionalQuantity(
+  value: unknown,
+  name: string
+): bigint | undefined {
+  return value === undefined ? undefined : parseQrlControlQuantity(value, name);
+}
+
+function parseQrlControlQuantity(value: unknown, name: string): bigint {
+  if (typeof value === "bigint") {
+    // tslint:disable-next-line:strict-comparisons
+    if (value >= (global as any).BigInt(0)) {
+      return value;
+    }
+  } else if (typeof value === "number") {
+    if (Number.isSafeInteger(value) && value >= 0) {
+      return (global as any).BigInt(value);
+    }
+  } else if (typeof value === "string") {
+    if (/^0x[0-9a-fA-F]+$/.test(value) || /^[0-9]+$/.test(value)) {
+      return (global as any).BigInt(value);
+    }
+  }
+
+  throw new InvalidArgumentsError(
+    `QRL ${name} must be a non-negative integer or quantity`
+  );
 }

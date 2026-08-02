@@ -27,11 +27,10 @@ export const ERROR_RANGES = {
     max: 499,
     title: "Dependencies resolution errors",
   },
-  SOLC: { min: 500, max: 599, title: "Solidity related errors" },
   BUILTIN_TASKS: { min: 600, max: 699, title: "Built-in tasks errors" },
   ARTIFACTS: { min: 700, max: 799, title: "Artifacts related errors" },
   PLUGINS: { min: 800, max: 899, title: "Plugin system errors" },
-  INTERNAL: { min: 900, max: 999, title: "Internal Buidler errors" },
+  INTERNAL: { min: 900, max: 999, title: "Internal Hardhat errors" },
 };
 
 export const ERRORS: {
@@ -42,98 +41,98 @@ export const ERRORS: {
   GENERAL: {
     NOT_INSIDE_PROJECT: {
       number: 1,
-      message: "You are not inside a Buidler project.",
-      title: "You are not inside a Buidler project",
-      description: `You are trying to run Buidler outside of a Buidler project.
+      message: "You are not inside a Hardhat project.",
+      title: "You are not inside a Hardhat project",
+      description: `You are trying to run Hardhat outside of a Hardhat project.
 
-You can learn hoy to use Buidler by reading the [Getting Started guide](./README.md).`,
+You can learn how to use Hardhat by reading the [Getting Started guide](./README.md).`,
     },
     INVALID_NODE_VERSION: {
       number: 2,
       message:
-        "Buidler doesn't support your Node.js version. It should be %requirement%.",
+        "Hardhat doesn't support your Node.js version. It should be %requirement%.",
       title: "Unsupported Node.js",
-      description: `Buidler doesn't support your Node.js version. 
+      description: `Hardhat doesn't support your Node.js version.
 
 Please upgrade your version of Node.js and try again.`,
     },
     UNSUPPORTED_OPERATION: {
       number: 3,
-      message: "%operation% is not supported in Buidler.",
+      message: "%operation% is not supported in Hardhat.",
       title: "Unsupported operation",
-      description: `You are tying to perform an unsupported operation. 
+      description: `You are tying to perform an unsupported operation.
 
-Unless you are creating a task or plugin, this is probably a bug. 
+Unless you are creating a task or plugin, this is probably a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_ALREADY_CREATED: {
       number: 4,
-      message: "BuidlerContext is already created.",
-      title: "Buidler was already initialized",
-      description: `Buidler initialization was executed twice. This is a bug.
+      message: "HardhatContext is already created.",
+      title: "Hardhat was already initialized",
+      description: `Hardhat initialization was executed twice. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_NOT_CREATED: {
       number: 5,
-      message: "BuidlerContext is not created.",
-      title: "Buidler wasn't initialized",
-      description: `Buidler initialization failed. This is a bug.
+      message: "HardhatContext is not created.",
+      title: "Hardhat wasn't initialized",
+      description: `Hardhat initialization failed. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_BRE_NOT_DEFINED: {
       number: 6,
       message:
-        "Buidler Runtime Environment is not defined in the BuidlerContext.",
-      title: "Buidler Runtime Environment not created",
-      description: `Buidler initialization failed. This is a bug.
+        "Hardhat Runtime Environment is not defined in the HardhatContext.",
+      title: "Hardhat Runtime Environment not created",
+      description: `Hardhat initialization failed. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     CONTEXT_BRE_ALREADY_DEFINED: {
       number: 7,
       message:
-        "Buidler Runtime Environment is already defined in the BuidlerContext",
-      title: "Tried to create the Buidler Runtime Environment twice",
-      description: `The Buidler initialization process was executed twice. This is a bug.
+        "Hardhat Runtime Environment is already defined in the HardhatContext",
+      title: "Tried to create the Hardhat Runtime Environment twice",
+      description: `The Hardhat initialization process was executed twice. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     INVALID_CONFIG: {
       number: 8,
       message: `There's one or more errors in your config file:
 
 %errors%
-  
-To learn more about Buidler's configuration, please go to https://buidler.dev/config/`,
-      title: "Invalid Buidler config",
-      description: `You have one or more errors in your config file. 
-      
-Check the error message for details, or go to [documentation](https://buidler.dev/config/) to learn more.`,
+
+To learn more about Hardhat's configuration, please go to the QRL Hardhat configuration documentation`,
+      title: "Invalid Hardhat config",
+      description: `You have one or more errors in your config file.
+
+Check the error message for details, or go to the configuration documentation to learn more.`,
     },
     LIB_IMPORTED_FROM_THE_CONFIG: {
       number: 9,
-      message: `Error while loading Buidler's configuration.
-You probably imported @nomiclabs/buidler instead of @nomiclabs/buidler/config`,
+      message: `Error while loading Hardhat's configuration.
+You probably imported @theqrl/hardhat instead of @theqrl/hardhat/config`,
       title: "Failed to load config file",
-      description: `There was an error while loading your config file. 
+      description: `There was an error while loading your config file.
 
-The most common source of errors is trying to import \`@nomiclabs/buidler\` instead of \`@nomiclabs/buidler/config\`.
+The most common source of errors is trying to import \`@theqrl/hardhat\` instead of \`@theqrl/hardhat/config\`.
 
 Please make sure your config file is correct.`,
     },
     USER_CONFIG_MODIFIED: {
       number: 10,
-      message: `Error while loading Buidler's configuration.
+      message: `Error while loading Hardhat's configuration.
 You or one of your plugins is trying to modify the userConfig.%path% value from a config extender`,
       title: "Attempted to modify the user's config",
       description: `An attempt to modify the user's config was made.
 
 This is probably a bug in one of your plugins.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
   },
   NETWORK: {
@@ -141,34 +140,34 @@ Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us i
       number: 100,
       message: "Network %network% doesn't exist",
       title: "Selected network doesn't exist",
-      description: `You are trying to run Buidler with a non-existent network. 
+      description: `You are trying to run Hardhat with a non-existent network.
 
-Read the [documentation](https://buidler.dev/config/#networks-configuration) to learn how to define custom networks.`,
+Read the network configuration documentation to learn how to define custom networks.`,
     },
     INVALID_GLOBAL_CHAIN_ID: {
       number: 101,
       message:
-        "Buidler was set to use chain id %configChainId%, but connected to a chain with id %connectionChainId%.",
+        "Hardhat was set to use chain id %configChainId%, but connected to a chain with id %connectionChainId%.",
       title: "Connected to the wrong network",
-      description: `Your config specifies a chain id for the network you are trying to used, but Buidler detected anotherone. 
+      description: `Your config specifies a chain id for the network you are trying to use, but Hardhat detected another one.
 
 Please make sure you are setting your config correctly.`,
     },
-    /* DEPRECATED: This error only happened because of a misconception in Buidler */
+    /* DEPRECATED: This error only happened because of a misconception in Hardhat */
     DEPRECATED_INVALID_TX_CHAIN_ID: {
       number: 102,
       message:
-        "Trying to send a tx with chain id %txChainId%, but Buidler is connected to a chain with id %chainId%.",
+        "Trying to send a tx with chain id %txChainId%, but Hardhat is connected to a chain with id %chainId%.",
       title: "Incorrectly send chainId in a transaction",
-      description: `Buidler sent the \`chainId\` field in a transaction. 
+      description: `Hardhat sent the \`chainId\` field in a transaction.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
-    ETHSIGN_MISSING_DATA_PARAM: {
+    QRLSIGN_MISSING_DATA_PARAM: {
       number: 103,
-      message: 'Missing "data" param when calling eth_sign.',
-      title: "Missing `data` param when calling eth_sign.",
-      description: `You called \`eth_sign\` with incorrect parameters.
+      message: 'Missing "data" param when calling qrl_sign.',
+      title: "Missing `data` param when calling qrl_sign.",
+      description: `You called \`qrl_sign\` with incorrect parameters.
 
 Please check that you are sending a \`data\` parameter.`,
     },
@@ -177,8 +176,8 @@ Please check that you are sending a \`data\` parameter.`,
       message:
         "Account %account% is not managed by the node you are connected to.",
       title: "Unrecognized account",
-      description: `You are trying to send a transaction or sign some data with an 
-account not managed by your Ethereum node nor Buidler.  
+      description: `You are trying to send a transaction or sign some data with an
+account not managed by your QRL node nor Hardhat.
 
 Please double check your accounts and the \`from\` parameter in your RPC calls.`,
     },
@@ -186,8 +185,8 @@ Please double check your accounts and the \`from\` parameter in your RPC calls.`
       number: 105,
       message: "Missing param %param% from a tx being signed locally.",
       title: "Missing transaction parameter",
-      description: `You are trying to send a transaction with a locally managed 
-account, and some parameters are missing. 
+      description: `You are trying to send a transaction with a locally managed
+account, and some parameters are missing.
 
 Please double check your transactions' parameters.`,
     },
@@ -196,27 +195,27 @@ Please double check your transactions' parameters.`,
       message:
         "No local account was set and there are accounts in the remote node.",
       title: "No remote accounts available",
-      description: `No local account was set and there are accounts in the remote node. 
+      description: `No local account was set and there are accounts in the remote node.
 
-Please make sure that your Ethereum node has unlocked accounts.`,
+Please make sure that your QRL node has unlocked accounts.`,
     },
     INVALID_HD_PATH: {
       number: 107,
       message:
         "HD path %path% is invalid. Read about BIP32 to know about the valid forms.",
       title: "Invalid HD path",
-      description: `An invalid HD/BIP32 derivation path was provided in your config.  
-      
-Read the [documentation](https://buidler.dev/config/#hd-wallet-config) to learn how to define HD accounts correctly.`,
+      description: `An invalid HD/BIP32 derivation path was provided in your config.
+
+Read the accounts configuration documentation to learn how to define HD accounts correctly.`,
     },
     INVALID_RPC_QUANTITY_VALUE: {
       number: 108,
       message:
         "Received invalid value `%value%` from/to the node's JSON-RPC, but a Quantity was expected.",
       title: "Invalid JSON-RPC value",
-      description: `One of your transactions sent or received an invalid JSON-RPC QUANTITY value. 
+      description: `One of your transactions sent or received an invalid JSON-RPC QUANTITY value.
 
-Please double check your calls' parameters and keep your Ethereum node up to date.`,
+Please double check your calls' parameters and keep your QRL node up to date.`,
     },
     NODE_IS_NOT_RUNNING: {
       number: 109,
@@ -240,18 +239,133 @@ Please make sure your node is running, and check your internet connection and ne
       number: 111,
       message: "Invalid JSON-RPC response received: %response%",
       title: "Invalid JSON-RPC response",
-      description: `One of your JSON-RPC requests received an invalid response. 
+      description: `One of your JSON-RPC requests received an invalid response.
 
 Please make sure your node is running, and check your internet connection and networks config.`,
     },
-    CANT_DERIVE_KEY: {
+    DEPLOYMENT_FAILED: {
       number: 112,
       message:
-        "Cannot derive key %path% from mnemonic '%mnemonic%.\nTry using another mnemonic or deriving less keys.",
-      title: "Could not derive an HD key",
-      description: `One of your HD keys could not be derived. 
+        "Contract deployment transaction %txHash% failed with status %status%.",
+      title: "Contract deployment failed",
+      description: `A contract deployment transaction was mined, but its receipt reports failure.`,
+    },
+    MISSING_CONTRACT_ADDRESS: {
+      number: 113,
+      message:
+        "Contract deployment transaction %txHash% did not return a contract address.",
+      title: "Missing contract address",
+      description: `A contract deployment transaction was mined, but its receipt didn't include a contract address.`,
+    },
+    INVALID_QRL_ADDRESS: {
+      number: 115,
+      message: "Invalid QRL address %address%.",
+      title: "Invalid QRL address",
+      description: `A QRL address must use the Q prefix followed by 128 hexadecimal characters.`,
+    },
+    INVALID_HEX_DATA: {
+      number: 116,
+      message: "Invalid hex data %value%.",
+      title: "Invalid hex data",
+      description: `QRL transaction data and bytecode values must be hexadecimal strings, optionally prefixed with 0x.`,
+    },
+    INVALID_QRL_ABI: {
+      number: 117,
+      message: "Invalid QRL ABI operation: %message%.",
+      title: "Invalid QRL ABI operation",
+      description: `The requested QRL contract ABI operation can't be encoded or decoded.`,
+    },
+    LEGACY_ETH_RPC_UNSUPPORTED: {
+      number: 121,
+      message: "Legacy eth_* JSON-RPC method %method% is not supported.",
+      title: "Unsupported legacy JSON-RPC method",
+      description: `This project is QRL-only. Use the equivalent qrl_* JSON-RPC method instead.`,
+    },
+    QRLJS_MONOREPO_UNAVAILABLE: {
+      number: 123,
+      message:
+        "Cannot load the QRL runtime from %path%: %message%. Installed packages include a bundled runtime; when networks.%network%.qrlJsMonorepoPath / QRLJS_MONOREPO_PATH is set it must point to a BUILT qrljs-monorepo checkout and is never silently ignored. When running Hardhat from its source tree, either set the override or generate the bundle with scripts/bundle-qrljs-runtime.js.",
+      title: "QRL runtime is unavailable",
+      description: `The hardhatqrlvm provider loads the QRL VM from the runtime bundled with the installed package, or from a locally built qrljs-monorepo checkout when the development override (QRLJS_MONOREPO_PATH / qrlJsMonorepoPath) is set. Fix the override, regenerate the bundle, or choose an HTTP network like qrl.`,
+    },
+    TRANSACTION_RECEIPT_MISMATCH: {
+      number: 122,
+      message:
+        "Transaction receipt hash mismatch. Expected %expected%, got %actual%.",
+      title: "Transaction receipt hash mismatch",
+      description: `The QRL node returned a transaction receipt for a different transaction hash than the one Hardhat requested.`,
+    },
+    MISSING_QRL_SENDER: {
+      number: 124,
+      message:
+        "No sender account available for the transaction on network %network%. Pass an explicit `from`, set `networks.%network%.from` in your config, or use a network that exposes accounts through qrl_accounts.",
+      title: "No QRL sender account available",
+      description: `Hardhat couldn't resolve a default sender for a transaction sent through an ergonomic contract helper.
 
-Try using another mnemonic or deriving less keys.`,
+The default sender is resolved in this order: the transaction's own \`from\` field, the network's \`from\` config field, and finally the first account returned by \`qrl_accounts\`.`,
+    },
+    UNLINKED_BYTECODE: {
+      number: 125,
+      message:
+        "The bytecode of contract %contractName% has unresolved library references: %libraries%. Pass their deployed addresses through the `libraries` option.",
+      title: "Unresolved library references",
+      description: `The contract uses one or more external libraries whose addresses were not provided at deployment time.
+
+Deploy the libraries first and pass their addresses, e.g. \`qrl.getContractFactory("MyContract", { libraries: { MyLib: "Q..." } })\`.`,
+    },
+    LINKING_UNKNOWN_LIBRARY: {
+      number: 126,
+      message:
+        "Contract %contractName% does not need library %library%. Needed libraries: %libraries%.",
+      title: "Unknown library provided for linking",
+      description: `A library address was provided for a library that the contract's bytecode does not reference.
+
+Double check the library name; both the bare name and the fully qualified \`file.hyp:Library\` form are accepted.`,
+    },
+    LINKING_AMBIGUOUS_LIBRARY: {
+      number: 127,
+      message:
+        "The library name %library% is ambiguous for contract %contractName%. It matches: %candidates%. Use the fully qualified name.",
+      title: "Ambiguous library name for linking",
+      description: `Two or more libraries referenced by the contract share the same bare name.
+
+Use the fully qualified \`file.hyp:Library\` form to disambiguate.`,
+    },
+    LINKING_INVALID_ADDRESS: {
+      number: 128,
+      message:
+        "Invalid address %address% provided for library %library% of contract %contractName%.",
+      title: "Invalid library address for linking",
+      description: `The address provided for a library is not a valid QRL address.
+
+QRL addresses start with \`Q\` followed by 128 hex characters.`,
+    },
+    LINKING_PLACEHOLDER_MISMATCH: {
+      number: 129,
+      message:
+        "The bytecode of contract %contractName% does not contain the expected link placeholder for library %library% at offset %offset%. The artifact may be corrupted or produced by an incompatible compiler.",
+      title: "Link reference placeholder mismatch",
+      description: `A link reference reported by the compiler does not point at a \`__$...$__\` placeholder in the bytecode.
+
+Recompile the project with a matching hypc build; if the problem persists, report it.`,
+    },
+    LINKING_CONFLICTING_ADDRESSES: {
+      number: 131,
+      message:
+        "Library %library% of contract %contractName% was given two different addresses (via its bare and fully qualified names).",
+      title: "Conflicting library addresses for linking",
+      description: `The same library was provided twice — through its bare name and its fully qualified name — with different addresses.
+
+Remove one of the entries or make the addresses identical.`,
+    },
+    INVALID_INITIAL_DATE: {
+      number: 130,
+      message:
+        "Invalid initialDate %value%. Use an ISO 8601 date string, e.g. 2026-01-01T00:00:00Z.",
+      title: "Invalid initialDate network config value",
+      description: `The \`initialDate\` value of the \`hardhatqrlvm\` network could not be parsed as a date.
+
+Use an ISO 8601 date string, e.g. \`2026-01-01T00:00:00Z\`.`,
     },
   },
   TASK_DEFINITIONS: {
@@ -260,8 +374,8 @@ Try using another mnemonic or deriving less keys.`,
       message:
         "Could not set positional param %paramName% for task %taskName% because there is already a variadic positional param and it has to be the last positional one.",
       title: "Could not add positional param",
-      description: `Could add a positional param to your task because 
-there is already a variadic positional param and it has to be the last 
+      description: `Could add a positional param to your task because
+there is already a variadic positional param and it has to be the last
 positional one.
 
 Please double check your task definitions.`,
@@ -272,16 +386,16 @@ Please double check your task definitions.`,
         "Could not set param %paramName% for task %taskName% because its name is already used.",
       title: "Repeated param name",
       description: `Could not add a param to your task because its name is already used.
-      
+
 Please double check your task definitions.`,
     },
-    PARAM_CLASHES_WITH_BUIDLER_PARAM: {
+    PARAM_CLASHES_WITH_HARDHAT_PARAM: {
       number: 202,
       message:
-        "Could not set param %paramName% for task %taskName% because its name is used as a param for Buidler.",
-      title: "Buidler and task param names clash",
-      description: `Could not add a param to your task because its name is used as a param for Buidler.
-      
+        "Could not set param %paramName% for task %taskName% because its name is used as a param for Hardhat.",
+      title: "Hardhat and task param names clash",
+      description: `Could not add a param to your task because its name is used as a param for Hardhat.
+
 Please double check your task definitions.`,
     },
     MANDATORY_PARAM_AFTER_OPTIONAL: {
@@ -290,7 +404,7 @@ Please double check your task definitions.`,
         "Could not set param %paramName% for task %taskName% because it is mandatory and it was added after an optional positional param.",
       title: "Optional param followed by a required one",
       description: `Could not add param to your task because it is required and it was added after an optional positional param.
-      
+
 Please double check your task definitions.`,
     },
     OVERRIDE_NO_PARAMS: {
@@ -340,7 +454,7 @@ Please, double check your task definitions.`,
       number: 205,
       message: "No action set for task %taskName%.",
       title: "Tried to run task without an action",
-      description: `A task was run, but it has no action set.  
+      description: `A task was run, but it has no action set.
 
 Please double check your task definitions.`,
     },
@@ -349,7 +463,7 @@ Please double check your task definitions.`,
       message:
         "Tried to call runSuper from a non-overridden definition of task %taskName%",
       title: "`runSuper` not available",
-      description: `You tried to call \`runSuper\` from a non-overridden task. 
+      description: `You tried to call \`runSuper\` from a non-overridden task.
 
 Please use \`runSuper.isDefined\` to make sure that you can call it.`,
     },
@@ -358,7 +472,7 @@ Please use \`runSuper.isDefined\` to make sure that you can call it.`,
       message:
         "Default value for param %paramName% of task %taskName% doesn't match the default one, try specifying it.",
       title: "Default value has incorrect type",
-      description: `One of your tasks has a parameter whose default value doesn't match the expected type. 
+      description: `One of your tasks has a parameter whose default value doesn't match the expected type.
 
 Please double check your task definitions.`,
     },
@@ -367,7 +481,7 @@ Please double check your task definitions.`,
       message:
         "Default value for param %paramName% of task %taskName% shouldn't be set.",
       title: "Required parameter has a default value",
-      description: `One of your tasks has a required parameter with a default value. 
+      description: `One of your tasks has a required parameter with a default value.
 
 Please double check your task definitions.`,
     },
@@ -376,7 +490,7 @@ Please double check your task definitions.`,
       message:
         "Invalid param name %paramName% in task %taskName%. Param names must be camelCase.",
       title: "Invalid casing in parameter name",
-      description: `Your parameter names must use camelCase.  
+      description: `Your parameter names must use camelCase.
 
 Please double check your task definitions.`,
     },
@@ -386,7 +500,7 @@ Please double check your task definitions.`,
       number: 300,
       message: "Invalid environment variable %varName%'s value: %value%",
       title: "Invalid environment variable value",
-      description: `You are setting one of Buidler arguments using an environment variable, but it has an incorrect value. 
+      description: `You are setting one of Hardhat arguments using an environment variable, but it has an incorrect value.
 
 Please double check your environment variables.`,
     },
@@ -394,7 +508,7 @@ Please double check your environment variables.`,
       number: 301,
       message: "Invalid value %value% for argument %name% of type %type%",
       title: "Invalid argument type",
-      description: `One of your Buidler or task's arguments has an invalid type. 
+      description: `One of your Hardhat or task's arguments has an invalid type.
 
 Please double check your arguments.`,
     },
@@ -403,8 +517,8 @@ Please double check your arguments.`,
       message:
         "Invalid argument %name%: File %value% doesn't exist or is not a readable file.",
       title: "Invalid file argument",
-      description: `One of your tasks expected a file as an argument, but you provided a 
-non-existent or non-readable file. 
+      description: `One of your tasks expected a file as an argument, but you provided a
+non-existent or non-readable file.
 
 Please double check your arguments.`,
     },
@@ -412,7 +526,7 @@ Please double check your arguments.`,
       number: 303,
       message: "Unrecognized task %task%",
       title: "Unrecognized task",
-      description: `Tried to run a non-existent task. 
+      description: `Tried to run a non-existent task.
 
 Please double check the name of the task you are trying to run.`,
     },
@@ -421,81 +535,81 @@ Please double check the name of the task you are trying to run.`,
       message:
         "Unrecognised command line argument %argument%.\nNote that task arguments must come after the task name.",
       title: "Unrecognized command line argument",
-      description: `Buidler couldn't recognize one of your command line arguments.
-       
+      description: `Hardhat couldn't recognize one of your command line arguments.
+
 This may be because you are writing it before the task name. It should come after it.
 
-Please double check how you invoked Buidler.`,
+Please double check how you invoked Hardhat.`,
     },
     UNRECOGNIZED_PARAM_NAME: {
       number: 305,
       message: "Unrecognized param %param%",
       title: "Unrecognized param",
-      description: `Buidler couldn't recognize one of your tasks' parameters.
-       
-Please double check how you invoked Buidler or run your task.`,
+      description: `Hardhat couldn't recognize one of your tasks' parameters.
+
+Please double check how you invoked Hardhat or run your task.`,
     },
     MISSING_TASK_ARGUMENT: {
       number: 306,
       message: "Missing task argument %param%",
       title: "Missing task argument",
-      description: `You tried to run a task, but one of its required arguments was missing. 
+      description: `You tried to run a task, but one of its required arguments was missing.
 
-Please double check how you invoked Buidler or run your task.`,
+Please double check how you invoked Hardhat or run your task.`,
     },
     MISSING_POSITIONAL_ARG: {
       number: 307,
       message: "Missing positional argument %param%",
       title: "Missing task positional argument",
-      description: `You tried to run a task, but one of its required arguments was missing. 
+      description: `You tried to run a task, but one of its required arguments was missing.
 
-Please double check how you invoked Buidler or run your task.`,
+Please double check how you invoked Hardhat or run your task.`,
     },
     UNRECOGNIZED_POSITIONAL_ARG: {
       number: 308,
       message: "Unrecognized positional argument %argument%",
       title: "Unrecognized task positional argument",
-      description: `You tried to run a task with more positional arguments than needed. 
+      description: `You tried to run a task with more positional arguments than needed.
 
-Please double check how you invoked Buidler or run your task.`,
+Please double check how you invoked Hardhat or run your task.`,
     },
     REPEATED_PARAM: {
       number: 309,
       message: "Repeated parameter %param%",
       title: "Repeated task parameter",
-      description: `You tried to run a task with a repeated parameter. 
+      description: `You tried to run a task with a repeated parameter.
 
-Please double check how you invoked Buidler or run your task.`,
+Please double check how you invoked Hardhat or run your task.`,
     },
     PARAM_NAME_INVALID_CASING: {
       number: 310,
       message: "Invalid param %param%. Command line params must be lowercase.",
       title: "Invalid casing in command line parameter",
-      description: `You tried to run buidler with a parameter with invalid casing. They must be lowercase. 
+      description: `You tried to run Hardhat with a parameter with invalid casing. They must be lowercase.
 
-Please double check how you invoked Buidler.`,
+Please double check how you invoked Hardhat.`,
     },
     INVALID_JSON_ARGUMENT: {
       number: 311,
       message: "Error parsing JSON value for argument %param%: %error%",
       title: "Invalid JSON parameter",
-      description: `You tried to run a task with an invalid JSON parameter. 
+      description: `You tried to run a task with an invalid JSON parameter.
 
-Please double check how you invoked Buidler or run your task.`,
+Please double check how you invoked Hardhat or run your task.`,
     },
   },
   RESOLVER: {
     FILE_NOT_FOUND: {
       number: 400,
       message: "File %file% doesn't exist.",
-      title: "Solidity file not found",
-      description: `Tried to resolve a non-existing Solidity file as an entry-point.`,
+      title: "Hyperion source not found",
+      description: `Tried to resolve a non-existing Hyperion source as an entry-point.`,
     },
     FILE_OUTSIDE_PROJECT: {
       number: 401,
       message: "File %file% is outside the project.",
       title: "Tried to import file outside your project",
-      description: `One of your projects tried to import a file that it's outside your Buidler project. 
+      description: `One of your projects tried to import a file that it's outside your Hardhat project.
 
 This is disabled for security reasons.`,
     },
@@ -504,15 +618,15 @@ This is disabled for security reasons.`,
       message:
         "File %file% belongs to a library but was treated as a local one.",
       title: "Resolved library file as a local one",
-      description: `One of your libraries' files was treated as a local file. This is a bug. 
+      description: `One of your libraries' files was treated as a local file. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     LIBRARY_NOT_INSTALLED: {
       number: 403,
       message: "Library %library% is not installed.",
-      title: "Solidity library not installed",
-      description: `One of your Solidity sources imports a library that is not installed.
+      title: "Hyperion library not installed",
+      description: `One of your Hyperion sources imports a library that is not installed.
 
 Please double check your imports or install the missing dependency.`,
     },
@@ -520,15 +634,15 @@ Please double check your imports or install the missing dependency.`,
       number: 404,
       message: "File %file% doesn't exist.",
       title: "Missing library file",
-      description: `One of your libraries' files was imported but doesn't exist. 
+      description: `One of your libraries' files was imported but doesn't exist.
 
 Please double check your imports or update your libraries.`,
     },
     ILLEGAL_IMPORT: {
       number: 405,
       message: "Illegal import %imported% from %from%",
-      title: "Illegal Solidity import",
-      description: `One of your libraries tried to use a relative import to import a file outside of its scope. 
+      title: "Illegal Hyperion import",
+      description: `One of your libraries tried to use a relative import to import a file outside of its scope.
 
 This is disabled for security reasons.`,
     },
@@ -536,8 +650,8 @@ This is disabled for security reasons.`,
       number: 406,
       message:
         "File %file% from %library% is resolved to a path outside of its library.",
-      title: "Illegal Solidity import",
-      description: `One of your libraries tried to use a relative import to import a file outside of its scope. 
+      title: "Illegal Hyperion import",
+      description: `One of your libraries tried to use a relative import to import a file outside of its scope.
 
 This is disabled for security reasons.`,
     },
@@ -545,47 +659,9 @@ This is disabled for security reasons.`,
       number: 407,
       message: "File %imported%, imported from %from%, not found.",
       title: "Imported file not found",
-      description: `One of your source files imported a non-existing one. 
+      description: `One of your source files imported a non-existing one.
 
 Please double check your imports.`,
-    },
-  },
-  SOLC: {
-    INVALID_VERSION: {
-      number: 500,
-      message:
-        "Solidity version %version% is invalid or hasn't been released yet.",
-      title: "Invalid `solc` version",
-      description: `The Solidity version in your config is invalid or hasn't been released yet. 
-
-Please double check your \`solc\` config.`,
-    },
-    DOWNLOAD_FAILED: {
-      number: 501,
-      message:
-        "Couldn't download compiler version %remoteVersion%. Please check your connection or use local version %localVersion%",
-      title: "`solc` download failed",
-      description: `Couldn't download \`solc\`. 
-      
-Please check your Internet connection.`,
-    },
-    VERSION_LIST_DOWNLOAD_FAILED: {
-      number: 502,
-      message:
-        "Couldn't download compiler versions list. Please check your connection or use local version %localVersion%",
-      title: "Couldn't obtain `solc` version list",
-      description: `Couldn't download \`solc\`'s version list. 
-      
-Please check your Internet connection.`,
-    },
-    INVALID_DOWNLOAD: {
-      number: 503,
-      message:
-        "Couldn't download compiler version %remoteVersion%. Checksum verification failed. Please check your connection or use local version %localVersion%",
-      title: "Downloaded `solc` checksum verification failed",
-      description: `Downloaded \`solc\` verification failed.. 
-      
-Please check your Internet connection.`,
     },
   },
   BUILTIN_TASKS: {
@@ -594,30 +670,72 @@ Please check your Internet connection.`,
       message: "Compilation failed",
       title: "Compilation failed",
       description: `Your smart contracts failed to compile.
-      
-Please check Buidler's output for more details.`,
+
+Please check Hardhat's output for more details.`,
+    },
+    HYPERION_COMPILER_REPOSITORY_ERROR: {
+      number: 607,
+      message:
+        "Couldn't load the Hyperion compiler repository at %url%: %error%",
+      title: "Hyperion compiler repository is unavailable",
+      description: `Hardhat couldn't load the configured Hyperion compiler manifest.
+
+Check the repository URL and your network connection, or configure a local compiler path.`,
+    },
+    HYPERION_COMPILER_VERSION_NOT_FOUND: {
+      number: 608,
+      message: "Hyperion compiler version %version% is not available in %url%.",
+      title: "Hyperion compiler version is unavailable",
+      description: `The configured Hyperion compiler repository doesn't contain the requested version.
+
+Choose a version listed by the repository or configure a local compiler path.`,
+    },
+    HYPERION_COMPILER_DOWNLOAD_FAILED: {
+      number: 609,
+      message: "Couldn't download Hyperion compiler %version%: %error%",
+      title: "Hyperion compiler download failed",
+      description: `Hardhat couldn't download the selected Hyperion compiler build.
+
+Check the repository URL and your network connection.`,
+    },
+    HYPERION_COMPILER_INVALID_CHECKSUM: {
+      number: 610,
+      message:
+        "Downloaded Hyperion compiler %version% has an invalid %algorithm% checksum.",
+      title: "Invalid Hyperion compiler download",
+      description: `The downloaded Hyperion compiler doesn't match the checksum from the repository manifest.
+
+The file was removed and won't be executed.`,
+    },
+    HYPERION_COMPILER_NOT_FOUND: {
+      number: 611,
+      message: "Hyperion compiler %path% couldn't be resolved.",
+      title: "Hyperion compiler not found",
+      description: `Hardhat couldn't resolve the configured local hypc executable.
+
+Check hyperion.compilerPath, HYPERION_HYPC_PATH, HYPC_PATH, or your PATH.`,
     },
     RUN_FILE_NOT_FOUND: {
       number: 601,
       message: "Script %script% doesn't exist.",
       title: "Script doesn't exist",
-      description: `Tried to use \`buidler run\` to execut a non-existing script.
-      
+      description: `Tried to use \`hardhat run\` to execut a non-existing script.
+
 Please double check your script's path`,
     },
     RUN_SCRIPT_ERROR: {
       number: 602,
       message: "Error running script {%script%}: %error%",
       title: "Error running script",
-      description: `Running a script resulted in an error. 
+      description: `Running a script resulted in an error.
 
-Please check Buidler's output for more details.`,
+Please check Hardhat's output for more details.`,
     },
     FLATTEN_CYCLE: {
       number: 603,
-      message: "Buidler flatten doesn't support cyclic dependencies.",
+      message: "Hardhat flatten doesn't support cyclic dependencies.",
       title: "Flatten detected cyclic dependencies",
-      description: `Buidler flatten doesn't support cyclic dependencies. 
+      description: `Hardhat flatten doesn't support cyclic dependencies.
 
 We recommend not using this kind of dependencies.`,
     },
@@ -636,11 +754,11 @@ We recommend not using this kind of dependencies.`,
     JSONRPC_UNSUPPORTED_NETWORK: {
       number: 606,
       message:
-        "Unsupported network for JSON-RPC server. Only buidlerevm is currently supported.",
+        "The JSON-RPC server can only be started on the hardhatqrlvm network. Omit --network or select hardhatqrlvm.",
       title: "Unsupported network for JSON-RPC server.",
-      description: `JSON-RPC server can only be started when running the BuidlerEVM network.
-      
-To start the JSON-RPC server, retry the command without the --network parameter.`,
+      description: `\`hardhat node\` serves the in-process local QRL network; it never proxies to an HTTP network.
+
+Run it without \`--network\`, or pass \`--network hardhatqrlvm\`.`,
     },
   },
   ARTIFACTS: {
@@ -648,7 +766,7 @@ To start the JSON-RPC server, retry the command without the --network parameter.
       number: 700,
       message: 'Artifact for contract "%contractName%" not found.',
       title: "Artifact not found",
-      description: `Tried to import a non-existing artifact. 
+      description: `Tried to import a non-existing artifact.
 
 Please double check that your contracts have been compiled and your artifact's name.`,
     },
@@ -659,18 +777,18 @@ Please double check that your contracts have been compiled and your artifact's n
       message: `Plugin %plugin% is not installed.
 %extraMessage%Please run: npm install --save-dev%extraFlags% %plugin%`,
       title: "Plugin not installed",
-      description: `You are trying to use a plugin that hasn't been installed. 
+      description: `You are trying to use a plugin that hasn't been installed.
 
-Please follow Buidler's instructions to resolve this.`,
+Please follow Hardhat's instructions to resolve this.`,
     },
     MISSING_DEPENDENCY: {
       number: 801,
       message: `Plugin %plugin% requires %dependency% to be installed.
 %extraMessage%Please run: npm install --save-dev%extraFlags% "%dependency%@%versionSpec%"`,
       title: "Plugin dependencies not installed",
-      description: `You are trying to use a plugin with unmet dependencies. 
+      description: `You are trying to use a plugin with unmet dependencies.
 
-Please follow Buidler's instructions to resolve this.`,
+Please follow Hardhat's instructions to resolve this.`,
     },
     DEPENDENCY_VERSION_MISMATCH: {
       number: 802,
@@ -678,16 +796,16 @@ Please follow Buidler's instructions to resolve this.`,
 %extraMessage%If you haven't installed %dependency% manually, please run: npm install --save-dev%extraFlags% "%dependency%@%versionSpec%"
 If you have installed %dependency% yourself, please reinstall it with a valid version.`,
       title: "Plugin dependencies's version mismatch",
-      description: `You are trying to use a plugin that requires a different version of one of its dependencies. 
+      description: `You are trying to use a plugin that requires a different version of one of its dependencies.
 
-Please follow Buidler's instructions to resolve this.`,
+Please follow Hardhat's instructions to resolve this.`,
     },
     OLD_STYLE_IMPORT_DETECTED: {
       number: 803,
       message: `You are trying to load %pluginNameText% with a require or import statement.
 Please replace it with a call to usePlugin("%pluginNameCode%").`,
       title: "Importing a plugin with `require`",
-      description: `You are trying to load a plugin with a call to \`require\`. 
+      description: `You are trying to load a plugin with a call to \`require\`.
 
 Please use \`usePlugin(npm-plugin-package)\` instead.`,
     },
@@ -700,7 +818,7 @@ Please use \`usePlugin(npm-plugin-package)\` instead.`,
       title: "Invalid error message template",
       description: `An error message template contains an invalid variable name. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     TEMPLATE_VALUE_CONTAINS_VARIABLE_TAG: {
       number: 901,
@@ -709,7 +827,7 @@ Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us i
       title: "Invalid error message replacement",
       description: `Tried to replace an error message variable with a value that contains another variable name. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
     TEMPLATE_VARIABLE_TAG_MISSING: {
       number: 902,
@@ -717,7 +835,7 @@ Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us i
       title: "Missing replacement value from error message template",
       description: `An error message template is missing a replacement value. This is a bug.
 
-Please [report it](https://github.com/nomiclabs/buidler/issues/new) to help us improve Buidler.`,
+Please report it to the QRL Hardhat maintainers to help improve Hardhat.`,
     },
   },
 };

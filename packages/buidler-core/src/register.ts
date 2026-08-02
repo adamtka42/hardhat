@@ -1,9 +1,9 @@
 import debug from "debug";
 
-import { BuidlerContext } from "./internal/context";
+import { HardhatContext } from "./internal/context";
 import { loadConfigAndTasks } from "./internal/core/config/config-loading";
-import { BUIDLER_PARAM_DEFINITIONS } from "./internal/core/params/buidler-params";
-import { getEnvBuidlerArguments } from "./internal/core/params/env-variables";
+import { getEnvHardhatArguments } from "./internal/core/params/env-variables";
+import { HARDHAT_PARAM_DEFINITIONS } from "./internal/core/params/hardhat-params";
 import { Environment } from "./internal/core/runtime-environment";
 import { loadTsNodeIfPresent } from "./internal/core/typescript-support";
 import {
@@ -11,11 +11,11 @@ import {
   isNodeCalledWithoutAScript,
 } from "./internal/util/console";
 
-if (!BuidlerContext.isCreated()) {
+if (!HardhatContext.isCreated()) {
   // tslint:disable-next-line no-var-requires
   require("source-map-support/register");
 
-  const ctx = BuidlerContext.createBuidlerContext();
+  const ctx = HardhatContext.createHardhatContext();
 
   if (isNodeCalledWithoutAScript()) {
     disableReplWriterShowProxy();
@@ -23,31 +23,31 @@ if (!BuidlerContext.isCreated()) {
 
   loadTsNodeIfPresent();
 
-  const buidlerArguments = getEnvBuidlerArguments(
-    BUIDLER_PARAM_DEFINITIONS,
+  const hardhatArguments = getEnvHardhatArguments(
+    HARDHAT_PARAM_DEFINITIONS,
     process.env
   );
 
-  if (buidlerArguments.verbose) {
-    debug.enable("buidler*");
+  if (hardhatArguments.verbose) {
+    debug.enable("hardhat*");
   }
 
-  const config = loadConfigAndTasks(buidlerArguments);
+  const config = loadConfigAndTasks(hardhatArguments);
 
   // TODO: This is here for backwards compatibility.
   // There are very few projects using this.
-  if (buidlerArguments.network === undefined) {
-    buidlerArguments.network = config.defaultNetwork;
+  if (hardhatArguments.network === undefined) {
+    hardhatArguments.network = config.defaultNetwork;
   }
 
   const env = new Environment(
     config,
-    buidlerArguments,
+    hardhatArguments,
     ctx.tasksDSL.getTaskDefinitions(),
     ctx.extendersManager.getExtenders()
   );
 
-  ctx.setBuidlerRuntimeEnvironment(env);
+  ctx.setHardhatRuntimeEnvironment(env);
 
   env.injectToGlobal();
 }

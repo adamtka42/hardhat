@@ -1,42 +1,53 @@
 import { assert } from "chai";
 
-import { BUIDLEREVM_NETWORK_NAME } from "../../../../src/internal/constants";
 import {
   getValidationErrors,
   validateConfig,
 } from "../../../../src/internal/core/config/config-validation";
 import { ERRORS } from "../../../../src/internal/core/errors-list";
-import { expectBuidlerError } from "../../../helpers/errors";
+import { expectHardhatError } from "../../../helpers/errors";
 
 describe("Config validation", function () {
   describe("default network config", function () {
     it("Should fail if the wrong type is used", function () {
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig({ defaultNetwork: 123 }),
         ERRORS.GENERAL.INVALID_CONFIG
       );
     });
   });
 
-  describe("Solc config", function () {
-    const invalidSolcType = {
-      solc: 123,
+  describe("Hyperion config", function () {
+    const invalidHyperionType = {
+      hyperion: 123,
     };
 
     const invalidVersionType = {
-      solc: {
+      hyperion: {
         version: 123,
       },
     };
 
     const invalidOptimizerType = {
-      solc: {
+      hyperion: {
         optimizer: 123,
       },
     };
 
+    const invalidCompilerPathType = {
+      hyperion: {
+        compilerPath: 123,
+      },
+    };
+
+    const invalidCompilerRepositoryUrlType = {
+      hyperion: {
+        compilerRepositoryUrl: 123,
+      },
+    };
+
     const invalidOptimizerEnabledType = {
-      solc: {
+      hyperion: {
         optimizer: {
           enabled: 123,
         },
@@ -44,60 +55,59 @@ describe("Config validation", function () {
     };
 
     const invalidOptimizerRunsType = {
-      solc: {
+      hyperion: {
         optimizer: {
           runs: "",
         },
       },
     };
 
-    const invalidEvmVersionType = {
-      solc: {
-        evmVersion: 123,
-      },
-    };
-
     it("Should fail with invalid types", function () {
-      expectBuidlerError(
-        () => validateConfig(invalidSolcType),
+      expectHardhatError(
+        () => validateConfig(invalidHyperionType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidVersionType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidOptimizerType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
+        () => validateConfig(invalidCompilerPathType),
+        ERRORS.GENERAL.INVALID_CONFIG
+      );
+
+      expectHardhatError(
+        () => validateConfig(invalidCompilerRepositoryUrlType),
+        ERRORS.GENERAL.INVALID_CONFIG
+      );
+
+      expectHardhatError(
         () => validateConfig(invalidOptimizerEnabledType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidOptimizerRunsType),
-        ERRORS.GENERAL.INVALID_CONFIG
-      );
-
-      expectBuidlerError(
-        () => validateConfig(invalidEvmVersionType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
     });
 
-    it("Shouldn't fail with an empty solc config", function () {
+    it("Shouldn't fail with an empty hyperion config", function () {
       const errors = getValidationErrors({
-        solc: {},
+        hyperion: {},
       });
 
       assert.isEmpty(errors);
     });
 
-    it("Shouldn't fail without a solc config", function () {
+    it("Shouldn't fail without a hyperion config", function () {
       const errors = getValidationErrors({});
 
       assert.isEmpty(errors);
@@ -105,13 +115,14 @@ describe("Config validation", function () {
 
     it("Shouldn't fail with valid configs", function () {
       const errors = getValidationErrors({
-        solc: {
+        hyperion: {
           version: "123",
+          compilerPath: "/usr/local/bin/hypc",
+          compilerRepositoryUrl: "https://compilers.example/",
           optimizer: {
             enabled: true,
             runs: 123,
           },
-          evmVersion: "asd",
         },
       });
 
@@ -120,7 +131,7 @@ describe("Config validation", function () {
 
     it("Shouldn't fail with unrecognized params", function () {
       const errors = getValidationErrors({
-        solc: {
+        hyperion: {
           unrecognized: 123,
         },
       });
@@ -165,32 +176,32 @@ describe("Config validation", function () {
     };
 
     it("Should fail with invalid types", function () {
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidPathsType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidCacheType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidArtifactsType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidRootType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidSourcesType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
 
-      expectBuidlerError(
+      expectHardhatError(
         () => validateConfig(invalidTestsType),
         ERRORS.GENERAL.INVALID_CONFIG
       );
@@ -239,12 +250,12 @@ describe("Config validation", function () {
     describe("Invalid types", function () {
       describe("Networks object", function () {
         it("Should fail with invalid types", function () {
-          expectBuidlerError(
+          expectHardhatError(
             () => validateConfig({ networks: 123 }),
             ERRORS.GENERAL.INVALID_CONFIG
           );
 
-          expectBuidlerError(
+          expectHardhatError(
             () =>
               validateConfig({
                 networks: {
@@ -256,269 +267,136 @@ describe("Config validation", function () {
         });
       });
 
-      describe("BuidlerEVM network config", function () {
-        it("Should fail with invalid types", function () {
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: 123,
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
+      describe("Hardhat QRLVM network config", function () {
+        const localAddress = `Q${"01".repeat(64)}`;
 
-          expectBuidlerError(
+        it("Should accept a valid `hardhatqrlvm` network", function () {
+          const errors = getValidationErrors({
+            networks: {
+              hardhatqrlvm: {
+                chainId: 1,
+                from: localAddress,
+                accounts: [
+                  {
+                    address: localAddress,
+                    balance: "1000",
+                    seed: `0x010000${"01".repeat(48)}`,
+                    nonce: 0,
+                  },
+                ],
+                automine: true,
+                loggingEnabled: true,
+                blockGasLimit: 30000000,
+                qrlJsMonorepoPath: "/tmp/qrljs-monorepo",
+              },
+            },
+          });
+
+          assert.isEmpty(errors);
+        });
+
+        it("Should only recognize the reserved local network name", function () {
+          const errors = getValidationErrors({
+            networks: {
+              localAlias: {
+                accounts: [{ address: localAddress }],
+              },
+            },
+          });
+
+          assert.include(
+            errors.join("\n"),
+            "HardhatConfig.networks.localAlias.url"
+          );
+        });
+
+        it("Should reject url on `hardhatqrlvm` networks", function () {
+          expectHardhatError(
             () =>
               validateConfig({
                 networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    chainId: "asd",
+                  hardhatqrlvm: {
+                    url: "http://localhost",
                   },
                 },
               }),
-            ERRORS.GENERAL.INVALID_CONFIG
+            ERRORS.GENERAL.INVALID_CONFIG,
+            "HardhatConfig.networks.hardhatqrlvm.url"
           );
+        });
 
-          expectBuidlerError(
+        it("Should reject invalid local account addresses", function () {
+          expectHardhatError(
             () =>
               validateConfig({
                 networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    hardfork: "not-supported",
+                  hardhatqrlvm: {
+                    accounts: [{ address: `Q${"01".repeat(20)}` }],
                   },
                 },
               }),
-            ERRORS.GENERAL.INVALID_CONFIG
+            ERRORS.GENERAL.INVALID_CONFIG,
+            "64-byte QRL address"
           );
+        });
 
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    throwOnCallFailures: "a",
+        it("Should reject invalid local account seeds", function () {
+          for (const seed of [
+            "0x010000",
+            `010000${"01".repeat(48)}`,
+            `0x010000${"01".repeat(47)}zz`,
+            123,
+          ]) {
+            expectHardhatError(
+              () =>
+                validateConfig({
+                  networks: {
+                    hardhatqrlvm: {
+                      accounts: [{ address: localAddress, seed }],
+                    },
                   },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
+                }),
+              ERRORS.GENERAL.INVALID_CONFIG,
+              "51-byte QRL extended seed hex string"
+            );
+          }
+        });
 
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    throwOnTransactionFailures: "a",
+        it("Should reject non-local account config forms", function () {
+          for (const accounts of [
+            "remote",
+            { type: "custom", accounts: [localAddress] },
+          ]) {
+            expectHardhatError(
+              () =>
+                validateConfig({
+                  networks: {
+                    hardhatqrlvm: {
+                      accounts,
+                    },
                   },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    from: 123,
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    gas: "asdasd",
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    gasPrice: "6789",
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    gasMultiplier: "123",
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    blockGasLimit: "asd",
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    accounts: 123,
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    accounts: [{}],
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    accounts: [{ privateKey: "" }],
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    accounts: [{ balance: "" }],
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    accounts: [{ privateKey: 123 }],
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    accounts: [{ balance: 213 }],
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    loggingEnabled: 123,
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    loggingEnabled: "a",
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          // Non boolean allowUnlimitedContractSize
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    allowUnlimitedContractSize: "a",
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
-
-          // Non string initialDate
-          expectBuidlerError(
-            () =>
-              validateConfig({
-                networks: {
-                  [BUIDLEREVM_NETWORK_NAME]: {
-                    initialDate: 123,
-                  },
-                },
-              }),
-            ERRORS.GENERAL.INVALID_CONFIG
-          );
+                }),
+              ERRORS.GENERAL.INVALID_CONFIG,
+              "Hardhat QRLVM account array"
+            );
+          }
         });
       });
 
       describe("HTTP network config", function () {
         describe("Url field", function () {
           it("Should fail if no url is set for custom networks", function () {
-            expectBuidlerError(
+            expectHardhatError(
               () => validateConfig({ networks: { custom: {} } }),
               ERRORS.GENERAL.INVALID_CONFIG
             );
           });
 
-          it("Shouldn't fail if no url is set for localhost network", function () {
-            const errors = getValidationErrors({ networks: { localhost: {} } });
-            assert.isEmpty(errors);
-          });
-
-          it("Shouldn't fail if no url is set for buidler network", function () {
-            const errors = getValidationErrors({
-              networks: { [BUIDLEREVM_NETWORK_NAME]: {} },
-            });
-            assert.isEmpty(errors);
+          it("Should fail if no url is set for localhost network", function () {
+            expectHardhatError(
+              () => validateConfig({ networks: { localhost: {} } }),
+              ERRORS.GENERAL.INVALID_CONFIG
+            );
           });
         });
 
@@ -550,7 +428,7 @@ describe("Config validation", function () {
           });
 
           it("Should reject other types", function () {
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -563,7 +441,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -578,7 +456,7 @@ describe("Config validation", function () {
           });
 
           it("Should reject non-string values", function () {
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -594,7 +472,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -614,7 +492,7 @@ describe("Config validation", function () {
 
         describe("Accounts field", function () {
           it("Shouldn't work with invalid types", function () {
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -627,7 +505,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -640,7 +518,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -654,60 +532,18 @@ describe("Config validation", function () {
             );
           });
 
-          describe("HDAccounstConfig", function () {
-            it("Should fail with invalid types", function () {
-              expectBuidlerError(
+          describe("Legacy HD account config", function () {
+            it("Should reject legacy mnemonic account config", function () {
+              expectHardhatError(
                 () =>
                   validateConfig({
                     networks: {
                       asd: {
                         accounts: {
-                          mnemonic: 123,
-                        },
-                        url: "",
-                      },
-                    },
-                  }),
-                ERRORS.GENERAL.INVALID_CONFIG
-              );
-
-              expectBuidlerError(
-                () =>
-                  validateConfig({
-                    networks: {
-                      asd: {
-                        accounts: {
-                          initialIndex: "asd",
-                        },
-                        url: "",
-                      },
-                    },
-                  }),
-                ERRORS.GENERAL.INVALID_CONFIG
-              );
-
-              expectBuidlerError(
-                () =>
-                  validateConfig({
-                    networks: {
-                      asd: {
-                        accounts: {
-                          count: "asd",
-                        },
-                        url: "",
-                      },
-                    },
-                  }),
-                ERRORS.GENERAL.INVALID_CONFIG
-              );
-
-              expectBuidlerError(
-                () =>
-                  validateConfig({
-                    networks: {
-                      asd: {
-                        accounts: {
-                          path: 123,
+                          mnemonic: "asd asd asd",
+                          initialIndex: 0,
+                          count: 123,
+                          path: "m/123",
                         },
                         url: "",
                       },
@@ -720,7 +556,7 @@ describe("Config validation", function () {
 
           describe("OtherAccountsConfig", function () {
             it("Should fail with invalid types", function () {
-              expectBuidlerError(
+              expectHardhatError(
                 () =>
                   validateConfig({
                     networks: {
@@ -737,9 +573,9 @@ describe("Config validation", function () {
             });
           });
 
-          describe("List of private keys", function () {
+          describe("List of QRL extended seeds", function () {
             it("Shouldn't work with invalid types", function () {
-              expectBuidlerError(
+              expectHardhatError(
                 () =>
                   validateConfig({
                     networks: {
@@ -751,6 +587,28 @@ describe("Config validation", function () {
                   }),
                 ERRORS.GENERAL.INVALID_CONFIG
               );
+            });
+
+            it("Shouldn't work with invalid QRL extended seed strings", function () {
+              for (const seed of [
+                "0x010000",
+                "0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
+                "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be40z",
+              ]) {
+                expectHardhatError(
+                  () =>
+                    validateConfig({
+                      networks: {
+                        asd: {
+                          accounts: [seed],
+                          url: "",
+                        },
+                      },
+                    }),
+                  ERRORS.GENERAL.INVALID_CONFIG,
+                  "51-byte QRL extended seed hex string"
+                );
+              }
             });
           });
 
@@ -769,7 +627,7 @@ describe("Config validation", function () {
             });
 
             it("Shouldn't work with other strings", function () {
-              expectBuidlerError(
+              expectHardhatError(
                 () =>
                   validateConfig({
                     networks: {
@@ -787,7 +645,7 @@ describe("Config validation", function () {
 
         describe("Other fields", function () {
           it("Shouldn't accept invalid types", function () {
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -800,7 +658,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -813,7 +671,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -826,7 +684,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -839,7 +697,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -852,7 +710,7 @@ describe("Config validation", function () {
               ERRORS.GENERAL.INVALID_CONFIG
             );
 
-            expectBuidlerError(
+            expectHardhatError(
               () =>
                 validateConfig({
                   networks: {
@@ -862,6 +720,22 @@ describe("Config validation", function () {
                   },
                 }),
               ERRORS.GENERAL.INVALID_CONFIG
+            );
+          });
+
+          it("Shouldn't accept invalid QRL sender addresses", function () {
+            expectHardhatError(
+              () =>
+                validateConfig({
+                  networks: {
+                    asd: {
+                      from: "0x0001",
+                      url: "",
+                    },
+                  },
+                }),
+              ERRORS.GENERAL.INVALID_CONFIG,
+              "64-byte QRL address"
             );
           });
         });
@@ -887,17 +761,11 @@ describe("Config validation", function () {
         networks: {
           commonThings: {
             chainId: 1,
-            from: "0x0001",
+            from: `Q${"1".repeat(128)}`,
             gas: "auto",
             gasPrice: "auto",
             gasMultiplier: 123,
             url: "",
-          },
-          [BUIDLEREVM_NETWORK_NAME]: {
-            gas: 678,
-            gasPrice: 123,
-            blockGasLimit: 8000,
-            accounts: [{ privateKey: "asd", balance: "123" }],
           },
           localhost: {
             gas: 678,
@@ -908,23 +776,17 @@ describe("Config validation", function () {
             accounts: "remote",
             url: "",
           },
-          withPrivateKeys: {
-            accounts: ["0x0", "0x1"],
-            url: "",
-          },
-          withHdKeys: {
-            accounts: {
-              mnemonic: "asd asd asd",
-              initialIndex: 0,
-              count: 123,
-              path: "m/123",
-            },
+          withQrlExtendedSeeds: {
+            accounts: [
+              "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
+              "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be402",
+            ],
             url: "",
           },
           withOtherTypeOfAccounts: {
             accounts: {
-              type: "ledger",
-              asd: 12,
+              type: "custom",
+              customOption: 12,
             },
             url: "",
           },
@@ -940,8 +802,9 @@ describe("Config validation", function () {
               url: "http://localhost:8545",
             },
             localhost: {
+              url: "http://localhost:8545",
               accounts: [
-                "0xa95f9e3e7ae4e4865c5968828fe7c03fffa8a9f3bb52d36d26243f4c868ee166",
+                "0x0100002fa45cae7e96414b644715d0e29de4ca12864fe7d52f3260545ad7c280bd7ceee79627d99d3bf9a1bbb2bcd73d5be401",
               ],
             },
           },
@@ -958,10 +821,8 @@ describe("Config validation", function () {
       const errors = getValidationErrors({
         networks: {
           localhost: {
+            url: "",
             asd: 1232,
-          },
-          [BUIDLEREVM_NETWORK_NAME]: {
-            asdasd: "123",
           },
         },
       });

@@ -1,14 +1,14 @@
 {
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "stackTrace": [
         {
           "type": "CALLSTACK_ENTRY",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "constructor",
             "line": 5
           }
@@ -18,7 +18,7 @@
           "message": "D.m failed",
           "sourceReference": {
             "contract": "C",
-            "file": "d.sol",
+            "file": "d.hyp",
             "function": "m",
             "line": 9
           }

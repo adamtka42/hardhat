@@ -6,7 +6,7 @@ import {
   JsonRpcResponse,
   parseJsonResponse,
 } from "../../util/jsonrpc";
-import { BuidlerError } from "../errors";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 interface ProviderError extends Error {
@@ -42,7 +42,7 @@ export class HttpProvider extends EventEmitter {
       error.message = jsonRpcResponse.error.message;
       error.code = jsonRpcResponse.error.code;
       error.data = jsonRpcResponse.error.data;
-      // tslint:disable-next-line only-buidler-error
+      // tslint:disable-next-line only-hardhat-error
       throw error;
     }
 
@@ -69,7 +69,7 @@ export class HttpProvider extends EventEmitter {
       return parseJsonResponse(await response.text());
     } catch (error) {
       if (error.code === "ECONNREFUSED") {
-        throw new BuidlerError(
+        throw new HardhatError(
           ERRORS.NETWORK.NODE_IS_NOT_RUNNING,
           { network: this._networkName },
           error
@@ -77,10 +77,10 @@ export class HttpProvider extends EventEmitter {
       }
 
       if (error.type === "request-timeout") {
-        throw new BuidlerError(ERRORS.NETWORK.NETWORK_TIMEOUT, {}, error);
+        throw new HardhatError(ERRORS.NETWORK.NETWORK_TIMEOUT, {}, error);
       }
 
-      // tslint:disable-next-line only-buidler-error
+      // tslint:disable-next-line only-hardhat-error
       throw error;
     }
   }

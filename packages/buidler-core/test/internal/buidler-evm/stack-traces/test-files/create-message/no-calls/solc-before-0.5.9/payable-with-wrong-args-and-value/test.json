@@ -2,18 +2,17 @@
   "solc": "<0.5.9",
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "value": 1,
       "stackTrace": [
         {
-          "type": "REVERT_ERROR",
-          "message": "req",
+          "type": "INVALID_PARAMS_ERROR",
           "sourceReference": {
-            "file": "c.sol",
+            "file": "c.hyp",
             "contract": "C",
             "function": "constructor",
-            "line": 6
+            "line": 5
           }
         }
       ]

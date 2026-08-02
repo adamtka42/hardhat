@@ -1,13 +1,12 @@
 import debug from "debug";
 
 import {
-  BuidlerArguments,
-  BuidlerRuntimeEnvironment,
   EnvironmentExtender,
-  EthereumProvider,
+  HardhatArguments,
+  HardhatRuntimeEnvironment,
   Network,
   ParamDefinition,
-  ResolvedBuidlerConfig,
+  ResolvedHardhatConfig,
   RunSuperFunction,
   RunTaskFunction,
   TaskArguments,
@@ -16,69 +15,61 @@ import {
 } from "../../types";
 import { lazyObject } from "../util/lazy";
 
-import { BuidlerError } from "./errors";
+import { HardhatError } from "./errors";
 import { ERRORS } from "./errors-list";
 import { createProvider } from "./providers/construction";
 import { OverriddenTaskDefinition } from "./tasks/task-definitions";
 
-const log = debug("buidler:core:bre");
+const log = debug("hardhat:core:bre");
 
-export class Environment implements BuidlerRuntimeEnvironment {
+export class Environment implements HardhatRuntimeEnvironment {
   private static readonly _BLACKLISTED_PROPERTIES: string[] = [
     "injectToGlobal",
     "_runTaskDefinition",
   ];
 
-  /**
-   * An EIP1193 Ethereum provider.
-   */
-  public ethereum: EthereumProvider;
+  public qrl!: HardhatRuntimeEnvironment["qrl"];
 
   public network: Network;
 
   private readonly _extenders: EnvironmentExtender[];
 
   /**
-   * Initializes the Buidler Runtime Environment and the given
+   * Initializes the Hardhat Runtime Environment and the given
    * extender functions.
    *
    * @remarks The extenders' execution order is given by the order
-   * of the requires in the buidler's config file and its plugins.
+   * of the requires in Hardhat config file and its plugins.
    *
-   * @param config The buidler's config object.
-   * @param buidlerArguments The parsed buidler's arguments.
+   * @param config The Hardhat config object.
+   * @param hardhatArguments The parsed Hardhat arguments.
    * @param tasks A map of tasks.
    * @param extenders A list of extenders.
    */
   constructor(
-    public readonly config: ResolvedBuidlerConfig,
-    public readonly buidlerArguments: BuidlerArguments,
+    public readonly config: ResolvedHardhatConfig,
+    public readonly hardhatArguments: HardhatArguments,
     public readonly tasks: TasksMap,
     extenders: EnvironmentExtender[] = []
   ) {
-    log("Creating BuidlerRuntimeEnvironment");
+    log("Creating HardhatRuntimeEnvironment");
 
     const networkName =
-      buidlerArguments.network !== undefined
-        ? buidlerArguments.network
+      hardhatArguments.network !== undefined
+        ? hardhatArguments.network
         : config.defaultNetwork;
 
     const networkConfig = config.networks[networkName];
 
     if (networkConfig === undefined) {
-      throw new BuidlerError(ERRORS.NETWORK.CONFIG_NOT_FOUND, {
+      throw new HardhatError(ERRORS.NETWORK.CONFIG_NOT_FOUND, {
         network: networkName,
       });
     }
 
     const provider = lazyObject(() => {
       log(`Creating provider for network ${networkName}`);
-      return createProvider(
-        networkName,
-        networkConfig,
-        config.solc.version,
-        config.paths
-      );
+      return createProvider(networkName, networkConfig, config.paths);
     });
 
     this.network = {
@@ -87,7 +78,6 @@ export class Environment implements BuidlerRuntimeEnvironment {
       provider,
     };
 
-    this.ethereum = provider;
     this._extenders = extenders;
 
     extenders.forEach((extender) => extender(this));
@@ -108,7 +98,7 @@ export class Environment implements BuidlerRuntimeEnvironment {
     log("Running task %s", name);
 
     if (taskDefinition === undefined) {
-      throw new BuidlerError(ERRORS.ARGUMENTS.UNRECOGNIZED_TASK, {
+      throw new HardhatError(ERRORS.ARGUMENTS.UNRECOGNIZED_TASK, {
         task: name,
       });
     }
@@ -122,7 +112,7 @@ export class Environment implements BuidlerRuntimeEnvironment {
   };
 
   /**
-   * Injects the properties of `this` (the Buidler Runtime Environment) into the global scope.
+   * Injects the properties of `this` (the Hardhat Runtime Environment) into the global scope.
    *
    * @param blacklist a list of property names that won't be injected.
    *
@@ -176,7 +166,7 @@ export class Environment implements BuidlerRuntimeEnvironment {
       runSuperFunction.isDefined = true;
     } else {
       runSuperFunction = async () => {
-        throw new BuidlerError(ERRORS.TASK_DEFINITIONS.RUNSUPER_NOT_AVAILABLE, {
+        throw new HardhatError(ERRORS.TASK_DEFINITIONS.RUNSUPER_NOT_AVAILABLE, {
           taskName: taskDefinition.name,
         });
       };
@@ -205,7 +195,7 @@ export class Environment implements BuidlerRuntimeEnvironment {
    * Also, populate missing, non-mandatory arguments with default param values (if any).
    *
    * @private
-   * @throws BuidlerError if any of the following are true:
+   * @throws HardhatError if any of the following are true:
    *  > a required argument is missing
    *  > an argument's value's type doesn't match the defined param type
    *
@@ -228,7 +218,7 @@ export class Environment implements BuidlerRuntimeEnvironment {
     ];
 
     const initResolvedArguments: {
-      errors: BuidlerError[];
+      errors: HardhatError[];
       values: TaskArguments;
     } = { errors: [], values: {} };
 
@@ -285,7 +275,7 @@ export class Environment implements BuidlerRuntimeEnvironment {
       }
 
       // undefined & mandatory argument -> error
-      throw new BuidlerError(ERRORS.ARGUMENTS.MISSING_TASK_ARGUMENT, {
+      throw new HardhatError(ERRORS.ARGUMENTS.MISSING_TASK_ARGUMENT, {
         param: name,
       });
     }

@@ -16,14 +16,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         with:
-          node-version: 10
-      - uses: actions/checkout@v2
-      - name: Install node-gyp-cache
-        run: |
-          npm install -g node-gyp-cache
-          npm config set node_gyp node-gyp-cache
+          node-version: 20
+      - uses: actions/checkout@v4
       - name: Install
         run: npm install
       - name: lint
@@ -35,51 +31,103 @@ jobs:
     name: Typecheck tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         with:
-          node-version: 10
-      - uses: actions/checkout@v2
-      - name: Install node-gyp-cache
-        run: |
-          npm install -g node-gyp-cache
-          npm config set node_gyp node-gyp-cache
+          node-version: 20
+      - uses: actions/checkout@v4
       - name: Install
         run: npm install
       - name: Build tests
         run: npm run build-test
 
   test_windows:
-    name: Test on Windows with Node 10
+    name: Test on Windows with Node 20
     runs-on: windows-latest
     steps:
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         with:
-          node-version: 10
-      - uses: actions/checkout@v2
-      #      - name: Install node-gyp-cache
-      #        run: |
-      #          npm install -g node-gyp-cache
-      #          npm config set node_gyp node-gyp-cache
+          node-version: 20
+      - uses: actions/checkout@v4
       - name: Install
         run: npm install
+      - uses: actions/checkout@v4
+        with:
+          repository: adamtka42/web3.js
+          ref: migrate-64-byte-addresses
+          path: web3.js
+      - name: Enable pnpm
+        run: corepack enable pnpm
+      - name: Install web3.js
+        working-directory: web3.js
+        env:
+          npm_config_script_shell: "C:\\Program Files\\Git\\bin\\bash.exe"
+        run: pnpm install --frozen-lockfile --config.engine-strict=false
+      - name: Build web3-qrl-accounts
+        working-directory: web3.js
+        env:
+          npm_config_script_shell: "C:\\Program Files\\Git\\bin\\bash.exe"
+        run: pnpm --filter @theqrl/web3-qrl-accounts... run build
+      - name: Use local web3-qrl-accounts
+        run: npm --prefix packages/buidler-core install --no-save ./web3.js/packages/web3-qrl-accounts
+      - uses: actions/checkout@v4
+        with:
+          repository: adamtka42/qrljs-monorepo
+          ref: qrl-adaptation
+          path: qrljs-monorepo
+      - name: Install qrljs-monorepo
+        working-directory: qrljs-monorepo
+        env:
+          npm_config_script_shell: "C:\\Program Files\\Git\\bin\\bash.exe"
+        run: npm ci
+      - name: Build qrljs-monorepo
+        working-directory: qrljs-monorepo
+        env:
+          npm_config_script_shell: "C:\\Program Files\\Git\\bin\\bash.exe"
+        run: npm run build --workspaces --if-present
       - name: Run tests
+        env:
+          QRLJS_MONOREPO_PATH: ${{ github.workspace }}/qrljs-monorepo
         run: npm run test
 
   test_macos:
-    name: Test on MacOS with Node 10
-    runs-on: macos-latest
+    name: Test on MacOS with Node 20
+    runs-on: macos-13
     steps:
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         with:
-          node-version: 10
-      - uses: actions/checkout@v2
-      - name: Install node-gyp-cache
-        run: |
-          npm install -g node-gyp-cache
-          npm config set node_gyp node-gyp-cache
+          node-version: 20
+      - uses: actions/checkout@v4
       - name: Install
         run: npm install
+      - uses: actions/checkout@v4
+        with:
+          repository: adamtka42/web3.js
+          ref: migrate-64-byte-addresses
+          path: web3.js
+      - name: Enable pnpm
+        run: corepack enable pnpm
+      - name: Install web3.js
+        working-directory: web3.js
+        run: pnpm install --frozen-lockfile --config.engine-strict=false
+      - name: Build web3-qrl-accounts
+        working-directory: web3.js
+        run: pnpm --filter @theqrl/web3-qrl-accounts... run build
+      - name: Use local web3-qrl-accounts
+        run: npm --prefix packages/buidler-core install --no-save ./web3.js/packages/web3-qrl-accounts
+      - uses: actions/checkout@v4
+        with:
+          repository: adamtka42/qrljs-monorepo
+          ref: qrl-adaptation
+          path: qrljs-monorepo
+      - name: Install qrljs-monorepo
+        working-directory: qrljs-monorepo
+        run: npm ci
+      - name: Build qrljs-monorepo
+        working-directory: qrljs-monorepo
+        run: npm run build --workspaces --if-present
       - name: Run tests
+        env:
+          QRLJS_MONOREPO_PATH: ${{ github.workspace }}/qrljs-monorepo
         run: npm run test
 
   test_linux:
@@ -87,19 +135,41 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [10, 12, 13]
+        node: [20]
     steps:
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: install vyper
-        run: docker pull ethereum/vyper:0.1.0b10
-      - uses: actions/checkout@v2
-      - name: Install node-gyp-cache
-        run: |
-          npm install -g node-gyp-cache
-          npm config set node_gyp node-gyp-cache
+      - uses: actions/checkout@v4
       - name: Install
         run: npm install
+      - uses: actions/checkout@v4
+        with:
+          repository: adamtka42/web3.js
+          ref: migrate-64-byte-addresses
+          path: web3.js
+      - name: Enable pnpm
+        run: corepack enable pnpm
+      - name: Install web3.js
+        working-directory: web3.js
+        run: pnpm install --frozen-lockfile --config.engine-strict=false
+      - name: Build web3-qrl-accounts
+        working-directory: web3.js
+        run: pnpm --filter @theqrl/web3-qrl-accounts... run build
+      - name: Use local web3-qrl-accounts
+        run: npm --prefix packages/buidler-core install --no-save ./web3.js/packages/web3-qrl-accounts
+      - uses: actions/checkout@v4
+        with:
+          repository: adamtka42/qrljs-monorepo
+          ref: qrl-adaptation
+          path: qrljs-monorepo
+      - name: Install qrljs-monorepo
+        working-directory: qrljs-monorepo
+        run: npm ci
+      - name: Build qrljs-monorepo
+        working-directory: qrljs-monorepo
+        run: npm run build --workspaces --if-present
       - name: Run tests
+        env:
+          QRLJS_MONOREPO_PATH: ${{ github.workspace }}/qrljs-monorepo
         run: npm run test

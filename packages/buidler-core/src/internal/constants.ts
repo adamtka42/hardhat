@@ -1,14 +1,7 @@
-export const BUIDLER_NAME = "Buidler";
+export const HARDHAT_NAME = "Hardhat";
 
-export const BUIDLER_EXECUTABLE_NAME = "buidler";
-export const BUIDLEREVM_NETWORK_NAME = "buidlerevm";
+export const HARDHAT_EXECUTABLE_NAME = "hardhat";
+export const HARDHAT_QRLVM_NETWORK_NAME = "hardhatqrlvm";
 
-export const SOLC_INPUT_FILENAME = "solc-input.json";
-export const SOLC_OUTPUT_FILENAME = "solc-output.json";
-
-export const BUIDLEREVM_SUPPORTED_HARDFORKS = [
-  "byzantium",
-  "constantinople",
-  "petersburg",
-  "istanbul",
-];
+export const COMPILER_INPUT_FILENAME = "compiler-input.json";
+export const COMPILER_OUTPUT_FILENAME = "compiler-output.json";

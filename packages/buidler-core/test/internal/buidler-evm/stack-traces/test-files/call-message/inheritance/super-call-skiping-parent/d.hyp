@@ -1,0 +1,7 @@
+pragma hyperion >=0.0;
+
+import "./e.hyp";
+
+contract D is E {
+
+}

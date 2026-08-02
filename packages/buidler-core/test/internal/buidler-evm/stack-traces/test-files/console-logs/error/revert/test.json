@@ -2,10 +2,10 @@
   "description": "Should output right parameters into console",
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "imports": [
-        "/../../../../../../../../console.sol"
+        "@theqrl/hardhat/console.hyp"
       ]
     },
     {
@@ -18,7 +18,7 @@
           "message": "req",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "test",
             "line": 9
           }

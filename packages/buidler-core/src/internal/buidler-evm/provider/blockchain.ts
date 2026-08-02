@@ -1,114 +1,152 @@
-import { BN, bufferToHex, bufferToInt } from "ethereumjs-util";
-
 export type Block = any;
+
+type Callback<ResultT = void> = (error: Error | null, result?: ResultT) => void;
 
 export class Blockchain {
   private readonly _blocks: Block[] = [];
   private readonly _blockNumberByHash: Map<string, number> = new Map();
 
-  public getLatestBlock(cb: any): void {
+  public getLatestBlock(callback: Callback<Block>): void {
     if (this._blocks.length === 0) {
-      cb(new Error("No block available"));
+      callback(new Error("No block available"));
+      return;
     }
 
-    cb(null, this._blocks[this._blocks.length - 1]);
+    callback(null, this._blocks[this._blocks.length - 1]);
   }
 
-  public putBlock(block: any, cb: any): void {
-    const blockNumber = bufferToInt(block.header.number);
+  public putBlock(block: Block, callback: Callback<Block>): void {
+    const blockNumber = blockNumberToIndex(block.header.number);
 
     if (this._blocks.length !== blockNumber) {
-      cb(new Error("Invalid block number"));
+      callback(new Error("Invalid block number"));
       return;
     }
 
     this._blocks.push(block);
-    this._blockNumberByHash.set(bufferToHex(block.hash()), blockNumber);
+    this._blockNumberByHash.set(blockHashKey(block.hash()), blockNumber);
 
-    cb(null, block);
+    callback(null, block);
   }
 
-  public delBlock(blockHash: Buffer, cb: any): void {
-    const blockNumber = this._blockNumberByHash.get(bufferToHex(blockHash));
+  public delBlock(blockHash: Uint8Array, callback: Callback): void {
+    const blockNumber = this._blockNumberByHash.get(blockHashKey(blockHash));
 
     if (blockNumber === undefined) {
-      cb(new Error("Block not found"));
+      callback(new Error("Block not found"));
       return;
     }
 
-    for (let n = blockNumber; n < this._blocks.length; n++) {
-      const block = this._blocks[n];
-
-      this._blockNumberByHash.delete(bufferToHex(block.hash()));
-    }
-
-    this._blocks.splice(blockNumber);
-    cb(null);
+    this._deleteFrom(blockNumber);
+    callback(null);
   }
 
   public getBlock(
-    hashOrBlockNumber: Buffer | BN,
-    cb: (err: Error | null, block?: Block) => void
+    hashOrBlockNumber: Uint8Array | bigint,
+    callback: Callback<Block>
   ): void {
     let blockNumber: number;
 
-    if (BN.isBN(hashOrBlockNumber)) {
-      blockNumber = hashOrBlockNumber.toNumber();
+    if (typeof hashOrBlockNumber === "bigint") {
+      blockNumber = blockNumberToIndex(hashOrBlockNumber);
     } else {
-      const hash = bufferToHex(hashOrBlockNumber);
+      const hash = blockHashKey(hashOrBlockNumber);
+      const indexedBlockNumber = this._blockNumberByHash.get(hash);
 
-      if (!this._blockNumberByHash.has(hash)) {
-        cb(new Error("Block not found"));
+      if (indexedBlockNumber === undefined) {
+        callback(new Error("Block not found"));
         return;
       }
 
-      blockNumber = this._blockNumberByHash.get(hash)!;
+      blockNumber = indexedBlockNumber;
     }
 
-    cb(null, this._blocks[blockNumber]);
+    callback(null, this._blocks[blockNumber]);
   }
 
-  public iterator(name: string, onBlock: any, cb: any): void {
-    let n = 0;
+  public iterator(
+    _name: string,
+    onBlock: (
+      block: Block,
+      reorg: boolean,
+      callback: (error?: Error | null) => void
+    ) => void,
+    callback: Callback
+  ): void {
+    let blockNumber = 0;
 
-    const iterate = (err?: Error | undefined | null) => {
-      if (err !== null || err !== undefined) {
-        cb(err);
+    const iterate = (error?: Error | null) => {
+      if (error !== null && error !== undefined) {
+        callback(error);
         return;
       }
 
-      if (n >= this._blocks.length) {
-        cb(null);
+      if (blockNumber >= this._blocks.length) {
+        callback(null);
         return;
       }
 
-      onBlock(this._blocks[n], false, (onBlockErr?: Error | null) => {
-        n += 1;
-        iterate(onBlockErr);
-      });
+      onBlock(
+        this._blocks[blockNumber],
+        false,
+        (onBlockError?: Error | null) => {
+          blockNumber += 1;
+          iterate(onBlockError);
+        }
+      );
     };
 
     iterate(null);
   }
 
-  public getDetails(_: string, cb: any): void {
-    cb(null);
+  public getDetails(_name: string, callback: Callback): void {
+    callback(null);
   }
 
   public deleteAllFollowingBlocks(block: Block): void {
-    const blockNumber = bufferToInt(block.header.number);
+    const blockNumber = blockNumberToIndex(block.header.number);
     const actualBlock = this._blocks[blockNumber];
 
-    if (actualBlock === undefined || !block.hash().equals(actualBlock.hash())) {
-      // tslint:disable-next-line only-buidler-error
+    if (
+      actualBlock === undefined ||
+      !bytesEqual(block.hash(), actualBlock.hash())
+    ) {
+      // tslint:disable-next-line only-hardhat-error
       throw new Error("Invalid block");
     }
 
-    for (let i = blockNumber + 1; i < this._blocks.length; i++) {
-      const blockToDelete = this._blocks[i];
-      this._blockNumberByHash.delete(bufferToHex(blockToDelete.hash()));
-    }
-
-    this._blocks.splice(blockNumber + 1);
+    this._deleteFrom(blockNumber + 1);
   }
+
+  private _deleteFrom(blockNumber: number): void {
+    for (let index = blockNumber; index < this._blocks.length; index++) {
+      this._blockNumberByHash.delete(blockHashKey(this._blocks[index].hash()));
+    }
+    this._blocks.splice(blockNumber);
+  }
+}
+
+function blockNumberToIndex(blockNumber: bigint): number {
+  const index = Number(blockNumber);
+  if (!Number.isSafeInteger(index) || index < 0) {
+    // tslint:disable-next-line only-hardhat-error
+    throw new Error(`Invalid block number ${blockNumber.toString()}`);
+  }
+  return index;
+}
+
+function blockHashKey(hash: Uint8Array): string {
+  return Buffer.from(hash).toString("hex").toLowerCase();
+}
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
 }

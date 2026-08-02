@@ -1,14 +1,14 @@
 {
   "transactions": [
     {
-      "file": "l.sol",
+      "file": "l.hyp",
       "contract": "L"
     },
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "libraries": {
-        "l.sol": {
+        "l.hyp": {
           "L": 0
         }
       }
@@ -22,7 +22,7 @@
           "type": "CALLSTACK_ENTRY",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "test",
             "line": 8
           }
@@ -32,7 +32,7 @@
           "message": "check",
           "sourceReference": {
             "contract": "L",
-            "file": "l.sol",
+            "file": "l.hyp",
             "function": "check",
             "line": 6
           }

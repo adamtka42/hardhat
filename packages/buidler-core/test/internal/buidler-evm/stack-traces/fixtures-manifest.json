@@ -1,0 +1,1471 @@
+{
+  "baseline": {
+    "repository": "Hardhat/Buidler",
+    "ref": "main (v1.3.3 migration baseline)",
+    "fixtureRoot": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/",
+    "total": 142,
+    "categoryCounts": {
+      "call-message": 65,
+      "console-logs": 26,
+      "create-message": 50,
+      "special-cases": 1
+    }
+  },
+  "classifications": [
+    "qrl-applicable",
+    "qrl-specific-replacement",
+    "replaced-with-reference",
+    "eth-only"
+  ],
+  "fixtures": [
+    {
+      "id": "call-message/external-calls/forward-contract-failure-multiple-times",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/forward-contract-failure-multiple-times/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/forward-contract-failure-multiple-times"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/forward-contract-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/forward-contract-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/forward-contract-failure"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/ignored-library-call-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/ignored-library-call-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "UNRECOGNIZED_CONTRACT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/ignored-library-call-reverts"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/incorrect-returndata-size",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/incorrect-returndata-size/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["RETURNDATA_SIZE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/incorrect-returndata-size"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/library-call-missing-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/library-call-missing-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [
+        "CALLSTACK_ENTRY",
+        "UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR"
+      ],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/library-call-missing-function"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/library-call-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/library-call-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/library-call-reverts"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/library-call-with-internal-calls-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/library-call-with-internal-calls-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/library-call-with-internal-calls-reverts"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/non-contract-account-called",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/non-contract-account-called/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["NONCONTRACT_ACCOUNT_CALLED_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/non-contract-account-called"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/not-forward-contract-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/not-forward-contract-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/not-forward-contract-failure"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/proxy",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/proxy/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/proxy"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/send-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/send-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/send-fails"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/send-without-funds",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/send-without-funds/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/send-without-funds"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/transfer-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/transfer-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/transfer-fails"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/transfer-without-funds",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/transfer-without-funds/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALL_FAILED_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/transfer-without-funds"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/unrecognized-contracts/recognized-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/unrecognized-contracts/recognized-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [
+        "CALLSTACK_ENTRY",
+        "UNRECOGNIZED_CONTRACT_CALLSTACK_ENTRY",
+        "REVERT_ERROR"
+      ],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/unrecognized-contracts/recognized-failure"
+      ]
+    },
+    {
+      "id": "call-message/external-calls/unrecognized-contracts/unrecognized-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/external-calls/unrecognized-contracts/unrecognized-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "UNRECOGNIZED_CONTRACT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/external-calls/unrecognized-contracts/unrecognized-failure"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/inherited-fallback",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/inherited-fallback/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/inherited-fallback"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/inherited-function-with-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/inherited-function-with-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/inherited-function-with-modifier"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/inherited-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/inherited-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/inherited-modifier"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/inherited-nonpayable-fallback",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/inherited-nonpayable-fallback/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FALLBACK_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/inherited-nonpayable-fallback"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/inherited-nonpayable-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/inherited-nonpayable-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/inherited-nonpayable-function"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/super-call-skiping-parent",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/super-call-skiping-parent/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/super-call-skiping-parent"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/super-call-with-modifier-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/super-call-with-modifier-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/super-call-with-modifier-failure"
+      ]
+    },
+    {
+      "id": "call-message/inheritance/super-call",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/inheritance/super-call/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/inheritance/super-call"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-from-modifier-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-from-modifier-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-from-modifier-fails"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-to-function-with-failing-modifier-after",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-to-function-with-failing-modifier-after/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-to-function-with-failing-modifier-after"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-to-function-with-failing-modifier-before",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-to-function-with-failing-modifier-before/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-to-function-with-failing-modifier-before"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-to-function-with-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-to-function-with-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-to-function-with-modifier"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-to-internal-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-to-internal-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-to-internal-function"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-to-private-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-to-private-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-to-private-function"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/call-to-public-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/call-to-public-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/call-to-public-function"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/modifier-fails-after-call",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/modifier-fails-after-call/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/modifier-fails-after-call"
+      ]
+    },
+    {
+      "id": "call-message/internal-calls/recursive-call",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/internal-calls/recursive-call/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/internal-calls/recursive-call"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/address-payable-as-argument",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/address-payable-as-argument/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/address-payable-as-argument"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/assert",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/assert/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/assert"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/contract-as-argument",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/contract-as-argument/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/contract-as-argument"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/direct-library-call-existing-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/direct-library-call-existing-function/test.json",
+      "classification": "eth-only",
+      "reason": "Current Hyperion library runtime has no Ethereum/Solidity-style direct-call guard and permits direct library calls, so this failure class has no QRL execution equivalent.",
+      "expectedTypes": ["DIRECT_LIBRARY_CALL_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/solidityTracer.ts :: current Hyperion direct-library behavior is not misclassified"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/direct-library-call-internal-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/direct-library-call-internal-function/test.json",
+      "classification": "eth-only",
+      "reason": "Current Hyperion library runtime has no Ethereum/Solidity-style direct-call guard and permits direct library calls, so this failure class has no QRL execution equivalent.",
+      "expectedTypes": ["DIRECT_LIBRARY_CALL_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/solidityTracer.ts :: current Hyperion direct-library behavior is not misclassified"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/direct-library-call-non-existing-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/direct-library-call-non-existing-function/test.json",
+      "classification": "eth-only",
+      "reason": "Current Hyperion library runtime has no Ethereum/Solidity-style direct-call guard and permits direct library calls, so this failure class has no QRL execution equivalent.",
+      "expectedTypes": ["DIRECT_LIBRARY_CALL_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/solidityTracer.ts :: current Hyperion direct-library behavior is not misclassified"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/division-by-zero",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/division-by-zero/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/division-by-zero"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/enum-as-argument",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/enum-as-argument/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/enum-as-argument"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/fail-after-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/fail-after-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/fail-after-modifier"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/fallback-non-payable-with-selector",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/fallback-non-payable-with-selector/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FALLBACK_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/fallback-non-payable-with-selector"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/fallback-non-payable-without-selector",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/fallback-non-payable-without-selector/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FALLBACK_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/fallback-non-payable-without-selector"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/function-non-payable",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/function-non-payable/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/function-non-payable"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/funds-to-public-array-access",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/funds-to-public-array-access/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/funds-to-public-array-access"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/funds-to-public-mapping-access",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/funds-to-public-mapping-access/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/funds-to-public-mapping-access"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/funds-to-public-multiple-mapping-access",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/funds-to-public-multiple-mapping-access/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/funds-to-public-multiple-mapping-access"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/invalid-internal-array-access",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/invalid-internal-array-access/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/invalid-internal-array-access"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/invalid-public-array-access",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/invalid-public-array-access/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/invalid-public-array-access"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/modifier-fails-after",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/modifier-fails-after/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/modifier-fails-after"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/modifier-fails-before",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/modifier-fails-before/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/modifier-fails-before"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/modifier-multiple-underscores",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/modifier-multiple-underscores/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/modifier-multiple-underscores"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/multiple-modifiers",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/multiple-modifiers/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/multiple-modifiers"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/no-fallback-nor-selector",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/no-fallback-nor-selector/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/no-fallback-nor-selector"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/public-array-access-with-invalid-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/public-array-access-with-invalid-args/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/public-array-access-with-invalid-args"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/public-mapping-access-with-invalid-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/public-mapping-access-with-invalid-args/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/public-mapping-access-with-invalid-args"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/public-multiple-mapping-access-with-invalid-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/public-multiple-mapping-access-with-invalid-args/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/public-multiple-mapping-access-with-invalid-args"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/require-with-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/require-with-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/require-with-message"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/require-without-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/require-without-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/require-without-message"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/revert-in-assembly",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/revert-in-assembly/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/revert-in-assembly"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/revert-with-message-after-send-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/revert-with-message-after-send-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/revert-with-message-after-send-fails"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/revert-with-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/revert-with-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/revert-with-message"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/revert-without-message-in-fallback",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/revert-without-message-in-fallback/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/revert-without-message-in-fallback"
+      ]
+    },
+    {
+      "id": "call-message/no-calls/revert-without-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/call-message/no-calls/revert-without-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: call-message/no-calls/revert-without-message"
+      ]
+    },
+    {
+      "id": "console-logs/address/address",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/address/address/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/address/bool",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/address/bool/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/address/string",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/address/string/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/address/uint",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/address/uint/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/bool/address",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/bool/address/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/bool/bool",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/bool/bool/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/bool/string",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/bool/string/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/bool/uint",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/bool/uint/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/contract-creation/not-reverting",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/contract-creation/not-reverting/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/contract-creation/not-reverting"
+      ]
+    },
+    {
+      "id": "console-logs/contract-creation/reverting",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/contract-creation/reverting/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/contract-creation/reverting"
+      ]
+    },
+    {
+      "id": "console-logs/error/assert",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/error/assert/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/error/assert"
+      ]
+    },
+    {
+      "id": "console-logs/error/revert",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/error/revert/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/error/revert"
+      ]
+    },
+    {
+      "id": "console-logs/multiple-messages/multiple-creates",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/multiple-messages/multiple-creates/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/multiple-messages/multiple-creates"
+      ]
+    },
+    {
+      "id": "console-logs/multiple-messages/not-reverting",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/multiple-messages/not-reverting/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/multiple-messages/not-reverting"
+      ]
+    },
+    {
+      "id": "console-logs/multiple-messages/reverting",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/multiple-messages/reverting/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Console output interacting with creation or failure remains behaviorally relevant on QRL.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: console-logs/multiple-messages/reverting"
+      ]
+    },
+    {
+      "id": "console-logs/single-log/bytes10-bytes21",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/single-log/bytes10-bytes21/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/single-log/bytes22-bytes32",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/single-log/bytes22-bytes32/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/single-log/uint-bytes9",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/single-log/uint-bytes9/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/string/address",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/string/address/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/string/bool",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/string/bool/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/string/string",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/string/string/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/string/uint",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/string/uint/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/uint/address",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/uint/address/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/uint/bool",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/uint/bool/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/uint/string",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/uint/string/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "console-logs/uint/uint",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/console-logs/uint/uint/test.json",
+      "classification": "replaced-with-reference",
+      "reason": "The ETH address/signature fixture is replaced by generated 64-byte QRL console signatures and codec tests.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/consoleLogger.ts :: generated signature and decoding matrix",
+        "hardhat-contracts-tests/test/console-log-test.js :: full console API surface"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/forward-contract-failure-multiple-times",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/forward-contract-failure-multiple-times/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/forward-contract-failure-multiple-times"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/forward-contract-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/forward-contract-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/forward-contract-failure"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/ignored-library-call-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/ignored-library-call-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "UNRECOGNIZED_CONTRACT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/ignored-library-call-reverts"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/incorrect-returndata-size",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/incorrect-returndata-size/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["RETURNDATA_SIZE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/incorrect-returndata-size"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/library-call-missing-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/library-call-missing-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [
+        "CALLSTACK_ENTRY",
+        "UNRECOGNIZED_FUNCTION_WITHOUT_FALLBACK_ERROR"
+      ],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/library-call-missing-function"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/library-call-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/library-call-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/library-call-reverts"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/library-call-with-internal-calls-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/library-call-with-internal-calls-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/library-call-with-internal-calls-reverts"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/non-contract-account-called",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/non-contract-account-called/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["NONCONTRACT_ACCOUNT_CALLED_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/non-contract-account-called"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/not-forward-contract-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/not-forward-contract-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/not-forward-contract-failure"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/send-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/send-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/send-fails"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/send-without-funds",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/send-without-funds/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": [],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/send-without-funds"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/transfer-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/transfer-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/transfer-fails"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/transfer-without-funds",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/transfer-without-funds/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALL_FAILED_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/transfer-without-funds"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/unrecognized-deployments/unrecognized-contract-calls-recognized-one-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/unrecognized-deployments/unrecognized-contract-calls-recognized-one-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["UNRECOGNIZED_CREATE_CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/unrecognized-deployments/unrecognized-contract-calls-recognized-one-failure"
+      ]
+    },
+    {
+      "id": "create-message/external-calls/unrecognized-deployments/unrecognized-contract-creates-recognized-one-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/external-calls/unrecognized-deployments/unrecognized-contract-creates-recognized-one-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["UNRECOGNIZED_CREATE_CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/external-calls/unrecognized-deployments/unrecognized-contract-creates-recognized-one-failure"
+      ]
+    },
+    {
+      "id": "create-message/inheritance/multiple-constructor-one-fails-in-call",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/inheritance/multiple-constructor-one-fails-in-call/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/inheritance/multiple-constructor-one-fails-in-call"
+      ]
+    },
+    {
+      "id": "create-message/inheritance/multiple-constructor-one-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/inheritance/multiple-constructor-one-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/inheritance/multiple-constructor-one-fails"
+      ]
+    },
+    {
+      "id": "create-message/inheritance/only-inherited-constructor-reverts",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/inheritance/only-inherited-constructor-reverts/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/inheritance/only-inherited-constructor-reverts"
+      ]
+    },
+    {
+      "id": "create-message/inheritance/only-inherited-constructor-with-failing-call-from-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/inheritance/only-inherited-constructor-with-failing-call-from-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/inheritance/only-inherited-constructor-with-failing-call-from-modifier"
+      ]
+    },
+    {
+      "id": "create-message/inheritance/only-inherited-constructor-with-failing-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/inheritance/only-inherited-constructor-with-failing-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/inheritance/only-inherited-constructor-with-failing-modifier"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/call-from-modifier-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/call-from-modifier-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/call-from-modifier-fails"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/call-to-function-with-failing-modifier-after",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/call-to-function-with-failing-modifier-after/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/call-to-function-with-failing-modifier-after"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/call-to-function-with-failing-modifier-before",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/call-to-function-with-failing-modifier-before/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/call-to-function-with-failing-modifier-before"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/call-to-internal-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/call-to-internal-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/call-to-internal-function"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/call-to-private-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/call-to-private-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/call-to-private-function"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/call-to-public-function",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/call-to-public-function/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/call-to-public-function"
+      ]
+    },
+    {
+      "id": "create-message/internal-calls/modifier-fails-after-call",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/internal-calls/modifier-fails-after-call/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/internal-calls/modifier-fails-after-call"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/assert",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/assert/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/assert"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/division-by-zero",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/division-by-zero/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/division-by-zero"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/fail-after-modifier",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/fail-after-modifier/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/fail-after-modifier"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/invalid-array-access",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/invalid-array-access/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/invalid-array-access"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/modifier-fails-after",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/modifier-fails-after/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/modifier-fails-after"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/modifier-fails-before",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/modifier-fails-before/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/modifier-fails-before"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/modifier-multiple-underscores",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/modifier-multiple-underscores/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/modifier-multiple-underscores"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/multiple-modifiers",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/multiple-modifiers/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["CALLSTACK_ENTRY", "REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/multiple-modifiers"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/require-with-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/require-with-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/require-with-message"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/require-without-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/require-without-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/require-without-message"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/revert-in-assembly",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/revert-in-assembly/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/revert-in-assembly"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/revert-with-message-after-send-fails",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/revert-with-message-after-send-fails/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/revert-with-message-after-send-fails"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/revert-with-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/revert-with-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/revert-with-message"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/revert-without-message",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/revert-without-message/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/revert-without-message"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/send-value-to-nonpayable-with-wrong-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/send-value-to-nonpayable-with-wrong-args/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/send-value-to-nonpayable-with-wrong-args"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/send-value-to-nonpayable",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/send-value-to-nonpayable/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["FUNCTION_NOT_PAYABLE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/send-value-to-nonpayable"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/solc-after-0.5.9/nonpayable-with-wrong-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/solc-after-0.5.9/nonpayable-with-wrong-args/test.json",
+      "classification": "qrl-specific-replacement",
+      "reason": "The solc version boundary is ETH-specific; current Hyperion behavior is asserted directly for the same constructor argument/value combination.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/solc-after-0.5.9/nonpayable-with-wrong-args"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/solc-after-0.5.9/payable-with-wrong-args-and-value",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/solc-after-0.5.9/payable-with-wrong-args-and-value/test.json",
+      "classification": "qrl-specific-replacement",
+      "reason": "The solc version boundary is ETH-specific; current Hyperion behavior is asserted directly for the same constructor argument/value combination.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/solc-after-0.5.9/payable-with-wrong-args-and-value"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/solc-after-0.5.9/payable-with-wrong-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/solc-after-0.5.9/payable-with-wrong-args/test.json",
+      "classification": "qrl-specific-replacement",
+      "reason": "The solc version boundary is ETH-specific; current Hyperion behavior is asserted directly for the same constructor argument/value combination.",
+      "expectedTypes": ["INVALID_PARAMS_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/solc-after-0.5.9/payable-with-wrong-args"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/solc-before-0.5.9/nonpayable-with-wrong-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/solc-before-0.5.9/nonpayable-with-wrong-args/test.json",
+      "classification": "qrl-specific-replacement",
+      "reason": "The solc version boundary is ETH-specific; current Hyperion behavior is asserted directly for the same constructor argument/value combination.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/solc-before-0.5.9/nonpayable-with-wrong-args"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/solc-before-0.5.9/payable-with-wrong-args-and-value",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/solc-before-0.5.9/payable-with-wrong-args-and-value/test.json",
+      "classification": "qrl-specific-replacement",
+      "reason": "The solc version boundary is ETH-specific; current Hyperion behavior is asserted directly for the same constructor argument/value combination.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/solc-before-0.5.9/payable-with-wrong-args-and-value"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/solc-before-0.5.9/payable-with-wrong-args",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/solc-before-0.5.9/payable-with-wrong-args/test.json",
+      "classification": "qrl-specific-replacement",
+      "reason": "The solc version boundary is ETH-specific; current Hyperion behavior is asserted directly for the same constructor argument/value combination.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/solc-before-0.5.9/payable-with-wrong-args"
+      ]
+    },
+    {
+      "id": "create-message/no-calls/unrecognized-failure",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/create-message/no-calls/unrecognized-failure/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["UNRECOGNIZED_CREATE_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: create-message/no-calls/unrecognized-failure"
+      ]
+    },
+    {
+      "id": "special-cases/different-contracts-same-deployment-bytecode",
+      "baselinePath": "packages/buidler-core/test/internal/buidler-evm/stack-traces/test-files/special-cases/different-contracts-same-deployment-bytecode/test.json",
+      "classification": "qrl-applicable",
+      "reason": "Hyperion and the QRL VM expose an equivalent execution behavior.",
+      "expectedTypes": ["REVERT_ERROR"],
+      "coverage": [
+        "test/internal/buidler-evm/stack-traces/execution.ts :: special-cases/different-contracts-same-deployment-bytecode"
+      ]
+    }
+  ]
+}

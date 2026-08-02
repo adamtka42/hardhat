@@ -2,18 +2,18 @@ import debug from "debug";
 import http, { Server } from "http";
 import { Server as WSServer } from "ws";
 
-import { EthereumProvider } from "../../../types";
+import { IQrlProvider } from "../../../types";
 import { HttpProvider } from "../../core/providers/http";
 
 import JsonRpcHandler from "./handler";
 
-const log = debug("buidler:core:buidler-evm:jsonrpc");
+const log = debug("buidler:core:qrl:jsonrpc");
 
 export interface JsonRpcServerConfig {
   hostname: string;
   port: number;
 
-  provider: EthereumProvider;
+  provider: IQrlProvider;
 }
 
 export class JsonRpcServer {
@@ -35,18 +35,41 @@ export class JsonRpcServer {
     this._wsServer.on("connection", handler.handleWs);
   }
 
-  public getProvider = (name = "json-rpc"): EthereumProvider => {
-    const { address, port } = this._httpServer.address();
+  public getProvider = (name = "json-rpc"): IQrlProvider => {
+    const { address, port } = this._httpServer.address() as {
+      address: string;
+      port: number;
+    };
 
-    return new HttpProvider(`http://${address}:${port}/`, name);
+    return new HttpProvider(`http://${formatHost(address)}:${port}/`, name);
   };
 
   public listen = (): Promise<{ address: string; port: number }> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       log(`Starting JSON-RPC server on port ${this._config.port}`);
+      // Bind failures (e.g. EADDRINUSE) are emitted as server errors and
+      // must reject instead of leaving the promise pending forever. The
+      // shared WebSocket server RE-EMITS them, so it needs a handler too —
+      // otherwise Node crashes with an unhandled 'error' event.
+      this._httpServer.once("error", reject);
+      this._wsServer.once("error", reject);
       this._httpServer.listen(this._config.port, this._config.hostname, () => {
-        // We get the address and port directly from the server in order to handle random port allocation with `0`.
-        resolve(this._httpServer.address());
+        this._httpServer.removeListener("error", reject);
+        this._wsServer.removeListener("error", reject);
+        // Post-startup errors must never crash the node process.
+        this._httpServer.on("error", (error) =>
+          log(`http server error: ${error.message}`)
+        );
+        this._wsServer.on("error", (error) =>
+          log(`ws server error: ${error.message}`)
+        );
+        // The actual address and port come from the server itself to
+        // support random port allocation with port `0`.
+        const { address, port } = this._httpServer.address() as {
+          address: string;
+          port: number;
+        };
+        resolve({ address: formatHost(address), port });
       });
     });
   };
@@ -75,7 +98,7 @@ export class JsonRpcServer {
           }
 
           log("JSON-RPC server closed");
-          resolve();
+          resolve(undefined);
         });
       }),
       new Promise((resolve, reject) => {
@@ -88,9 +111,14 @@ export class JsonRpcServer {
           }
 
           log("Websocket server closed");
-          resolve();
+          resolve(undefined);
         });
       }),
     ]);
   };
+}
+
+/** Brackets IPv6 addresses so they are valid inside URLs. */
+export function formatHost(address: string): string {
+  return address.includes(":") ? `[${address}]` : address;
 }

@@ -1,114 +1,78 @@
-import { Instruction, JumpType, SourceFile, SourceLocation } from "./model";
-import { getOpcodeLength, getPushLength, isJump, isPush } from "./opcodes";
+/**
+ * Decoder for the compiler's instruction source maps (the solc-inherited
+ * `s:l:f:j` format) and the pc → instruction-index mapping.
+ */
 
-export interface SourceMapLocation {
+export interface QrlSourceLocation {
   offset: number;
   length: number;
-  file: number;
+  sourceIndex: number;
+  jumpType: string;
 }
 
-export interface SourceMap {
-  location: SourceMapLocation;
-  jumpType: JumpType;
-}
+/**
+ * Decodes a source map string into one location per instruction. Entries are
+ * `;`-separated; empty fields inherit the previous entry's value.
+ */
+export function decodeQrlSourceMap(sourceMap: string): QrlSourceLocation[] {
+  const locations: QrlSourceLocation[] = [];
+  let offset = 0;
+  let length = 0;
+  let sourceIndex = -1;
+  let jumpType = "-";
 
-function jumpLetterToJumpType(letter: string): JumpType {
-  if (letter === "i") {
-    return JumpType.INTO_FUNCTION;
+  for (const entry of sourceMap.split(";")) {
+    const fields = entry.split(":");
+    if (fields[0] !== undefined && fields[0] !== "") {
+      offset = parseInt(fields[0], 10);
+    }
+    if (fields[1] !== undefined && fields[1] !== "") {
+      length = parseInt(fields[1], 10);
+    }
+    if (fields[2] !== undefined && fields[2] !== "") {
+      sourceIndex = parseInt(fields[2], 10);
+    }
+    if (fields[3] !== undefined && fields[3] !== "") {
+      jumpType = fields[3];
+    }
+    locations.push({ offset, length, sourceIndex, jumpType });
   }
 
-  if (letter === "o") {
-    return JumpType.OUTOF_FUNCTION;
-  }
-  return JumpType.NOT_JUMP;
+  return locations;
 }
 
-function uncompressSourcemaps(compressedSourcemap: string): SourceMap[] {
-  const mappings: SourceMap[] = [];
+/**
+ * Maps every byte offset (pc) of the bytecode to its instruction index.
+ *
+ * QRL note: PUSH spans `0x60`-`0x9f` (PUSH1-64 for 512-bit words and 64-byte
+ * addresses) — an Ethereum-style decoder that stops at 0x7f would
+ * desynchronize on every address push.
+ */
+export function buildQrlPcToInstruction(bytecode: Uint8Array): number[] {
+  const map = new Array<number>(bytecode.length).fill(-1);
+  let instruction = 0;
 
-  const compressedMappings = compressedSourcemap.split(";");
-
-  for (let i = 0; i < compressedMappings.length; i++) {
-    const parts = compressedMappings[i].split(":");
-
-    mappings.push({
-      location: {
-        offset:
-          parts[0] !== undefined && parts[0] !== ""
-            ? +parts[0]
-            : mappings[i - 1].location.offset,
-        length:
-          parts[1] !== undefined && parts[1] !== ""
-            ? +parts[1]
-            : mappings[i - 1].location.length,
-        file:
-          parts[2] !== undefined && parts[2] !== ""
-            ? +parts[2]
-            : mappings[i - 1].location.file,
-      },
-      jumpType:
-        parts[3] !== undefined && parts[3] !== ""
-          ? jumpLetterToJumpType(parts[3])
-          : mappings[i - 1].jumpType,
-    });
-  }
-
-  return mappings;
-}
-
-export function decodeInstructions(
-  bytecode: Buffer,
-  compressedSourcemaps: string,
-  fileIdToSourceFile: Map<number, SourceFile>
-): Instruction[] {
-  const sourceMaps = uncompressSourcemaps(compressedSourcemaps);
-
-  const instructions: Instruction[] = [];
-
-  let bytesIndex = 0;
-
-  // Solidity inlines some data after the contract, so we stop decoding
-  // as soon as we have enough instructions as uncompressed mappings. This is
-  // not very documented, but we manually tested that it works.
-  while (instructions.length < sourceMaps.length) {
-    const pc = bytesIndex;
+  for (let pc = 0; pc < bytecode.length; ) {
+    map[pc] = instruction;
     const opcode = bytecode[pc];
-    const sourceMap = sourceMaps[instructions.length];
-    let pushData: Buffer | undefined;
-    let location: SourceLocation | undefined;
-
-    const jumpType =
-      isJump(opcode) && sourceMap.jumpType === JumpType.NOT_JUMP
-        ? JumpType.INTERNAL_JUMP
-        : sourceMap.jumpType;
-
-    if (isPush(opcode)) {
-      const length = getPushLength(opcode);
-      pushData = bytecode.slice(bytesIndex + 1, bytesIndex + 1 + length);
+    pc += 1;
+    if (opcode >= 0x60 && opcode <= 0x9f) {
+      pc += opcode - 0x5f;
     }
-
-    if (sourceMap.location.file !== -1) {
-      const file = fileIdToSourceFile.get(sourceMap.location.file)!;
-
-      location = new SourceLocation(
-        file,
-        sourceMap.location.offset,
-        sourceMap.location.length
-      );
-    }
-
-    const instruction = new Instruction(
-      pc,
-      opcode,
-      jumpType,
-      pushData,
-      location
-    );
-
-    instructions.push(instruction);
-
-    bytesIndex += getOpcodeLength(opcode);
+    instruction += 1;
   }
 
-  return instructions;
+  return map;
+}
+
+/** Converts a character offset in the source text to a 1-based line number. */
+export function offsetToLine(source: string, offset: number): number {
+  let line = 1;
+  const end = Math.min(offset, source.length);
+  for (let index = 0; index < end; index++) {
+    if (source.charCodeAt(index) === 10) {
+      line += 1;
+    }
+  }
+  return line;
 }

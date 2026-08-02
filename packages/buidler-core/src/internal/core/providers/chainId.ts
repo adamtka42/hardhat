@@ -1,12 +1,12 @@
-import { IEthereumProvider } from "../../../types";
-import { BuidlerError } from "../errors";
+import { IQrlProvider } from "../../../types";
+import { HardhatError } from "../errors";
 import { ERRORS } from "../errors-list";
 
 import { createChainIdGetter, rpcQuantityToNumber } from "./provider-utils";
 import { wrapSend } from "./wrapper";
 
 export function createChainIdValidationProvider(
-  provider: IEthereumProvider,
+  provider: IQrlProvider,
   chainId?: number
 ) {
   const getChainId = createChainIdGetter(provider);
@@ -15,7 +15,7 @@ export function createChainIdValidationProvider(
     const realChainId = await getChainId();
 
     if (chainId !== undefined && realChainId !== chainId) {
-      throw new BuidlerError(ERRORS.NETWORK.INVALID_GLOBAL_CHAIN_ID, {
+      throw new HardhatError(ERRORS.NETWORK.INVALID_GLOBAL_CHAIN_ID, {
         configChainId: chainId,
         connectionChainId: realChainId,
       });

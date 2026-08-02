@@ -2,9 +2,9 @@
   "description": "Should output console.log of other contracts if they don't revert",
   "transactions": [
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
-      "imports": ["/../../../../../../../../console.sol"]
+      "imports": ["@theqrl/hardhat/console.hyp"]
     },
     {
       "to": 0,

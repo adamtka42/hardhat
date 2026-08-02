@@ -1,14 +1,14 @@
 {
   "transactions": [
     {
-      "file": "l.sol",
+      "file": "l.hyp",
       "contract": "IgnoredL"
     },
     {
-      "file": "c.sol",
+      "file": "c.hyp",
       "contract": "C",
       "libraries": {
-        "l.sol": {
+        "l.hyp": {
           "IgnoredL": 0
         }
       },
@@ -18,7 +18,7 @@
           "type": "CALLSTACK_ENTRY",
           "sourceReference": {
             "contract": "C",
-            "file": "c.sol",
+            "file": "c.hyp",
             "function": "constructor",
             "line": 8
           }

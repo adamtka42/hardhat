@@ -1,4 +1,4 @@
-import { BuidlerError } from "../core/errors";
+import { HardhatError } from "../core/errors";
 import { ERRORS } from "../core/errors-list";
 
 /**
@@ -21,11 +21,6 @@ import { ERRORS } from "../core/errors-list";
  *
  *    import findUpT from "find-up";
  *    export const findUp = lazyFunction<typeof findUpT>(() => require("find-up"));
- *
- * You can also use it with named exports:
- *
- *    import { EthT } from "web3x/eth";
- *    const Eth = lazyFunction<typeof EthT>(() => require("web3x/eth").Eth);
  */
 
 export function lazyObject<T extends object>(objectCreator: () => T): T {
@@ -34,13 +29,13 @@ export function lazyObject<T extends object>(objectCreator: () => T): T {
     () => ({}),
     (object) => {
       if (object instanceof Function) {
-        throw new BuidlerError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
+        throw new HardhatError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
           operation: "Creating lazy functions or classes with lazyObject",
         });
       }
 
       if (typeof object !== "object" || object === null) {
-        throw new BuidlerError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
+        throw new HardhatError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
           operation: "Using lazyObject with anything other than objects",
         });
       }
@@ -56,7 +51,7 @@ export function lazyFunction<T extends Function>(functionCreator: () => T): T {
     () => function () {},
     (object) => {
       if (!(object instanceof Function)) {
-        throw new BuidlerError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
+        throw new HardhatError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
           operation:
             "Using lazyFunction with anything other than functions or classes",
         });
@@ -93,7 +88,7 @@ function createLazyProxy<ActualT extends GuardT, GuardT extends object>(
       // Using a null prototype seems to tirgger a V8 bug, so we forbid it
       // See: https://github.com/nodejs/node/issues/29730
       if (Object.getPrototypeOf(target) === null) {
-        throw new BuidlerError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
+        throw new HardhatError(ERRORS.GENERAL.UNSUPPORTED_OPERATION, {
           operation:
             "Using lazyFunction or lazyObject to construct objects/functions with prototype null",
         });
@@ -121,18 +116,9 @@ function createLazyProxy<ActualT extends GuardT, GuardT extends object>(
     },
 
     get(target, property, receiver) {
-      // We have this short-circuit logic here to avoid a cyclic require when
-      // loading Web3.js.
-      //
       // If a lazy object is somehow accessed while its real target is being
       // created, it would trigger an endless loop of recreation, which node
       // detects and resolve to an empty object.
-      //
-      // This happens with Web3.js because we a lazyObject that loads it,
-      // and expose it as `global.web3`. This Web3.js file accesses
-      // `global.web3` when it's being loaded, triggering the loop we mentioned
-      // before: https://github.com/ethereum/web3.js/blob/8574bd3bf11a2e9cf4bcf8850cab13e1db56653f/packages/web3-core-requestmanager/src/givenProvider.js#L41
-      //
       // We just return `undefined` in that case, to not enter into the loop.
       const stack = new Error().stack;
       if (

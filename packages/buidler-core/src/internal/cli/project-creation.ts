@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import fsExtra from "fs-extra";
-import os from "os";
 import path from "path";
 
-import { BUIDLER_NAME } from "../constants";
+import { HARDHAT_NAME } from "../constants";
 import { ExecutionMode, getExecutionMode } from "../core/execution-mode";
 import { getRecommendedGitIgnore } from "../core/project-structure";
 import { getPackageJson, getPackageRoot } from "../util/packageInfo";
@@ -11,16 +10,8 @@ import { getPackageJson, getPackageRoot } from "../util/packageInfo";
 import { emoji } from "./emoji";
 
 const CREATE_SAMPLE_PROJECT_ACTION = "Create a sample project";
-const CREATE_EMPTY_BUIDLER_CONFIG_ACTION = "Create an empty buidler.config.js";
+const CREATE_EMPTY_HARDHAT_CONFIG_ACTION = "Create an empty hardhat.config.js";
 const QUIT_ACTION = "Quit";
-
-const SAMPLE_PROJECT_DEPENDENCIES = [
-  "@nomiclabs/buidler-waffle",
-  "ethereum-waffle",
-  "chai",
-  "@nomiclabs/buidler-ethers",
-  "ethers",
-];
 
 async function removeProjectDirIfPresent(projectRoot: string, dirName: string) {
   const dirPath = path.join(projectRoot, dirName);
@@ -53,7 +44,7 @@ async function printWelcomeMessage() {
 
   console.log(
     chalk.cyan(
-      `${emoji("👷 ")}Welcome to ${BUIDLER_NAME} v${packageJson.version}${emoji(
+      `${emoji("👷 ")}Welcome to ${HARDHAT_NAME} v${packageJson.version}${emoji(
         " 👷‍"
       )}‍\n`
     )
@@ -88,7 +79,7 @@ ${content}`;
 
 async function addGitAttributes(projectRoot: string) {
   const gitAttributesPath = path.join(projectRoot, ".gitattributes");
-  let content = "*.sol linguist-language=Solidity";
+  let content = "*.hyp linguist-language=Hyperion";
 
   if (await fsExtra.pathExists(gitAttributesPath)) {
     const existingContent = await fsExtra.readFile(gitAttributesPath, "utf-8");
@@ -111,27 +102,20 @@ function printSuggestedCommands() {
       : "npx ";
 
   console.log(`Try running some of the following tasks:`);
-  console.log(`  ${npx}buidler accounts`);
-  console.log(`  ${npx}buidler compile`);
-  console.log(`  ${npx}buidler test`);
-  console.log(`  ${npx}buidler node`);
-  console.log(`  node scripts/sample-script.js`);
-  console.log(`  ${npx}buidler help`);
+  console.log(`  ${npx}hardhat accounts`);
+  console.log(`  ${npx}hardhat compile`);
+  console.log(`  ${npx}hardhat test`);
+  console.log(`  ${npx}hardhat run scripts/sample-script.js --network qrl`);
+  console.log(`  ${npx}hardhat help`);
 }
 
-async function printTrufflePluginInstallationInstructions() {
-  console.log(
-    `You need to install these dependencies to run the sample project:`
-  );
-
-  const cmd = await getRecommendedDependenciesInstallationCommand();
-
-  console.log(`  ${cmd.join(" ")}`);
+async function printSampleProjectInfo() {
+  console.log(`The sample project uses Hardhat's built-in QRL helpers.`);
 }
 
-async function writeEmptyBuidlerConfig() {
+async function writeEmptyHardhatConfig() {
   return fsExtra.writeFile(
-    "buidler.config.js",
+    "hardhat.config.js",
     "module.exports = {};\n",
     "utf-8"
   );
@@ -153,9 +137,9 @@ async function getAction() {
             value: CREATE_SAMPLE_PROJECT_ACTION,
           },
           {
-            name: CREATE_EMPTY_BUIDLER_CONFIG_ACTION,
-            message: CREATE_EMPTY_BUIDLER_CONFIG_ACTION,
-            value: CREATE_EMPTY_BUIDLER_CONFIG_ACTION,
+            name: CREATE_EMPTY_HARDHAT_CONFIG_ACTION,
+            message: CREATE_EMPTY_HARDHAT_CONFIG_ACTION,
+            value: CREATE_EMPTY_HARDHAT_CONFIG_ACTION,
           },
           { name: QUIT_ACTION, message: QUIT_ACTION, value: QUIT_ACTION },
         ],
@@ -168,7 +152,7 @@ async function getAction() {
       return QUIT_ACTION;
     }
 
-    // tslint:disable-next-line only-buidler-error
+    // tslint:disable-next-line only-hardhat-error
     throw e;
   }
 }
@@ -185,8 +169,8 @@ export async function createProject() {
     return;
   }
 
-  if (action === CREATE_EMPTY_BUIDLER_CONFIG_ACTION) {
-    await writeEmptyBuidlerConfig();
+  if (action === CREATE_EMPTY_HARDHAT_CONFIG_ACTION) {
+    await writeEmptyHardhatConfig();
     console.log(
       `${emoji("✨ ")}${chalk.cyan(`Config file created`)}${emoji(" ✨")}`
     );
@@ -205,7 +189,7 @@ export async function createProject() {
         name: "projectRoot",
         type: "input",
         initial: process.cwd(),
-        message: "Buidler project root:",
+        message: "Hardhat project root:",
       },
       createConfirmationPrompt(
         "shouldAddGitIgnore",
@@ -213,7 +197,7 @@ export async function createProject() {
       ),
       createConfirmationPrompt(
         "shouldAddGitAttributes",
-        "Do you want to add a .gitattributes to enable Soldity highlighting on GitHub?"
+        "Do you want to add a .gitattributes to enable Hyperion highlighting on GitHub?"
       ),
     ]);
   } catch (e) {
@@ -221,7 +205,7 @@ export async function createProject() {
       return;
     }
 
-    // tslint:disable-next-line only-buidler-error
+    // tslint:disable-next-line only-hardhat-error
     throw e;
   }
 
@@ -237,37 +221,8 @@ export async function createProject() {
     await addGitAttributes(projectRoot);
   }
 
-  let shouldShowInstallationInstructions = true;
-
-  if (await canInstallTrufflePlugin()) {
-    const installedRecommendedDeps = SAMPLE_PROJECT_DEPENDENCIES.filter(
-      isInstalled
-    );
-
-    if (
-      installedRecommendedDeps.length === SAMPLE_PROJECT_DEPENDENCIES.length
-    ) {
-      shouldShowInstallationInstructions = false;
-    } else if (installedRecommendedDeps.length === 0) {
-      const shouldInstall = await confirmTrufflePluginInstallation();
-      if (shouldInstall) {
-        const installed = await installRecommendedDependencies();
-
-        if (!installed) {
-          console.warn(
-            chalk.red("Failed to install the sample project's dependencies")
-          );
-        }
-
-        shouldShowInstallationInstructions = !installed;
-      }
-    }
-  }
-
-  if (shouldShowInstallationInstructions) {
-    console.log(``);
-    await printTrufflePluginInstallationInstructions();
-  }
+  console.log(``);
+  await printSampleProjectInfo();
 
   console.log(
     `\n${emoji("✨ ")}${chalk.cyan("Project created")}${emoji(" ✨")}`
@@ -310,116 +265,4 @@ function createConfirmationPrompt(name: string, message: string) {
       return value;
     },
   };
-}
-
-async function canInstallTrufflePlugin() {
-  return (
-    (await fsExtra.pathExists("package.json")) &&
-    (getExecutionMode() === ExecutionMode.EXECUTION_MODE_LOCAL_INSTALLATION ||
-      getExecutionMode() === ExecutionMode.EXECUTION_MODE_LINKED) &&
-    // TODO: Figure out why this doesn't work on Win
-    os.type() !== "Windows_NT"
-  );
-}
-
-function isInstalled(dep: string) {
-  const packageJson = fsExtra.readJSONSync("package.json");
-
-  const allDependencies = {
-    ...packageJson.dependencies,
-    ...packageJson.devDependencies,
-    ...packageJson.optionalDependencies,
-  };
-
-  return dep in allDependencies;
-}
-
-async function isYarnProject() {
-  return fsExtra.pathExists("yarn.lock");
-}
-
-async function installRecommendedDependencies() {
-  console.log("");
-  const installCmd = await getRecommendedDependenciesInstallationCommand();
-  return installDependencies(installCmd[0], installCmd.slice(1));
-}
-
-async function confirmTrufflePluginInstallation(): Promise<boolean> {
-  const { default: enquirer } = await import("enquirer");
-
-  let responses: {
-    shouldInstallPlugin: boolean;
-  };
-
-  const packageManager = (await isYarnProject()) ? "yarn" : "npm";
-
-  try {
-    responses = await enquirer.prompt<typeof responses>([
-      createConfirmationPrompt(
-        "shouldInstallPlugin",
-        `Do you want to install the sample project's dependencies with ${packageManager} (${SAMPLE_PROJECT_DEPENDENCIES.join(
-          " "
-        )})?`
-      ),
-    ]);
-  } catch (e) {
-    if (e === "") {
-      return false;
-    }
-
-    // tslint:disable-next-line only-buidler-error
-    throw e;
-  }
-
-  return responses.shouldInstallPlugin === true;
-}
-
-async function installDependencies(
-  packageManager: string,
-  args: string[]
-): Promise<boolean> {
-  const { spawn } = await import("child_process");
-
-  console.log(`${packageManager} ${args.join(" ")}`);
-
-  const childProcess = spawn(packageManager, args, {
-    stdio: "inherit" as any, // There's an error in the TS definition of ForkOptions
-  });
-
-  return new Promise((resolve, reject) => {
-    childProcess.once("close", (status) => {
-      childProcess.removeAllListeners("error");
-
-      if (status === 0) {
-        resolve(true);
-        return;
-      }
-
-      reject(false);
-    });
-
-    childProcess.once("error", (status) => {
-      childProcess.removeAllListeners("close");
-      reject(false);
-    });
-  });
-}
-
-async function getRecommendedDependenciesInstallationCommand(): Promise<
-  string[]
-> {
-  const isGlobal =
-    getExecutionMode() === ExecutionMode.EXECUTION_MODE_GLOBAL_INSTALLATION;
-
-  if (!isGlobal && (await isYarnProject())) {
-    return ["yarn", "add", "--dev", ...SAMPLE_PROJECT_DEPENDENCIES];
-  }
-
-  const npmInstall = ["npm", "install"];
-
-  if (isGlobal) {
-    npmInstall.push("--global");
-  }
-
-  return [...npmInstall, "--save-dev", ...SAMPLE_PROJECT_DEPENDENCIES];
 }

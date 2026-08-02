@@ -1,0 +1,15 @@
+pragma hyperion >=0.0;
+
+contract C {
+
+  constructor() public {
+
+
+
+
+
+
+    require(false, "req");
+  }
+
+}
